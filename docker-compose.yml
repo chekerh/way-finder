@@ -1,0 +1,29 @@
+version: '3.9'
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_DATABASE: wayfindr
+    volumes:
+      - mongo_data:/data/db
+
+  api:
+    build: .
+    depends_on:
+      - mongo
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://mongo:27017/wayfindr
+      JWT_SECRET: change_me
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+    driver: local
+
