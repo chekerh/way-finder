@@ -19,14 +19,13 @@ export class BookingController {
 
   @UseGuards(JwtAuthGuard)
   @Post('confirm')
-  async confirm(@Body() dto: ConfirmBookingDto) {
-    return this.bookingService.confirm(dto);
+  async confirm(@Req() req: any, @Body() dto: ConfirmBookingDto) {
+    return this.bookingService.confirm(req.user.sub, dto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('history')
   async history(@Req() req: any) {
     return this.bookingService.history(req.user.sub);
-    }
+  }
 }
-

@@ -14,9 +14,16 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const existing = await this.userService.findByUsername(dto.username);
     if (existing) throw new ConflictException('Username already exists');
+    
+    // Check if email already exists
+    const existingEmail = await this.userService.findByEmail(dto.email);
+    if (existingEmail) throw new ConflictException('Email already exists');
+    
     const hash = await bcrypt.hash(dto.password, 10);
     const user = await this.userService.create({ ...dto, password: hash });
-    return { id: (user as any)._id, username: user.username, email: user.email };
+    const userObj = (user as any).toObject ? (user as any).toObject() : user;
+    const { password, ...result } = userObj;
+    return { message: 'User registered successfully', user: result };
   }
 
   async login(dto: LoginDto) {
@@ -29,4 +36,3 @@ export class AuthService {
     return { access_token: token };
   }
 }
-

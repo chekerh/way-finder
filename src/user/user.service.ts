@@ -19,6 +19,10 @@ export class UserService {
     return this.userModel.findOne({ username }).exec();
   }
 
+  async findByEmail(email: string): Promise<User | null> {
+    return this.userModel.findOne({ email }).exec();
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.userModel.findById(id).exec();
   }
@@ -31,4 +35,3 @@ export class UserService {
     return updated;
   }
 }
-

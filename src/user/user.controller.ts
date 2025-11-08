@@ -10,13 +10,19 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@Req() req: any) {
-    return await this.userService.findById(req.user.sub);
+    const user = await this.userService.findById(req.user.sub);
+    if (!user) return null;
+    const userObj = (user as any).toObject ? (user as any).toObject() : user;
+    const { password, ...result } = userObj;
+    return result;
   }
 
   @UseGuards(JwtAuthGuard)
   @Put('profile')
   async updateProfile(@Req() req: any, @Body() dto: UpdateUserDto) {
-    return await this.userService.updateProfile(req.user.sub, dto);
+    const user = await this.userService.updateProfile(req.user.sub, dto);
+    const userObj = (user as any).toObject ? (user as any).toObject() : user;
+    const { password, ...result } = userObj;
+    return result;
   }
 }
-

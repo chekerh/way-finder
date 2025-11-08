@@ -31,11 +31,11 @@ export class BookingService {
     };
   }
 
-  async confirm(dto: ConfirmBookingDto) {
+  async confirm(userId: string, dto: ConfirmBookingDto) {
     const confirmation_number = `CONF-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
     const total_price = 200; // would be computed from compare
     const booking = new this.bookingModel({
-      user_id: new Types.ObjectId(dto.user_id),
+      user_id: new Types.ObjectId(userId),
       offer_id: dto.offer_id,
       status: BookingStatus.CONFIRMED,
       payment_details: dto.payment_details,
@@ -50,4 +50,3 @@ export class BookingService {
     return this.bookingModel.find({ user_id: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).exec();
   }
 }
-
