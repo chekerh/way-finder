@@ -71,3 +71,7 @@ docker_data/
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+#two files that dont have to be in gihub
+CURSOR_BACKEND_MASTER_PROMPT.md
+ANDROID_MASTER_PROMPT.md
