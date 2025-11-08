@@ -24,6 +24,25 @@ export class User {
 
   @Prop({ type: String, enum: UserStatus, default: UserStatus.ACTIVE })
   status: UserStatus;
+
+  @Prop({ type: Boolean, default: false })
+  onboarding_completed: boolean;
+
+  @Prop({ type: Date, default: null })
+  onboarding_completed_at: Date;
+
+  @Prop({ type: Object, default: {} })
+  onboarding_preferences: {
+    travel_type?: string;
+    budget?: string;
+    interests?: string[];
+    accommodation_preference?: string;
+    destination_preferences?: string[];
+    group_size?: string;
+    travel_frequency?: string;
+    climate_preference?: string;
+    duration_preference?: string;
+  };
 }
 
 export type UserDocument = HydratedDocument<User>;

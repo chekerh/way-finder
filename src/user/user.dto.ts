@@ -36,6 +36,15 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(UserStatus)
   status?: UserStatus;
+
+  @IsOptional()
+  onboarding_completed?: boolean;
+
+  @IsOptional()
+  onboarding_completed_at?: Date;
+
+  @IsOptional()
+  onboarding_preferences?: any;
 }
 
 export class UserDto {
@@ -46,4 +55,3 @@ export class UserDto {
   preferences: string[];
   status: UserStatus;
 }
-
