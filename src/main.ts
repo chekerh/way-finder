@@ -7,16 +7,16 @@ import helmet from 'helmet';
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    
+
     // Enable CORS
     app.enableCors({
       origin: process.env.FRONTEND_ORIGIN || '*',
       credentials: true,
     });
-    
+
     // Security headers
     app.use(helmet());
-    
+
     // Global validation pipe
     app.useGlobalPipes(
       new ValidationPipe({
@@ -25,10 +25,10 @@ async function bootstrap() {
         transform: true,
       }),
     );
-    
+
     // Global API prefix
     app.setGlobalPrefix('api');
-    
+
     // Swagger documentation
     const config = new DocumentBuilder()
       .setTitle('Wayfindr API')
@@ -49,4 +49,3 @@ async function bootstrap() {
   }
 }
 bootstrap();
-
