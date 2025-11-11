@@ -12,9 +12,21 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { RealTimeGateway } from './real-time/real-time.gateway';
 
+const mongoUri = (() => {
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+  if (process.env.VERCEL) {
+    throw new Error(
+      'MONGODB_URI environment variable is not set. Please configure it in Vercel project settings.',
+    );
+  }
+  return 'mongodb://localhost:27017/wayfindr';
+})();
+
 @Module({
   imports: [
-    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017/wayfindr'),
+    MongooseModule.forRoot(mongoUri),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     UserModule,
     AuthModule,
