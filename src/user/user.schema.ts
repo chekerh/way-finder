@@ -4,16 +4,16 @@ import { UserStatus } from '../common/enums/user-status.enum';
 
 @Schema({ timestamps: true })
 export class User {
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, unique: true, index: true, trim: true })
   username: string;
 
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, unique: true, index: true, trim: true, lowercase: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, trim: true })
   first_name: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, trim: true })
   last_name: string;
 
   @Prop({ required: true })

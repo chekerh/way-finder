@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
@@ -12,24 +12,49 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.userService.findByUsername(dto.username);
+    const username = dto.username.trim();
+    const email = dto.email.trim().toLowerCase();
+    const firstName = dto.first_name.trim();
+    const lastName = dto.last_name.trim();
+
+    if (!username || !email || !firstName || !lastName) {
+      throw new BadRequestException('All fields are required');
+    }
+
+    const existing = await this.userService.findByUsername(username);
     if (existing) throw new ConflictException('Username already exists');
     
     // Check if email already exists
-    const existingEmail = await this.userService.findByEmail(dto.email);
+    const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) throw new ConflictException('Email already exists');
     
-    const hash = await bcrypt.hash(dto.password, 10);
-    const user = await this.userService.create({ ...dto, password: hash });
+    const password = dto.password.trim();
+    if (!password) throw new BadRequestException('Password is required');
+
+    const hash = await bcrypt.hash(password, 10);
+    const user = await this.userService.create({
+      ...dto,
+      username,
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      password: hash,
+    });
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
     const { password, ...result } = userObj;
     return { message: 'User registered successfully', user: result };
   }
 
   async login(dto: LoginDto) {
-    const user = await this.userService.findByUsername(dto.username);
+    const username = dto.username.trim();
+    if (!username) throw new BadRequestException('Username is required');
+
+    const password = dto.password.trim();
+    if (!password) throw new BadRequestException('Password is required');
+
+    const user = await this.userService.findByUsername(username);
     if (!user) throw new UnauthorizedException('Invalid credentials');
-    const ok = await bcrypt.compare(dto.password, user.password);
+    const ok = await bcrypt.compare(password, user.password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
     const payload = { sub: (user as any)._id.toString(), username: user.username };
     const token = await this.jwtService.signAsync(payload);

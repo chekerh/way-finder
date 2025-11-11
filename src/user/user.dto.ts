@@ -1,20 +1,25 @@
-import { IsArray, IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { UserStatus } from '../common/enums/user-status.enum';
 
 export class CreateUserDto {
   @IsString()
+  @IsNotEmpty()
   username: string;
 
   @IsEmail()
+  @IsNotEmpty()
   email: string;
 
   @IsString()
+  @IsNotEmpty()
   first_name: string;
 
   @IsString()
+  @IsNotEmpty()
   last_name: string;
 
   @IsString()
+  @IsNotEmpty()
   @MinLength(6)
   password: string;
 }
