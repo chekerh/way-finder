@@ -46,16 +46,21 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const username = dto.username.trim();
-    if (!username) throw new BadRequestException('Username is required');
+    const identifier = dto.username.trim();
+    if (!identifier) throw new BadRequestException('Username or email is required');
 
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
 
-    const user = await this.userService.findByUsername(username);
+    let user = await this.userService.findByUsername(identifier);
+    if (!user) {
+      user = await this.userService.findByEmail(identifier.toLowerCase());
+    }
     if (!user) throw new UnauthorizedException('Invalid credentials');
+
     const ok = await bcrypt.compare(rawPassword, user.password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
+
     const payload = { sub: (user as any)._id.toString(), username: user.username };
     const token = await this.jwtService.signAsync(payload);
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
