@@ -28,10 +28,10 @@ export class AuthService {
     const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) throw new ConflictException('Email already exists');
     
-    const password = dto.password.trim();
-    if (!password) throw new BadRequestException('Password is required');
+    const rawPassword = dto.password.trim();
+    if (!rawPassword) throw new BadRequestException('Password is required');
 
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(rawPassword, 10);
     const user = await this.userService.create({
       ...dto,
       username,
@@ -41,7 +41,7 @@ export class AuthService {
       password: hash,
     });
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
-    const { password, ...result } = userObj;
+    const { password: _password, ...result } = userObj;
     return { message: 'User registered successfully', user: result };
   }
 
@@ -49,17 +49,17 @@ export class AuthService {
     const username = dto.username.trim();
     if (!username) throw new BadRequestException('Username is required');
 
-    const password = dto.password.trim();
-    if (!password) throw new BadRequestException('Password is required');
+    const rawPassword = dto.password.trim();
+    if (!rawPassword) throw new BadRequestException('Password is required');
 
     const user = await this.userService.findByUsername(username);
     if (!user) throw new UnauthorizedException('Invalid credentials');
-    const ok = await bcrypt.compare(password, user.password);
+    const ok = await bcrypt.compare(rawPassword, user.password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
     const payload = { sub: (user as any)._id.toString(), username: user.username };
     const token = await this.jwtService.signAsync(payload);
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
-    const { password, ...userData } = userObj;
+    const { password: _password, ...userData } = userObj;
     return { 
       access_token: token,
       user: userData,
