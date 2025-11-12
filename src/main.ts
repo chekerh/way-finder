@@ -2,8 +2,8 @@ import type { INestApplication } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { IncomingMessage, ServerResponse } from 'http';
 import helmet from 'helmet';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AppModule } from './app.module';
 
 let cachedApp: INestApplication | null = null;
@@ -72,7 +72,7 @@ if (!process.env.VERCEL) {
   bootstrapLocal();
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
   const server = await getServerInstance();
   return server(req, res);
 }
