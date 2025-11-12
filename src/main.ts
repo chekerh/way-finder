@@ -1,13 +1,13 @@
+import type { INestApplication } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ValidationPipe, INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
-import serverlessExpress from '@vendia/serverless-express';
-import type { Context, Callback, Handler } from 'aws-lambda';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { AppModule } from './app.module';
 
-let cachedServer: ReturnType<typeof serverlessExpress> | null = null;
 let cachedApp: INestApplication | null = null;
+let cachedServer: any = null;
 
 async function createNestApp(): Promise<INestApplication> {
   if (cachedApp) {
@@ -47,6 +47,14 @@ async function createNestApp(): Promise<INestApplication> {
   return app;
 }
 
+async function getServerInstance() {
+  if (!cachedServer) {
+    const app = await createNestApp();
+    cachedServer = app.getHttpAdapter().getInstance();
+  }
+  return cachedServer;
+}
+
 async function bootstrapLocal() {
   try {
     const app = await createNestApp();
@@ -64,13 +72,7 @@ if (!process.env.VERCEL) {
   bootstrapLocal();
 }
 
-export const handler: Handler = async (event: any, context: Context, callback: Callback) => {
-  if (!cachedServer) {
-    const app = await createNestApp();
-    const expressApp = app.getHttpAdapter().getInstance();
-    cachedServer = serverlessExpress({ app: expressApp });
-  }
-  return cachedServer(event, context, callback);
-};
-
-export default handler;
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const server = await getServerInstance();
+  return server(req, res);
+}
