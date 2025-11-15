@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OnboardingSession, OnboardingSessionSchema } from './onboarding.schema';
 import { OnboardingService } from './onboarding.service';
@@ -10,6 +11,7 @@ import { UserModule } from '../user/user.module';
   imports: [
     MongooseModule.forFeature([{ name: OnboardingSession.name, schema: OnboardingSessionSchema }]),
     UserModule,
+    HttpModule,
   ],
   controllers: [OnboardingController],
   providers: [OnboardingService, OnboardingAIService],

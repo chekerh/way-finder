@@ -1,19 +1,10 @@
-import type { INestApplication } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import type { IncomingMessage, ServerResponse } from 'http';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
-let cachedApp: INestApplication | null = null;
-let cachedServer: any = null;
-
-async function createNestApp(): Promise<INestApplication> {
-  if (cachedApp) {
-    return cachedApp;
-  }
-
+async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
@@ -42,37 +33,13 @@ async function createNestApp(): Promise<INestApplication> {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  await app.init();
-  cachedApp = app;
-  return app;
+  const port = Number(process.env.PORT) || 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`🚀 Application is running on: http://localhost:${port}/api`);
+  console.log(`📚 Swagger docs available at: http://localhost:${port}/api-docs`);
 }
 
-async function getServerInstance() {
-  if (!cachedServer) {
-    const app = await createNestApp();
-    cachedServer = app.getHttpAdapter().getInstance();
-  }
-  return cachedServer;
-}
-
-async function bootstrapLocal() {
-  try {
-    const app = await createNestApp();
-    const port = process.env.PORT || 3000;
-    await app.listen(port);
-    console.log(`🚀 Application is running on: http://localhost:${port}/api`);
-    console.log(`📚 Swagger docs available at: http://localhost:${port}/api-docs`);
-  } catch (error) {
-    console.error('Error starting the application:', error);
-    process.exit(1);
-  }
-}
-
-if (!process.env.VERCEL) {
-  bootstrapLocal();
-}
-
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  const server = await getServerInstance();
-  return server(req, res);
-}
+bootstrap().catch(error => {
+  console.error('Error starting the application:', error);
+  process.exit(1);
+});

@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { OnboardingSession, OnboardingSessionDocument } from './onboarding.schema';
 import { AnswerDto } from './onboarding.dto';
 import { OnboardingAIService } from './ai/onboarding-ai.service';
 import { UserService } from '../user/user.service';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class OnboardingService {
@@ -13,7 +15,10 @@ export class OnboardingService {
     private readonly onboardingModel: Model<OnboardingSessionDocument>,
     private readonly aiService: OnboardingAIService,
     private readonly userService: UserService,
+    private readonly http: HttpService,
   ) {}
+
+  private readonly n8nBaseUrl = process.env.N8N_BASE_URL;
 
   async startSession(userId: string): Promise<any> {
     // Check if user already has a session
@@ -37,27 +42,7 @@ export class OnboardingService {
       throw new BadRequestException('Onboarding already completed');
     }
 
-    // Generate first/next question
-    const question = this.aiService.generateNextQuestion(session);
-    
-    if (!question) {
-      // Complete onboarding if no more questions
-      return await this.completeOnboarding(userId, session.session_id);
-    }
-
-    // Update current question
-    session.current_question_id = question.id;
-    await session.save();
-
-    return {
-      session_id: session.session_id,
-      question: question,
-      progress: {
-        current: session.questions_answered.length + 1,
-        total: null, // Dynamic based on AI
-      },
-      completed: false,
-    };
+    return this.forwardToN8N(session);
   }
 
   async submitAnswer(userId: string, dto: AnswerDto): Promise<any> {
@@ -85,30 +70,10 @@ export class OnboardingService {
       session.questions_answered.push(dto.question_id);
     }
 
-    // Generate next question
-    const nextQuestion = this.aiService.generateNextQuestion(session);
-
-    if (!nextQuestion) {
-      // Complete onboarding
-      return await this.completeOnboarding(userId, session.session_id);
-    }
-
-    // Update session
-    session.current_question_id = nextQuestion.id;
-    await session.save();
-
-    return {
-      session_id: session.session_id,
-      question: nextQuestion,
-      progress: {
-        current: session.questions_answered.length + 1,
-        total: null,
-      },
-      completed: false,
-    };
+    return this.forwardToN8N(session);
   }
 
-  async completeOnboarding(userId: string, sessionId: string): Promise<any> {
+  async completeOnboarding(userId: string, sessionId: string, providedPreferences?: any): Promise<any> {
     const session = await this.onboardingModel.findOne({
       user_id: new Types.ObjectId(userId),
       session_id: sessionId,
@@ -118,8 +83,7 @@ export class OnboardingService {
       throw new NotFoundException('Onboarding session not found');
     }
 
-    // Extract preferences
-    const preferences = this.aiService.extractPreferences(session.answers);
+    const preferences = providedPreferences ?? this.aiService.extractPreferences(session.answers);
 
     // Update session
     session.completed = true;
@@ -191,26 +155,44 @@ export class OnboardingService {
       throw new BadRequestException('Onboarding already completed');
     }
 
-    // Get current or next question
-    let question = this.aiService.generateNextQuestion(session);
-
-    if (!question) {
-      return await this.completeOnboarding(userId, session.session_id);
-    }
-
-    return {
-      session_id: session.session_id,
-      question: question,
-      progress: {
-        current: session.questions_answered.length + 1,
-        total: null,
-      },
-      completed: false,
-    };
+    return this.forwardToN8N(session);
   }
 
   private generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  private async forwardToN8N(session: OnboardingSessionDocument) {
+    const payload = {
+      session_id: session.session_id,
+      answers: session.answers,
+    };
+
+    if (!this.n8nBaseUrl) {
+      throw new InternalServerErrorException('N8N_BASE_URL is not configured');
+    }
+
+    const url = `${this.n8nBaseUrl}/webhook/wayfinder/onboarding/next`;
+    let response;
+
+    try {
+      const { data } = await firstValueFrom(this.http.post(url, payload));
+      response = data;
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to contact onboarding brain');
+    }
+
+    if (response.completed) {
+      await this.completeOnboarding(session.user_id.toString(), session.session_id, response.preferences);
+      return response;
+    }
+
+    if (response.question?.id) {
+      session.current_question_id = response.question.id;
+      await session.save();
+    }
+
+    return response;
   }
 }
 

@@ -1,0 +1,51 @@
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { CatalogService } from './catalog.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RecommendedQueryDto } from './dto/flight-search.dto';
+import { ExploreSearchDto } from './dto/explore-search.dto';
+import { ActivitySearchDto } from './dto/activity-search.dto';
+
+@Controller('catalog')
+export class CatalogController {
+  constructor(private readonly catalogService: CatalogService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('recommended')
+  async getRecommended(@Req() req: any, @Query() query: RecommendedQueryDto) {
+    const normalized: RecommendedQueryDto = {
+      ...query,
+      adults: query.adults ? Number(query.adults) : undefined,
+      maxResults: query.maxResults ? Number(query.maxResults) : undefined,
+      maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
+    };
+    return this.catalogService.getRecommendedFlights(req.user.sub, normalized);
+  }
+
+  @Get('explore')
+  async getExplore(@Query() query: ExploreSearchDto) {
+    return this.catalogService.getExploreOffers({
+      origin: query.origin ?? 'TUN',
+      destination: query.destination,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      budget: query.budget ? Number(query.budget) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
+  }
+
+  @Get('activities')
+  async getActivities(@Query() query: ActivitySearchDto) {
+    const themes =
+      typeof query.themes === 'string'
+        ? query.themes.split(',').map(theme => theme.trim()).filter(Boolean)
+        : query.themes;
+
+    return this.catalogService.getActivitiesFeed({
+      city: query.city,
+      themes,
+      limit: query.limit ? Number(query.limit) : undefined,
+      radiusMeters: query.radiusMeters ? Number(query.radiusMeters) : undefined,
+    });
+  }
+}
+

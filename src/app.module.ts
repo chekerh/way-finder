@@ -11,6 +11,7 @@ import { PaymentModule } from './payment/payment.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { RealTimeGateway } from './real-time/real-time.gateway';
+import { CatalogModule } from './catalog/catalog.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {
@@ -34,6 +35,7 @@ const mongoUri = (() => {
     PaymentModule,
     OnboardingModule,
     RecommendationsModule,
+    CatalogModule,
   ],
   controllers: [AppController],
   providers: [
