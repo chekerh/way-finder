@@ -1,9 +1,9 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RecommendedQueryDto } from './dto/flight-search.dto';
-import { ExploreSearchDto } from './dto/explore-search.dto';
-import { ActivitySearchDto } from './dto/activity-search.dto';
+import type { RecommendedQueryDto } from './dto/flight-search.dto';
+import type { ExploreSearchDto } from './dto/explore-search.dto';
+import type { ActivitySearchDto } from './dto/activity-search.dto';
 
 @Controller('catalog')
 export class CatalogController {
