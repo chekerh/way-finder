@@ -37,8 +37,9 @@ export class ActivitiesService {
       apikey: this.apiKey,
     });
 
-    if (params.themes && params.themes.length) {
-      query.append('kinds', params.themes.join(','));
+    const themes = Array.isArray(params.themes) ? params.themes : params.themes ? [params.themes] : [];
+    if (themes.length) {
+      query.append('kinds', themes.join(','));
     }
 
     try {
