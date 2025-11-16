@@ -11,7 +11,10 @@ import { UserModule } from '../user/user.module';
   imports: [
     MongooseModule.forFeature([{ name: OnboardingSession.name, schema: OnboardingSessionSchema }]),
     UserModule,
-    HttpModule,
+    HttpModule.register({
+      timeout: 35000,
+      maxRedirects: 5,
+    }),
   ],
   controllers: [OnboardingController],
   providers: [OnboardingService, OnboardingAIService],

@@ -46,6 +46,8 @@ Thumbs.db  # Windows
 
 # dotenv environment variable files
 .env
+.env.template
+
 .env.development.local
 .env.test.local
 .env.production.local

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -19,6 +19,7 @@ export class OnboardingService {
   ) {}
 
   private readonly n8nBaseUrl = process.env.N8N_BASE_URL;
+  private readonly logger = new Logger(OnboardingService.name);
 
   async startSession(userId: string): Promise<any> {
     // Check if user already has a session
@@ -173,13 +174,23 @@ export class OnboardingService {
     }
 
     const url = `${this.n8nBaseUrl}/webhook/wayfinder/onboarding/next`;
+    this.logger.log(`Calling n8n: ${url} session=${session.session_id}`);
     let response;
 
     try {
       const { data } = await firstValueFrom(this.http.post(url, payload));
       response = data;
     } catch (error) {
-      throw new InternalServerErrorException('Failed to contact onboarding brain');
+      const status = (error?.response && error.response.status) || undefined;
+      const respData = (error?.response && error.response.data) || undefined;
+      this.logger.error(
+        `n8n request failed`,
+        JSON.stringify({ url, status, response: respData, message: error?.message }),
+      );
+      throw new InternalServerErrorException({
+        message: 'Failed to contact onboarding brain',
+        details: respData || error?.message || 'unknown_error',
+      });
     }
 
     if (response.completed) {
