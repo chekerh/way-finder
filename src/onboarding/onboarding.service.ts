@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -20,6 +26,9 @@ export class OnboardingService {
 
   private readonly n8nBaseUrl = process.env.N8N_BASE_URL;
   private readonly logger = new Logger(OnboardingService.name);
+  // Simple flag so we can turn n8n usage on/off without changing code
+  private readonly useN8N =
+    process.env.USE_N8N_ONBOARDING === 'true' && !!this.n8nBaseUrl;
 
   async startSession(userId: string): Promise<any> {
     // Check if user already has a session
@@ -43,7 +52,7 @@ export class OnboardingService {
       throw new BadRequestException('Onboarding already completed');
     }
 
-    return this.forwardToN8N(session);
+    return this.forwardToEngine(session);
   }
 
   async submitAnswer(userId: string, dto: AnswerDto): Promise<any> {
@@ -71,7 +80,7 @@ export class OnboardingService {
       session.questions_answered.push(dto.question_id);
     }
 
-    return this.forwardToN8N(session);
+    return this.forwardToEngine(session);
   }
 
   async completeOnboarding(userId: string, sessionId: string, providedPreferences?: any): Promise<any> {
@@ -156,11 +165,63 @@ export class OnboardingService {
       throw new BadRequestException('Onboarding already completed');
     }
 
-    return this.forwardToN8N(session);
+    return this.forwardToEngine(session);
   }
 
   private generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  /**
+   * Single entry point for deciding the next onboarding step.
+   * If USE_N8N_ONBOARDING=true and N8N_BASE_URL is set, we call n8n.
+   * Otherwise we fall back to the built‑in OnboardingAIService so the flow always works.
+   */
+  private async forwardToEngine(session: OnboardingSessionDocument) {
+    if (this.useN8N) {
+      return this.forwardToN8N(session);
+    }
+
+    // Fallback: use local AI service
+    const nextQuestion = this.aiService.generateNextQuestion(session);
+
+    // No more questions → complete onboarding locally
+    if (!nextQuestion) {
+      const preferences = this.aiService.extractPreferences(session.answers);
+      await this.completeOnboarding(
+        session.user_id.toString(),
+        session.session_id,
+        preferences,
+      );
+
+      return {
+        session_id: session.session_id,
+        completed: true,
+        preferences,
+        message:
+          'Onboarding completed! Your personalized recommendations are ready.',
+      };
+    }
+
+    // There is a next question → update session & return payload
+    session.current_question_id = nextQuestion.id;
+    if (!session.questions_answered.includes(nextQuestion.id)) {
+      // Do not mark as answered yet; it will be marked when the user submits.
+      // We only track "current_question_id" here.
+    }
+    await session.save();
+
+    const totalQuestionsEstimate = 8; // rough count used for progress bar
+
+    return {
+      sessionId: session.session_id,
+      completed: false,
+      question: nextQuestion,
+      progress: {
+        current: session.questions_answered.length,
+        total: totalQuestionsEstimate,
+      } as any,
+    };
   }
 
   private async forwardToN8N(session: OnboardingSessionDocument) {
