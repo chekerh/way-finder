@@ -214,7 +214,8 @@ export class OnboardingService {
     const totalQuestionsEstimate = 8; // rough count used for progress bar
 
     return {
-      sessionId: session.session_id,
+      // Keep snake_case to match existing mobile models
+      session_id: session.session_id,
       completed: false,
       question: nextQuestion,
       progress: {
