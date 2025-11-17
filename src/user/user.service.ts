@@ -28,8 +28,14 @@ export class UserService {
   }
 
   async updateProfile(userId: string, updateUserDto: UpdateUserDto): Promise<User> {
+    const updatePayload: Partial<User> = { ...updateUserDto };
+
+    if (updatePayload.email) {
+      updatePayload.email = updatePayload.email.toLowerCase();
+    }
+
     const updated = await this.userModel
-      .findByIdAndUpdate(userId, { $set: updateUserDto }, { new: true })
+      .findByIdAndUpdate(userId, { $set: updatePayload }, { new: true, runValidators: true })
       .exec();
     if (!updated) throw new NotFoundException('User not found');
     return updated;

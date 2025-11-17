@@ -34,6 +34,22 @@ export class UpdateUserDto {
   last_name?: string;
 
   @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  bio?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   preferences?: string[];
@@ -57,6 +73,9 @@ export class UserDto {
   email: string;
   first_name: string;
   last_name: string;
+  phone?: string | null;
+  location?: string | null;
+  bio?: string | null;
   preferences: string[];
   status: UserStatus;
 }

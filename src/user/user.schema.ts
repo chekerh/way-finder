@@ -16,6 +16,15 @@ export class User {
   @Prop({ required: true, trim: true })
   last_name: string;
 
+@Prop({ trim: true, default: null })
+phone?: string;
+
+@Prop({ trim: true, default: null })
+location?: string;
+
+@Prop({ trim: true, default: null, maxlength: 500 })
+bio?: string;
+
   @Prop({ required: true })
   password: string;
 
