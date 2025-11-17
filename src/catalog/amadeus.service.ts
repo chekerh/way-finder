@@ -35,11 +35,10 @@ export class AmadeusService {
       throw new InternalServerErrorException('Amadeus credentials are not configured');
     }
 
-    const body = new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-    });
+    const body = new URLSearchParams();
+    body.set('grant_type', 'client_credentials');
+    body.set('client_id', this.clientId!);
+    body.set('client_secret', this.clientSecret!);
 
     const config: AxiosRequestConfig = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
