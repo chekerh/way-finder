@@ -3,7 +3,6 @@ import { HttpModule } from '@nestjs/axios';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 import { AmadeusService } from './amadeus.service';
-import { TequilaService } from './tequila.service';
 import { ActivitiesService } from './activities.service';
 import { UserModule } from '../user/user.module';
 
@@ -16,7 +15,7 @@ import { UserModule } from '../user/user.module';
     UserModule,
   ],
   controllers: [CatalogController],
-  providers: [CatalogService, AmadeusService, TequilaService, ActivitiesService],
+  providers: [CatalogService, AmadeusService, ActivitiesService],
   exports: [CatalogService],
 })
 export class CatalogModule {}

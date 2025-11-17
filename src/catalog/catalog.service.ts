@@ -1,17 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AmadeusService } from './amadeus.service';
-import { TequilaService } from './tequila.service';
 import { ActivitiesService } from './activities.service';
 import { FlightSearchDto, RecommendedQueryDto } from './dto/flight-search.dto';
 import { ExploreSearchDto } from './dto/explore-search.dto';
 import { ActivitySearchDto } from './dto/activity-search.dto';
 import { UserService } from '../user/user.service';
+import { FALLBACK_EXPLORE_OFFERS, FALLBACK_FLIGHT_OFFERS } from './catalog.fallback';
 
 @Injectable()
 export class CatalogService {
+  private amadeusCooldownUntil = 0;
+
   constructor(
     private readonly amadeus: AmadeusService,
-    private readonly tequila: TequilaService,
     private readonly activities: ActivitiesService,
     private readonly userService: UserService,
   ) {}
@@ -47,16 +48,22 @@ export class CatalogService {
     }
 
     // Otherwise, search for multiple popular destinations to provide variety
-    const popularDestinations = preferences.destination_preferences?.length > 0
-      ? preferences.destination_preferences
-      : ['CDG', 'LHR', 'FCO', 'MAD', 'AMS', 'FRA', 'DXB', 'JFK']; // Popular destinations
+    const popularDestinations =
+      preferences.destination_preferences?.length > 0
+        ? preferences.destination_preferences
+        : ['CDG', 'FCO', 'BCN', 'DXB', 'JFK'];
 
     const allFlights: any[] = [];
     const totalRequested = overrides.maxResults ?? 15;
-    const numDestinations = Math.min(5, popularDestinations.length); // Search up to 5 destinations
-    const maxPerDestination = Math.max(2, Math.floor(totalRequested / numDestinations)); // At least 2 per destination
+    const numDestinations = Math.min(3, popularDestinations.length);
+    const maxPerDestination = Math.max(2, Math.floor(totalRequested / numDestinations));
 
-    // Search for flights to multiple destinations in parallel (using Promise.all for better performance)
+    if (this.shouldUseFallbackFlights()) {
+      return this.buildFallbackFlightResponse(popularDestinations, totalRequested);
+    }
+
+    let hadSuccessfulExternalCall = false;
+
     const searchPromises = popularDestinations.slice(0, numDestinations).map(async (dest) => {
       try {
         const search: FlightSearchDto = {
@@ -72,31 +79,60 @@ export class CatalogService {
         };
 
         const result = await this.amadeus.searchFlights(search);
-        return result?.data ?? [];
+        if (result?.data?.length) {
+          hadSuccessfulExternalCall = true;
+          return result.data;
+        }
+        return [];
       } catch (error) {
-        // Return empty array if search fails
+        this.registerAmadeusFailure();
         return [];
       }
     });
 
-    // Wait for all searches to complete
     const results = await Promise.all(searchPromises);
-    results.forEach(flights => {
+    results.forEach((flights) => {
       if (flights.length > 0) {
         allFlights.push(...flights);
       }
     });
 
-    return { data: allFlights, meta: {} };
+    if (!allFlights.length) {
+      return this.buildFallbackFlightResponse(popularDestinations, totalRequested);
+    }
+
+    if (hadSuccessfulExternalCall) {
+      this.registerAmadeusSuccess();
+    }
+
+    return { data: allFlights.slice(0, totalRequested), meta: {} };
   }
 
   async getExploreOffers(params: ExploreSearchDto) {
-    try {
-      return this.tequila.searchExplore(params);
-    } catch (error) {
-      // If Tequila is not configured, return empty result
-      return { data: [], currency: 'EUR' };
+    const origin = (params.origin ?? 'TUN').toUpperCase();
+    const max = params.limit ?? 10;
+    const budget = params.budget;
+    const destination = params.destination?.toUpperCase();
+
+    let offers = FALLBACK_EXPLORE_OFFERS.filter((offer) => offer.flyFrom === origin);
+
+    if (destination) {
+      offers = offers.filter((offer) => offer.flyTo === destination);
     }
+
+    if (typeof budget === 'number') {
+      offers = offers.filter((offer) => offer.price <= budget);
+    }
+
+    if (!offers.length) {
+      offers = FALLBACK_EXPLORE_OFFERS;
+    }
+
+    return {
+      data: offers.slice(0, max),
+      currency: 'EUR',
+      source: 'fallback',
+    };
   }
 
   async getActivitiesFeed(params: ActivitySearchDto) {
@@ -119,6 +155,37 @@ export class CatalogService {
       default:
         return 'ECONOMY';
     }
+  }
+
+  private shouldUseFallbackFlights(): boolean {
+    return !this.amadeus.isConfigured() || Date.now() < this.amadeusCooldownUntil;
+  }
+
+  private registerAmadeusFailure() {
+    this.amadeusCooldownUntil = Date.now() + 5 * 60 * 1000;
+  }
+
+  private registerAmadeusSuccess() {
+    this.amadeusCooldownUntil = 0;
+  }
+
+  private buildFallbackFlightResponse(preferredDestinations: string[], maxResults?: number) {
+    const normalizedPrefs = preferredDestinations.map((code) => code.toUpperCase());
+
+    let flights = FALLBACK_FLIGHT_OFFERS.filter((flight) =>
+      normalizedPrefs.includes(flight.destinationCode),
+    );
+
+    if (!flights.length) {
+      flights = FALLBACK_FLIGHT_OFFERS;
+    }
+
+    const slice = flights.slice(0, maxResults ?? flights.length);
+
+    return {
+      data: slice.map((flight) => flight.offer),
+      meta: { fallback: true },
+    };
   }
 }
 

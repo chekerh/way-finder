@@ -1,20 +1,19 @@
 import { CatalogService } from './catalog.service';
 import { AmadeusService } from './amadeus.service';
-import { TequilaService } from './tequila.service';
 import { ActivitiesService } from './activities.service';
 import { UserService } from '../user/user.service';
 
 describe('CatalogService', () => {
   let catalogService: CatalogService;
-  const amadeus = { searchFlights: jest.fn() } as unknown as AmadeusService;
-  const tequila = { searchExplore: jest.fn() } as unknown as TequilaService;
+  const amadeus = { searchFlights: jest.fn(), isConfigured: jest.fn() } as unknown as AmadeusService;
   const activities = { findActivities: jest.fn() } as unknown as ActivitiesService;
   const userService = { findById: jest.fn() } as unknown as UserService;
 
   beforeEach(() => {
     jest.resetAllMocks();
     jest.useFakeTimers().setSystemTime(new Date('2025-01-01T00:00:00Z'));
-    catalogService = new CatalogService(amadeus, tequila, activities, userService);
+    (amadeus.isConfigured as jest.Mock).mockReturnValue(true);
+    catalogService = new CatalogService(amadeus, activities, userService);
   });
 
   afterEach(() => {
@@ -51,26 +50,17 @@ describe('CatalogService', () => {
     );
   });
 
-  it('passes explore parameters to Tequila service', async () => {
-    (tequila.searchExplore as jest.Mock).mockResolvedValue({ data: [] });
-
-    await catalogService.getExploreOffers({
+  it('returns fallback explore offers filtered by destination and budget', async () => {
+    const result = await catalogService.getExploreOffers({
       origin: 'TUN',
       destination: 'DXB',
-      dateFrom: '2025-02-01',
-      dateTo: '2025-02-10',
-      budget: 400,
-      limit: 5,
+      budget: 500,
+      limit: 1,
     });
 
-    expect(tequila.searchExplore).toHaveBeenCalledWith({
-      origin: 'TUN',
-      destination: 'DXB',
-      dateFrom: '2025-02-01',
-      dateTo: '2025-02-10',
-      budget: 400,
-      limit: 5,
-    });
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].flyTo).toBe('DXB');
+    expect(result.currency).toBe('EUR');
   });
 
   it('delegates activity lookups to OpenTripMap service', async () => {

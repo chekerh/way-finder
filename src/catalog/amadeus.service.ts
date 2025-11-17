@@ -22,12 +22,16 @@ export class AmadeusService {
 
   constructor(private readonly http: HttpService) {}
 
+  isConfigured(): boolean {
+    return Boolean(this.clientId && this.clientSecret);
+  }
+
   private async getAccessToken(): Promise<string> {
     if (this.cachedToken && Date.now() < this.tokenExpiry - 5000) {
       return this.cachedToken;
     }
 
-    if (!this.clientId || !this.clientSecret) {
+    if (!this.isConfigured()) {
       throw new InternalServerErrorException('Amadeus credentials are not configured');
     }
 
