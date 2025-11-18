@@ -15,5 +15,9 @@ export interface FlightSearchDto {
 export interface RecommendedQueryDto extends Partial<FlightSearchDto> {
   adults?: number;
   maxResults?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  airline?: string;
+  maxDuration?: number; // in minutes
 }
 

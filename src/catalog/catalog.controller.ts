@@ -18,6 +18,8 @@ export class CatalogController {
       adults: query.adults ? Number(query.adults) : undefined,
       maxResults: query.maxResults ? Number(query.maxResults) : undefined,
       maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
+      minPrice: query.minPrice ? Number(query.minPrice) : undefined,
+      maxDuration: query.maxDuration ? Number(query.maxDuration) : undefined,
     };
     return this.catalogService.getRecommendedFlights(req.user.sub, normalized);
   }
