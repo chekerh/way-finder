@@ -13,6 +13,9 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { RealTimeGateway } from './real-time/real-time.gateway';
 import { CatalogModule } from './catalog/catalog.module';
 import { DiscussionModule } from './discussion/discussion.module';
+import { FavoritesModule } from './favorites/favorites.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { ItineraryModule } from './itinerary/itinerary.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {
@@ -38,6 +41,9 @@ const mongoUri = (() => {
     RecommendationsModule,
     CatalogModule,
     DiscussionModule,
+    FavoritesModule,
+    ReviewsModule,
+    ItineraryModule,
   ],
   controllers: [AppController],
   providers: [
