@@ -12,6 +12,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { RealTimeGateway } from './real-time/real-time.gateway';
 import { CatalogModule } from './catalog/catalog.module';
+import { DiscussionModule } from './discussion/discussion.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {
@@ -36,6 +37,7 @@ const mongoUri = (() => {
     OnboardingModule,
     RecommendationsModule,
     CatalogModule,
+    DiscussionModule,
   ],
   controllers: [AppController],
   providers: [

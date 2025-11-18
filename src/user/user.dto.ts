@@ -50,6 +50,10 @@ export class UpdateUserDto {
   bio?: string;
 
   @IsOptional()
+  @IsString()
+  profile_image_url?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   preferences?: string[];

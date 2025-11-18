@@ -25,6 +25,9 @@ location?: string;
 @Prop({ trim: true, default: null, maxlength: 500 })
 bio?: string;
 
+  @Prop({ trim: true, default: null })
+  profile_image_url?: string;
+
   @Prop({ required: true })
   password: string;
 
