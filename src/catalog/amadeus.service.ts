@@ -1,8 +1,15 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import { AxiosRequestConfig } from 'axios';
+import { AxiosRequestConfig, AxiosError } from 'axios';
 import { lastValueFrom } from 'rxjs';
 import { FlightSearchDto } from './dto/flight-search.dto';
+
+export class AmadeusRateLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AmadeusRateLimitError';
+  }
+}
 
 interface AmadeusAuthResponse {
   access_token: string;
@@ -135,6 +142,21 @@ export class AmadeusService {
       );
       return response.data;
     } catch (error) {
+      if (error instanceof Error && 'response' in error) {
+        const axiosError = error as AxiosError;
+        if (axiosError.response?.status === 429) {
+          this.logger.warn(
+            `Amadeus rate limit exceeded (429). Please wait before making more requests.`,
+          );
+          throw new AmadeusRateLimitError('Amadeus API rate limit exceeded. Please try again later.');
+        }
+        if (axiosError.response?.status === 401) {
+          // Token might be expired, clear cache
+          this.cachedToken = null;
+          this.tokenExpiry = 0;
+          this.logger.warn('Amadeus authentication failed, token cache cleared');
+        }
+      }
       this.logger.error('Failed to fetch Amadeus flight offers', error instanceof Error ? error.stack : '');
       throw new InternalServerErrorException('Unable to fetch flight offers');
     }

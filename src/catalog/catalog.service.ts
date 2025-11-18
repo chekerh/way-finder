@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AmadeusService } from './amadeus.service';
+import { AmadeusService, AmadeusRateLimitError } from './amadeus.service';
 import { ActivitiesService } from './activities.service';
 import type { ActivityFeedResponse } from './activities.service';
 import { FlightSearchDto, RecommendedQueryDto } from './dto/flight-search.dto';
@@ -44,7 +44,12 @@ export class CatalogService {
       try {
         return this.amadeus.searchFlights(search);
       } catch (error) {
-        return { data: [], meta: {} };
+        if (error instanceof AmadeusRateLimitError) {
+          this.registerAmadeusRateLimit();
+        } else {
+          this.registerAmadeusFailure();
+        }
+        return this.buildFallbackFlightResponse([overrides.destinationLocationCode!], overrides.maxResults ?? 5);
       }
     }
 
@@ -86,7 +91,11 @@ export class CatalogService {
         }
         return [];
       } catch (error) {
-        this.registerAmadeusFailure();
+        if (error instanceof AmadeusRateLimitError) {
+          this.registerAmadeusRateLimit();
+        } else {
+          this.registerAmadeusFailure();
+        }
         return [];
       }
     });
@@ -163,7 +172,13 @@ export class CatalogService {
   }
 
   private registerAmadeusFailure() {
+    // Regular failure: 5 minute cooldown
     this.amadeusCooldownUntil = Date.now() + 5 * 60 * 1000;
+  }
+
+  private registerAmadeusRateLimit() {
+    // Rate limit (429): 30 minute cooldown to avoid hitting limits again
+    this.amadeusCooldownUntil = Date.now() + 30 * 60 * 1000;
   }
 
   private registerAmadeusSuccess() {
