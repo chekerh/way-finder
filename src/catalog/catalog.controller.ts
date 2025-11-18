@@ -1,5 +1,6 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
+import type { ActivityFeedResponse } from './activities.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { RecommendedQueryDto } from './dto/flight-search.dto';
 import type { ExploreSearchDto } from './dto/explore-search.dto';
@@ -34,7 +35,7 @@ export class CatalogController {
   }
 
   @Get('activities')
-  async getActivities(@Query() query: ActivitySearchDto) {
+  async getActivities(@Query() query: ActivitySearchDto): Promise<ActivityFeedResponse> {
     const themes =
       typeof query.themes === 'string'
         ? query.themes.split(',').map(theme => theme.trim()).filter(Boolean)

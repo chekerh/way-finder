@@ -3,6 +3,24 @@ export interface FallbackFlightOffer {
   offer: any;
 }
 
+export interface FallbackActivity {
+  id: string;
+  city: string;
+  country: string;
+  name: string;
+  category: string;
+  description: string;
+  imageUrl: string;
+  address: string;
+  price?: number;
+  rating?: number;
+  tags: string[];
+  coordinates: {
+    lat: number;
+    lon: number;
+  };
+}
+
 export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
   {
     destinationCode: 'CDG',
@@ -290,6 +308,93 @@ export const FALLBACK_EXPLORE_OFFERS = [
     localDeparture: '2025-12-09T13:45:00',
     localArrival: '2025-12-09T17:15:00',
     airlines: ['TK'],
+  },
+];
+
+export const FALLBACK_ACTIVITIES: FallbackActivity[] = [
+  {
+    id: 'ACT-PAR-LOUVRE',
+    city: 'Paris',
+    country: 'France',
+    name: 'Musée du Louvre',
+    category: 'Musées',
+    description: 'Découvrez la Joconde et plus de 35 000 œuvres dans le musée le plus visité au monde.',
+    imageUrl: 'https://images.unsplash.com/photo-1511739001486-6bfe10ce785f?w=800&h=600&fit=crop&q=80',
+    address: 'Rue de Rivoli, 75001 Paris',
+    price: 17,
+    rating: 4.8,
+    tags: ['culture', 'art', 'incontournable'],
+    coordinates: { lat: 48.8606, lon: 2.3376 },
+  },
+  {
+    id: 'ACT-PAR-EIFFEL',
+    city: 'Paris',
+    country: 'France',
+    name: 'Tour Eiffel & Croisière',
+    category: 'Activités',
+    description: 'Accès au deuxième étage de la Tour Eiffel suivi d’une croisière sur la Seine.',
+    imageUrl: 'https://images.unsplash.com/photo-1502602898669-a6655f84aff2?w=800&h=600&fit=crop&q=80',
+    address: 'Champ de Mars, 5 Av. Anatole France, 75007 Paris',
+    price: 49,
+    rating: 4.7,
+    tags: ['romantique', 'panorama'],
+    coordinates: { lat: 48.8584, lon: 2.2945 },
+  },
+  {
+    id: 'ACT-ROM-COLOSSEUM',
+    city: 'Rome',
+    country: 'Italie',
+    name: 'Visite du Colisée & Forum',
+    category: 'Activités',
+    description: 'Coupe-file pour le Colisée, le Forum Romain et le Mont Palatin avec guide francophone.',
+    imageUrl: 'https://images.unsplash.com/photo-1526481280695-3c46973e3323?w=800&h=600&fit=crop&q=80',
+    address: 'Piazza del Colosseo, 1, 00184 Roma',
+    price: 42,
+    rating: 4.9,
+    tags: ['histoire', 'UNESCO'],
+    coordinates: { lat: 41.8902, lon: 12.4922 },
+  },
+  {
+    id: 'ACT-ROM-TRASTE',
+    city: 'Rome',
+    country: 'Italie',
+    name: 'Food tour à Trastevere',
+    category: 'Restaurants',
+    description: 'Dégustez les meilleures spécialités romaines dans le quartier animé de Trastevere.',
+    imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop&q=80',
+    address: 'Piazza Trilussa, 00153 Roma',
+    price: 65,
+    rating: 4.6,
+    tags: ['gastronomie', 'street-food'],
+    coordinates: { lat: 41.8899, lon: 12.4709 },
+  },
+  {
+    id: 'ACT-DXB-DESERT',
+    city: 'Dubai',
+    country: 'EAU',
+    name: 'Safari désert & BBQ',
+    category: 'Activités',
+    description: 'Balade en 4x4 dans le désert avec sandboarding, spectacle et dîner BBQ.',
+    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&h=600&fit=crop&q=80',
+    address: 'Prise en charge depuis votre hôtel à Dubai',
+    price: 55,
+    rating: 4.7,
+    tags: ['aventure', 'famille'],
+    coordinates: { lat: 24.4539, lon: 54.3773 },
+  },
+  {
+    id: 'ACT-TUN-MEDINA',
+    city: 'Tunis',
+    country: 'Tunisie',
+    name: 'Medina Walking Tour',
+    category: 'Musées',
+    description: 'Visite guidée de la médina de Tunis et découverte des artisans locaux.',
+    imageUrl: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=800&h=600&fit=crop&q=80',
+    address: 'Place de la Kasbah, Tunis',
+    price: 15,
+    rating: 4.5,
+    tags: ['culture', 'artisanat'],
+    coordinates: { lat: 36.7997, lon: 10.162 },
   },
 ];
 

@@ -10,6 +10,26 @@ export class Booking {
   @Prop({ required: true })
   offer_id: string;
 
+  @Prop({ type: Object })
+  trip_details?: {
+    origin?: string;
+    destination?: string;
+    departure_date?: string;
+    return_date?: string;
+    travel_class?: string;
+    seats?: string;
+  };
+
+  @Prop({ type: [Object], default: [] })
+  passengers?: Array<{
+    full_name: string;
+    traveler_type?: string;
+    document_number?: string;
+  }>;
+
+  @Prop()
+  notes?: string;
+
   @Prop({ type: String, enum: BookingStatus, default: BookingStatus.PENDING })
   status: BookingStatus;
 

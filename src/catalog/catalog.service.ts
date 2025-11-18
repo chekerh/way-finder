@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AmadeusService } from './amadeus.service';
 import { ActivitiesService } from './activities.service';
+import type { ActivityFeedResponse } from './activities.service';
 import { FlightSearchDto, RecommendedQueryDto } from './dto/flight-search.dto';
 import { ExploreSearchDto } from './dto/explore-search.dto';
 import { ActivitySearchDto } from './dto/activity-search.dto';
@@ -135,7 +136,7 @@ export class CatalogService {
     };
   }
 
-  async getActivitiesFeed(params: ActivitySearchDto) {
+  async getActivitiesFeed(params: ActivitySearchDto): Promise<ActivityFeedResponse> {
     return this.activities.findActivities(params);
   }
 
