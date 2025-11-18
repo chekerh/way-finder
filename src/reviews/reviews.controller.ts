@@ -22,7 +22,9 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   async createReview(@Req() req: any, @Body() createReviewDto: CreateReviewDto) {
-    return this.reviewsService.createReview(req.user.sub, createReviewDto);
+    const review = await this.reviewsService.createReview(req.user.sub, createReviewDto);
+    const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+    return reviewObj;
   }
 
   @UseGuards(JwtAuthGuard)
@@ -32,7 +34,9 @@ export class ReviewsController {
     @Param('id') reviewId: string,
     @Body() updateReviewDto: UpdateReviewDto,
   ) {
-    return this.reviewsService.updateReview(req.user.sub, reviewId, updateReviewDto);
+    const review = await this.reviewsService.updateReview(req.user.sub, reviewId, updateReviewDto);
+    const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+    return reviewObj;
   }
 
   @UseGuards(JwtAuthGuard)
@@ -47,7 +51,11 @@ export class ReviewsController {
     @Param('itemType') itemType: ReviewItemType,
     @Param('itemId') itemId: string,
   ) {
-    return this.reviewsService.getReviews(itemType, itemId);
+    const reviews = await this.reviewsService.getReviews(itemType, itemId);
+    return reviews.map((review) => {
+      const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+      return reviewObj;
+    });
   }
 
   @Get(':itemType/:itemId/stats')
@@ -64,7 +72,11 @@ export class ReviewsController {
     @Req() req: any,
     @Query('type') itemType?: ReviewItemType,
   ) {
-    return this.reviewsService.getUserReviews(req.user.sub, itemType);
+    const reviews = await this.reviewsService.getUserReviews(req.user.sub, itemType);
+    return reviews.map((review) => {
+      const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+      return reviewObj;
+    });
   }
 
   @UseGuards(JwtAuthGuard)
@@ -74,7 +86,12 @@ export class ReviewsController {
     @Param('itemType') itemType: ReviewItemType,
     @Param('itemId') itemId: string,
   ) {
-    return this.reviewsService.checkUserReview(req.user.sub, itemType, itemId);
+    const review = await this.reviewsService.checkUserReview(req.user.sub, itemType, itemId);
+    if (!review) {
+      return null;
+    }
+    const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+    return reviewObj;
   }
 }
 

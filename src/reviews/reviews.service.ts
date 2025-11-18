@@ -27,7 +27,8 @@ export class ReviewsService {
       ...createReviewDto,
     });
 
-    return review.save();
+    const savedReview = await review.save();
+    return this.reviewModel.findById(savedReview._id).populate('userId', 'username first_name last_name profile_image_url').exec() as any;
   }
 
   async updateReview(userId: string, reviewId: string, updateReviewDto: UpdateReviewDto): Promise<Review> {
@@ -38,7 +39,8 @@ export class ReviewsService {
     }
 
     Object.assign(review, updateReviewDto);
-    return review.save();
+    const savedReview = await review.save();
+    return this.reviewModel.findById(savedReview._id).populate('userId', 'username first_name last_name profile_image_url').exec() as any;
   }
 
   async deleteReview(userId: string, reviewId: string): Promise<void> {
@@ -64,6 +66,7 @@ export class ReviewsService {
     }
     return this.reviewModel
       .find(query)
+      .populate('userId', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
   }
@@ -99,7 +102,7 @@ export class ReviewsService {
   }
 
   async checkUserReview(userId: string, itemType: ReviewItemType, itemId: string): Promise<Review | null> {
-    return this.reviewModel.findOne({ userId, itemType, itemId }).exec();
+    return this.reviewModel.findOne({ userId, itemType, itemId }).populate('userId', 'username first_name last_name profile_image_url').exec();
   }
 }
 

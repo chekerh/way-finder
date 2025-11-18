@@ -16,6 +16,7 @@ import { DiscussionModule } from './discussion/discussion.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ItineraryModule } from './itinerary/itinerary.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {
@@ -44,6 +45,7 @@ const mongoUri = (() => {
     FavoritesModule,
     ReviewsModule,
     ItineraryModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [
