@@ -18,6 +18,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { ItineraryModule } from './itinerary/itinerary.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SocialModule } from './social/social.module';
+import { SearchHistoryModule } from './search-history/search-history.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {
@@ -48,6 +49,7 @@ const mongoUri = (() => {
     ItineraryModule,
     NotificationsModule,
     SocialModule,
+    SearchHistoryModule,
   ],
   controllers: [AppController],
   providers: [
