@@ -9,9 +9,10 @@ import {
   MinLength,
   MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateJourneyDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsMongoId()
   booking_id?: string; // Optional, will be auto-linked if not provided
 
@@ -22,11 +23,28 @@ export class CreateJourneyDto {
   description?: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        // If not JSON, try splitting by comma
+        return value.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
+      }
+    }
+    return value;
+  })
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value === 'true';
+    }
+    return value;
+  })
   @IsBoolean()
   is_public?: boolean;
 }
