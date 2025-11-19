@@ -1,14 +1,14 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
-import { PaymentService } from './payment.service';
-import { FlouciService } from './flouci.service';
-import { CreateFlouciPaymentDto } from './dto/flouci-payment.dto';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreatePaypalOrderDto } from './dto/paypal-order.dto';
+import { PaymentService } from './payment.service';
+import { PaypalService } from './paypal.service';
 
 @Controller('payment')
 export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
-    private readonly flouciService: FlouciService,
+    private readonly paypalService: PaypalService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -30,34 +30,52 @@ export class PaymentController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('flouci/create')
-  async createFlouciPayment(@Req() req: any, @Body() dto: CreateFlouciPaymentDto) {
-    // Generate app_transaction_id if not provided
-    const appTransactionId = dto.app_transaction_id || `txn_${Date.now()}_${req.user.sub}`;
-    
-    const paymentRequest = {
-      ...dto,
-      app_transaction_id: appTransactionId,
-      app_transaction_time: dto.app_transaction_time || Date.now(),
-    };
+  @Post('paypal/create')
+  async createPaypalOrder(@Req() req: any, @Body() dto: CreatePaypalOrderDto) {
+    const order = await this.paypalService.createOrder(dto, req.user.sub);
+    const approvalUrl = this.paypalService.getApprovalLink(order);
+    const purchaseUnit = order?.purchase_units?.[0];
 
-    const result = await this.flouciService.createPayment(paymentRequest);
-    
-    // Record the payment attempt in the database
     await this.paymentService.record({
       userId: req.user.sub,
-      amount: dto.amount,
-      payment_method: 'Flouci',
+      amount: Number(purchaseUnit?.amount?.value || dto.amount),
+      payment_method: 'PayPal',
       payment_status: 'pending',
+      transaction_id: order?.id,
+      currency: purchaseUnit?.amount?.currency_code || dto.currency,
+      metadata: {
+        paypal_status: order?.status,
+        approval_url: approvalUrl,
+        reference_id: purchaseUnit?.reference_id,
+      },
     });
 
-    return result;
+    return {
+      orderId: order?.id,
+      status: order?.status,
+      approvalUrl,
+      purchaseUnits: order?.purchase_units,
+    };
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('flouci/status/:paymentId')
-  async getFlouciPaymentStatus(@Param('paymentId') paymentId: string) {
-    return this.flouciService.getPaymentStatus(paymentId);
+  @Post('paypal/capture/:orderId')
+  async capturePaypalOrder(@Param('orderId') orderId: string) {
+    const capture = await this.paypalService.captureOrder(orderId);
+    const paymentStatus = capture?.status === 'COMPLETED' ? 'success' : 'failed';
+
+    await this.paymentService.updateStatus(orderId, paymentStatus, {
+      paypal_status: capture?.status,
+      capture,
+    });
+
+    return capture;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('paypal/status/:orderId')
+  async getPaypalOrder(@Param('orderId') orderId: string) {
+    return this.paypalService.getOrder(orderId);
   }
 }
 

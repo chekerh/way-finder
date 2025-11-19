@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber, Min, Max, IsNotEmpty } from 'class-validator';
 
 export enum TravelTipCategory {
   GENERAL = 'general',
@@ -12,6 +12,7 @@ export enum TravelTipCategory {
 }
 
 export class GetTravelTipsDto {
+  @IsNotEmpty()
   @IsString()
   destinationId: string;
 

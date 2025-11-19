@@ -222,6 +222,246 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
       validatingAirlineCodes: ['VY'],
     },
   },
+  {
+    destinationCode: 'LHR',
+    offer: {
+      type: 'flight-offer',
+      id: 'WF-LHR-001',
+      source: 'fallback',
+      itineraries: [
+        {
+          duration: 'PT3H15M',
+          segments: [
+            {
+              id: 'WF-LHR-001-1',
+              departure: { iataCode: 'TUN', at: '2025-12-09T09:00:00' },
+              arrival: { iataCode: 'LHR', at: '2025-12-09T12:15:00' },
+              carrierCode: 'BA',
+              number: '202',
+              aircraft: { code: '320' },
+              duration: 'PT3H15M',
+            },
+          ],
+        },
+        {
+          duration: 'PT3H20M',
+          segments: [
+            {
+              id: 'WF-LHR-001-2',
+              departure: { iataCode: 'LHR', at: '2025-12-16T14:30:00' },
+              arrival: { iataCode: 'TUN', at: '2025-12-16T17:50:00' },
+              carrierCode: 'BA',
+              number: '203',
+              aircraft: { code: '320' },
+              duration: 'PT3H20M',
+            },
+          ],
+        },
+      ],
+      price: { currency: 'EUR', total: '280.00', base: '200.00' },
+      validatingAirlineCodes: ['BA'],
+    },
+  },
+  {
+    destinationCode: 'MAD',
+    offer: {
+      type: 'flight-offer',
+      id: 'WF-MAD-001',
+      source: 'fallback',
+      itineraries: [
+        {
+          duration: 'PT2H10M',
+          segments: [
+            {
+              id: 'WF-MAD-001-1',
+              departure: { iataCode: 'TUN', at: '2025-12-11T11:20:00' },
+              arrival: { iataCode: 'MAD', at: '2025-12-11T13:30:00' },
+              carrierCode: 'IB',
+              number: '3456',
+              aircraft: { code: '320' },
+              duration: 'PT2H10M',
+            },
+          ],
+        },
+        {
+          duration: 'PT2H15M',
+          segments: [
+            {
+              id: 'WF-MAD-001-2',
+              departure: { iataCode: 'MAD', at: '2025-12-18T16:45:00' },
+              arrival: { iataCode: 'TUN', at: '2025-12-18T18:00:00' },
+              carrierCode: 'IB',
+              number: '3457',
+              aircraft: { code: '320' },
+              duration: 'PT2H15M',
+            },
+          ],
+        },
+      ],
+      price: { currency: 'EUR', total: '195.00', base: '130.00' },
+      validatingAirlineCodes: ['IB'],
+    },
+  },
+  {
+    destinationCode: 'NRT',
+    offer: {
+      type: 'flight-offer',
+      id: 'WF-NRT-001',
+      source: 'fallback',
+      itineraries: [
+        {
+          duration: 'PT14H30M',
+          segments: [
+            {
+              id: 'WF-NRT-001-1',
+              departure: { iataCode: 'TUN', at: '2025-12-12T10:00:00' },
+              arrival: { iataCode: 'NRT', at: '2025-12-13T02:30:00' },
+              carrierCode: 'JL',
+              number: '601',
+              aircraft: { code: '787' },
+              duration: 'PT14H30M',
+            },
+          ],
+        },
+        {
+          duration: 'PT14H45M',
+          segments: [
+            {
+              id: 'WF-NRT-001-2',
+              departure: { iataCode: 'NRT', at: '2025-12-20T11:00:00' },
+              arrival: { iataCode: 'TUN', at: '2025-12-21T01:45:00' },
+              carrierCode: 'JL',
+              number: '602',
+              aircraft: { code: '787' },
+              duration: 'PT14H45M',
+            },
+          ],
+        },
+      ],
+      price: { currency: 'EUR', total: '850.00', base: '680.00' },
+      validatingAirlineCodes: ['JL'],
+    },
+  },
+  {
+    destinationCode: 'BKK',
+    offer: {
+      type: 'flight-offer',
+      id: 'WF-BKK-001',
+      source: 'fallback',
+      itineraries: [
+        {
+          duration: 'PT11H20M',
+          segments: [
+            {
+              id: 'WF-BKK-001-1',
+              departure: { iataCode: 'TUN', at: '2025-12-13T08:30:00' },
+              arrival: { iataCode: 'BKK', at: '2025-12-13T19:50:00' },
+              carrierCode: 'TG',
+              number: '945',
+              aircraft: { code: '777' },
+              duration: 'PT11H20M',
+            },
+          ],
+        },
+        {
+          duration: 'PT11H30M',
+          segments: [
+            {
+              id: 'WF-BKK-001-2',
+              departure: { iataCode: 'BKK', at: '2025-12-21T14:20:00' },
+              arrival: { iataCode: 'TUN', at: '2025-12-22T01:50:00' },
+              carrierCode: 'TG',
+              number: '946',
+              aircraft: { code: '777' },
+              duration: 'PT11H30M',
+            },
+          ],
+        },
+      ],
+      price: { currency: 'EUR', total: '620.00', base: '480.00' },
+      validatingAirlineCodes: ['TG'],
+    },
+  },
+  {
+    destinationCode: 'SIN',
+    offer: {
+      type: 'flight-offer',
+      id: 'WF-SIN-001',
+      source: 'fallback',
+      itineraries: [
+        {
+          duration: 'PT12H15M',
+          segments: [
+            {
+              id: 'WF-SIN-001-1',
+              departure: { iataCode: 'TUN', at: '2025-12-14T09:15:00' },
+              arrival: { iataCode: 'SIN', at: '2025-12-14T21:30:00' },
+              carrierCode: 'SQ',
+              number: '351',
+              aircraft: { code: '350' },
+              duration: 'PT12H15M',
+            },
+          ],
+        },
+        {
+          duration: 'PT12H25M',
+          segments: [
+            {
+              id: 'WF-SIN-001-2',
+              departure: { iataCode: 'SIN', at: '2025-12-22T23:45:00' },
+              arrival: { iataCode: 'TUN', at: '2025-12-23T12:10:00' },
+              carrierCode: 'SQ',
+              number: '352',
+              aircraft: { code: '350' },
+              duration: 'PT12H25M',
+            },
+          ],
+        },
+      ],
+      price: { currency: 'EUR', total: '720.00', base: '560.00' },
+      validatingAirlineCodes: ['SQ'],
+    },
+  },
+  {
+    destinationCode: 'ICN',
+    offer: {
+      type: 'flight-offer',
+      id: 'WF-ICN-001',
+      source: 'fallback',
+      itineraries: [
+        {
+          duration: 'PT13H40M',
+          segments: [
+            {
+              id: 'WF-ICN-001-1',
+              departure: { iataCode: 'TUN', at: '2025-12-15T07:45:00' },
+              arrival: { iataCode: 'ICN', at: '2025-12-15T21:25:00' },
+              carrierCode: 'KE',
+              number: '654',
+              aircraft: { code: '777' },
+              duration: 'PT13H40M',
+            },
+          ],
+        },
+        {
+          duration: 'PT13H50M',
+          segments: [
+            {
+              id: 'WF-ICN-001-2',
+              departure: { iataCode: 'ICN', at: '2025-12-23T10:30:00' },
+              arrival: { iataCode: 'TUN', at: '2025-12-24T00:20:00' },
+              carrierCode: 'KE',
+              number: '655',
+              aircraft: { code: '777' },
+              duration: 'PT13H50M',
+            },
+          ],
+        },
+      ],
+      price: { currency: 'EUR', total: '780.00', base: '620.00' },
+      validatingAirlineCodes: ['KE'],
+    },
+  },
 ];
 
 export const FALLBACK_EXPLORE_OFFERS = [

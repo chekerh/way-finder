@@ -4,7 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Payment, PaymentSchema } from './payment.schema';
 import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
-import { FlouciService } from './flouci.service';
+import { PaypalService } from './paypal.service';
 
 @Module({
   imports: [
@@ -15,7 +15,7 @@ import { FlouciService } from './flouci.service';
     }),
   ],
   controllers: [PaymentController],
-  providers: [PaymentService, FlouciService],
+  providers: [PaymentService, PaypalService],
 })
 export class PaymentModule {}
 

@@ -20,6 +20,11 @@ export class ConfirmBookingDto {
   @IsNotEmpty()
   @IsObject()
   payment_details: Record<string, any>;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'total_price must be a number' })
+  @Type(() => Number)
+  total_price?: number;
 }
 
 export class TripDetailsDto {
@@ -77,10 +82,6 @@ export class CreateBookingDto extends ConfirmBookingDto {
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  @IsNumber()
-  total_price?: number;
 }
 
 export class UpdateBookingDto extends PartialType(CreateBookingDto) {
