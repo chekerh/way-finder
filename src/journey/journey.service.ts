@@ -137,21 +137,23 @@ export class JourneyService {
         const commentsCount = await this.journeyCommentModel.countDocuments({ journey_id: journey._id });
         
         const journeyObj = journey.toObject ? journey.toObject() : journey;
-        const populatedUserId = journeyObj.user_id;
+        const populatedUserId = journeyObj.user_id as any;
         
         // Transform: keep user_id as string, move populated user data to 'user' field
+        const isPopulatedUser = populatedUserId && typeof populatedUserId === 'object' && populatedUserId._id;
+        
         return {
           ...journeyObj,
-          user_id: typeof populatedUserId === 'object' && populatedUserId?._id 
+          user_id: isPopulatedUser 
             ? populatedUserId._id.toString() 
             : (populatedUserId?.toString() || journeyObj.user_id?.toString()),
-          user: typeof populatedUserId === 'object' && populatedUserId?._id 
+          user: isPopulatedUser
             ? {
                 _id: populatedUserId._id.toString(),
-                username: populatedUserId.username,
-                firstName: populatedUserId.firstName || populatedUserId.first_name,
-                lastName: populatedUserId.lastName || populatedUserId.last_name,
-                profileImageUrl: populatedUserId.profile_image_url || populatedUserId.profileImageUrl,
+                username: populatedUserId.username || '',
+                firstName: populatedUserId.firstName || populatedUserId.first_name || '',
+                lastName: populatedUserId.lastName || populatedUserId.last_name || '',
+                profileImageUrl: populatedUserId.profile_image_url || populatedUserId.profileImageUrl || '',
               }
             : null,
           booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
@@ -185,21 +187,23 @@ export class JourneyService {
     const isLiked = userId ? await this.journeyLikeModel.exists({ journey_id: journey._id, user_id: this.toObjectId(userId, 'user id') }) : false;
 
     const journeyObj = journey.toObject ? journey.toObject() : journey;
-    const populatedUserId = journeyObj.user_id;
+    const populatedUserId = journeyObj.user_id as any;
     
     // Transform: keep user_id as string, move populated user data to 'user' field
+    const isPopulatedUser = populatedUserId && typeof populatedUserId === 'object' && populatedUserId._id;
+    
     return {
       ...journeyObj,
-      user_id: typeof populatedUserId === 'object' && populatedUserId?._id 
+      user_id: isPopulatedUser 
         ? populatedUserId._id.toString() 
         : (populatedUserId?.toString() || journeyObj.user_id?.toString()),
-      user: typeof populatedUserId === 'object' && populatedUserId?._id 
+      user: isPopulatedUser
         ? {
             _id: populatedUserId._id.toString(),
-            username: populatedUserId.username,
-            firstName: populatedUserId.firstName || populatedUserId.first_name,
-            lastName: populatedUserId.lastName || populatedUserId.last_name,
-            profileImageUrl: populatedUserId.profile_image_url || populatedUserId.profileImageUrl,
+            username: populatedUserId.username || '',
+            firstName: populatedUserId.firstName || populatedUserId.first_name || '',
+            lastName: populatedUserId.lastName || populatedUserId.last_name || '',
+            profileImageUrl: populatedUserId.profile_image_url || populatedUserId.profileImageUrl || '',
           }
         : null,
       booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
@@ -244,21 +248,23 @@ export class JourneyService {
 
     return journeys.map((journey) => {
       const journeyObj = journey.toObject ? journey.toObject() : journey;
-      const populatedUserId = journeyObj.user_id;
+      const populatedUserId = journeyObj.user_id as any;
       
       // Transform: keep user_id as string, move populated user data to 'user' field
+      const isPopulatedUser = populatedUserId && typeof populatedUserId === 'object' && populatedUserId._id;
+      
       return {
         ...journeyObj,
-        user_id: typeof populatedUserId === 'object' && populatedUserId?._id 
+        user_id: isPopulatedUser 
           ? populatedUserId._id.toString() 
           : (populatedUserId?.toString() || journeyObj.user_id?.toString()),
-        user: typeof populatedUserId === 'object' && populatedUserId?._id 
+        user: isPopulatedUser
           ? {
               _id: populatedUserId._id.toString(),
-              username: populatedUserId.username,
-              firstName: populatedUserId.firstName || populatedUserId.first_name,
-              lastName: populatedUserId.lastName || populatedUserId.last_name,
-              profileImageUrl: populatedUserId.profile_image_url || populatedUserId.profileImageUrl,
+              username: populatedUserId.username || '',
+              firstName: populatedUserId.firstName || populatedUserId.first_name || '',
+              lastName: populatedUserId.lastName || populatedUserId.last_name || '',
+              profileImageUrl: populatedUserId.profile_image_url || populatedUserId.profileImageUrl || '',
             }
           : null,
         booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
@@ -353,21 +359,23 @@ export class JourneyService {
 
     return comments.map((comment) => {
       const commentObj = comment.toObject ? comment.toObject() : comment;
-      const populatedUserId = commentObj.user_id;
+      const populatedUserId = commentObj.user_id as any;
       
       // Transform: keep user_id as string, move populated user data to 'user' field
+      const isPopulatedUser = populatedUserId && typeof populatedUserId === 'object' && populatedUserId._id;
+      
       return {
         ...commentObj,
-        user_id: typeof populatedUserId === 'object' && populatedUserId?._id 
+        user_id: isPopulatedUser 
           ? populatedUserId._id.toString() 
           : (populatedUserId?.toString() || commentObj.user_id?.toString()),
-        user: typeof populatedUserId === 'object' && populatedUserId?._id 
+        user: isPopulatedUser
           ? {
               _id: populatedUserId._id.toString(),
-              username: populatedUserId.username,
-              firstName: populatedUserId.firstName || populatedUserId.first_name,
-              lastName: populatedUserId.lastName || populatedUserId.last_name,
-              profileImageUrl: populatedUserId.profile_image_url || populatedUserId.profileImageUrl,
+              username: populatedUserId.username || '',
+              firstName: populatedUserId.firstName || populatedUserId.first_name || '',
+              lastName: populatedUserId.lastName || populatedUserId.last_name || '',
+              profileImageUrl: populatedUserId.profile_image_url || populatedUserId.profileImageUrl || '',
             }
           : null,
         journey_id: commentObj.journey_id?.toString() || commentObj.journey_id,
