@@ -524,7 +524,7 @@ export class JourneyService {
 
     // Reset video status to pending
     journey.video_status = 'pending';
-    journey.video_url = null;
+    journey.video_url = undefined;
     await journey.save();
 
     // Prepare slides for video generation
