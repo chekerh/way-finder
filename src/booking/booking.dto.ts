@@ -73,10 +73,7 @@ export class PassengerDto {
 }
 
 export class CreateBookingDto extends ConfirmBookingDto {
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => TripDetailsDto)
-  trip_details?: TripDetailsDto;
+  // trip_details is inherited from ConfirmBookingDto, no need to redeclare
 
   @IsOptional()
   @IsArray()
