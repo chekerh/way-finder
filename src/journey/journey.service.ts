@@ -18,6 +18,9 @@ import {
 import { CreateJourneyDto, UpdateJourneyDto, CreateJourneyCommentDto } from './journey.dto';
 import { BookingService } from '../booking/booking.service';
 import { VideoProcessingService } from '../video-processing/video-processing.service';
+import { ImgBBService } from './imgbb.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class JourneyService {
@@ -29,6 +32,7 @@ export class JourneyService {
     @InjectModel(JourneyComment.name) private readonly journeyCommentModel: Model<JourneyCommentDocument>,
     private readonly bookingService: BookingService,
     private readonly videoProcessingService: VideoProcessingService,
+    private readonly imgbbService: ImgBBService,
   ) {}
 
   private toObjectId(id: string, label: string) {
@@ -36,6 +40,56 @@ export class JourneyService {
       throw new BadRequestException(`Invalid ${label}`);
     }
     return id as any;
+  }
+
+  /**
+   * Upload images to ImgBB and return their URLs
+   * @param files - Array of uploaded files from Multer
+   * @returns Array of ImgBB URLs
+   */
+  async uploadImagesToImgBB(files: Express.Multer.File[]): Promise<string[]> {
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const filePath = path.join(file.destination, file.filename);
+        try {
+          const imgbbUrl = await this.imgbbService.uploadImage(filePath, file.originalname);
+          
+          // Clean up local file after successful upload
+          try {
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+              this.logger.debug(`Deleted local file: ${filePath}`);
+            }
+          } catch (cleanupError) {
+            this.logger.warn(`Failed to delete local file ${filePath}: ${cleanupError.message}`);
+          }
+          
+          return imgbbUrl;
+        } catch (error) {
+          this.logger.error(`Failed to upload image ${file.originalname} to ImgBB: ${error.message}`);
+          // If ImgBB fails, fallback to local URL
+          const publicBaseUrl = (
+            process.env.PUBLIC_BASE_URL ||
+            process.env.BASE_URL ||
+            'http://localhost:3000'
+          ).replace(/\/$/, '');
+          return `${publicBaseUrl}/uploads/journeys/${file.filename}`;
+        }
+      });
+
+      const imageUrls = await Promise.all(uploadPromises);
+      this.logger.log(`Successfully processed ${imageUrls.length} images`);
+      return imageUrls;
+    } catch (error) {
+      this.logger.error(`Error uploading images to ImgBB: ${error.message}`, error.stack);
+      // Fallback to local URLs if ImgBB service fails
+      const publicBaseUrl = (
+        process.env.PUBLIC_BASE_URL ||
+        process.env.BASE_URL ||
+        'http://localhost:3000'
+      ).replace(/\/$/, '');
+      return files.map((file) => `${publicBaseUrl}/uploads/journeys/${file.filename}`);
+    }
   }
 
   async createJourney(userId: string, dto: CreateJourneyDto, imageUrls: string[]) {

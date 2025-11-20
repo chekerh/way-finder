@@ -19,9 +19,12 @@ import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { JourneyService } from './journey.service';
 import { CreateJourneyDto, UpdateJourneyDto, CreateJourneyCommentDto } from './journey.dto';
+import { Logger } from '@nestjs/common';
 
 @Controller('journey')
 export class JourneyController {
+  private readonly logger = new Logger(JourneyController.name);
+
   constructor(private readonly journeyService: JourneyService) {}
 
   @UseGuards(JwtAuthGuard)
@@ -58,9 +61,12 @@ export class JourneyController {
       throw new BadRequestException('At least one image is required');
     }
 
-    // Generate image URLs
-    const imageUrls = files.map((file) => `/uploads/journeys/${file.filename}`);
+    this.logger.log(`Uploading ${files.length} images to ImgBB for user ${req.user.sub}`);
+    
+    // Upload images to ImgBB and get URLs (parallel processing for better performance)
+    const imageUrls = await this.journeyService.uploadImagesToImgBB(files);
 
+    this.logger.log(`Successfully uploaded images, creating journey...`);
     return this.journeyService.createJourney(req.user.sub, dto, imageUrls);
   }
 

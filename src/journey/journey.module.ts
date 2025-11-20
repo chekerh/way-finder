@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { HttpModule } from '@nestjs/axios';
 import { JourneyController } from './journey.controller';
 import { JourneyService } from './journey.service';
+import { ImgBBService } from './imgbb.service';
 import { Journey, JourneySchema, JourneyLike, JourneyLikeSchema, JourneyComment, JourneyCommentSchema } from './journey.schema';
 import { BookingModule } from '../booking/booking.module';
 import { VideoProcessingModule } from '../video-processing/video-processing.module';
@@ -15,9 +17,10 @@ import { VideoProcessingModule } from '../video-processing/video-processing.modu
     ]),
     BookingModule,
     VideoProcessingModule,
+    HttpModule,
   ],
   controllers: [JourneyController],
-  providers: [JourneyService],
+  providers: [JourneyService, ImgBBService],
   exports: [JourneyService],
 })
 export class JourneyModule {}
