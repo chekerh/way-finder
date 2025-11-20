@@ -175,5 +175,11 @@ export class JourneyController {
   async deleteComment(@Req() req: any, @Param('commentId') commentId: string) {
     return this.journeyService.deleteComment(req.user.sub, commentId);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/regenerate-video')
+  async regenerateVideo(@Req() req: any, @Param('id') id: string) {
+    return this.journeyService.regenerateVideo(req.user.sub, id);
+  }
 }
 

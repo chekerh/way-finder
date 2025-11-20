@@ -510,5 +510,62 @@ export class JourneyService {
     return { message: 'Comment deleted successfully' };
   }
 
+  async regenerateVideo(userId: string, journeyId: string) {
+    const journey = await this.journeyModel.findById(journeyId).exec();
+
+    if (!journey || !journey.is_visible) {
+      throw new NotFoundException('Journey not found');
+    }
+
+    // Verify that the journey belongs to the user
+    if (journey.user_id.toString() !== userId) {
+      throw new ForbiddenException('You can only regenerate videos for your own journeys');
+    }
+
+    // Reset video status to pending
+    journey.video_status = 'pending';
+    journey.video_url = null;
+    await journey.save();
+
+    // Prepare slides for video generation
+    const publicBaseUrl = (
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
+
+    const queueSlides = journey.slides.map((slide) => {
+      const imageUrl = slide.imageUrl.startsWith('http')
+        ? slide.imageUrl
+        : `${publicBaseUrl}${slide.imageUrl.startsWith('/') ? '' : '/'}${slide.imageUrl}`;
+      return {
+        imageUrl,
+        caption: slide.caption,
+      };
+    });
+
+    // Enqueue video generation job
+    try {
+      await this.videoProcessingService.enqueueJourneyVideo({
+        journeyId: journey._id.toString(),
+        userId,
+        destination: journey.destination,
+        musicTheme: journey.music_theme || null,
+        captionText: journey.caption_text || null,
+        slides: queueSlides,
+      });
+      this.logger.log(`Video regeneration queued for journey ${journeyId} by user ${userId}`);
+    } catch (error) {
+      this.logger.error(`Failed to enqueue video regeneration for journey ${journeyId}`, error as Error);
+      throw error;
+    }
+
+    return {
+      message: 'Video generation started',
+      journey_id: journeyId,
+      video_status: 'pending',
+    };
+  }
+
 }
 
