@@ -42,7 +42,7 @@ export class JourneyController {
         },
       }),
       limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB per image
+        fileSize: 5 * 1024 * 1024, // 5MB per image (reduced from 10MB for faster uploads)
       },
       fileFilter: (req, file, cb) => {
         if (!file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
@@ -61,33 +61,27 @@ export class JourneyController {
       throw new BadRequestException('At least one image is required');
     }
 
-    this.logger.log(`Uploading ${files.length} images to ImgBB for user ${req.user.sub}`);
+    this.logger.log(`Uploading ${files.length} images to ImgBB for user ${req.user.sub} (5s timeout)`);
     
     try {
-      // Upload images to ImgBB and get URLs (parallel processing for better performance)
-      // Set a timeout for the entire upload process (2 minutes per image max)
+      // Upload images to ImgBB and get URLs with strict 5 second timeout
       const uploadPromise = this.journeyService.uploadImagesToImgBB(files);
       const timeoutPromise = new Promise<string[]>((_, reject) => {
         setTimeout(() => {
-          reject(new Error('Image upload timeout: ImgBB upload took too long'));
-        }, files.length * 120000); // 2 minutes per image
+          reject(new Error('Image upload timeout: Upload exceeded 5 seconds'));
+        }, 5000); // 5 seconds strict timeout
       });
 
       const imageUrls = await Promise.race([uploadPromise, timeoutPromise]) as string[];
 
-      this.logger.log(`Successfully uploaded ${imageUrls.length} images, creating journey...`);
+      this.logger.log(`Successfully uploaded ${imageUrls.length} images within 5s, creating journey...`);
       return this.journeyService.createJourney(req.user.sub, dto, imageUrls);
     } catch (error) {
-      this.logger.error(`Error uploading images: ${error.message}`, error.stack);
-      // If ImgBB upload fails or times out, fallback to local storage
-      const publicBaseUrl = (
-        process.env.PUBLIC_BASE_URL ||
-        process.env.BASE_URL ||
-        'http://localhost:3000'
-      ).replace(/\/$/, '');
-      const imageUrls = files.map((file) => `${publicBaseUrl}/uploads/journeys/${file.filename}`);
-      this.logger.warn(`Using local storage fallback for ${imageUrls.length} images`);
-      return this.journeyService.createJourney(req.user.sub, dto, imageUrls);
+      this.logger.error(`Error uploading images (timeout or error): ${error.message}`, error.stack);
+      // If upload fails or times out, throw error (don't fallback to local storage for strict 5s requirement)
+      throw new BadRequestException(
+        'Image upload failed or exceeded 5 seconds. Please try again with fewer or smaller images.'
+      );
     }
   }
 
