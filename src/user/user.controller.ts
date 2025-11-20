@@ -1,14 +1,22 @@
-import { Body, Controller, Get, Put, Req, UseGuards, Post, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Put, Req, UseGuards, Post, UploadedFile, UseInterceptors, BadRequestException, Logger } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ImgBBService } from '../journey/imgbb.service';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  private readonly logger = new Logger(UserController.name);
+
+  constructor(
+    private readonly userService: UserService,
+    private readonly imgbbService: ImgBBService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('profile')
@@ -58,9 +66,38 @@ export class UserController {
       throw new BadRequestException('No file uploaded');
     }
     
-    // In production, upload to cloud storage (S3, Cloudinary, etc.) and return URL
-    // For now, return a relative path that the frontend can use
-    const imageUrl = `/uploads/profiles/${file.filename}`;
+    this.logger.log(`Uploading profile image to ImgBB for user ${req.user.sub}`);
+    
+    let imageUrl: string;
+    const filePath = path.join(file.destination, file.filename);
+    
+    try {
+      // Upload to ImgBB
+      const imgbbUrl = await this.imgbbService.uploadImage(filePath, `profile-${req.user.sub}.jpg`);
+      
+      // Clean up local file after successful upload
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          this.logger.debug(`Deleted local profile file: ${filePath}`);
+        }
+      } catch (cleanupError) {
+        this.logger.warn(`Failed to delete local profile file ${filePath}: ${cleanupError.message}`);
+      }
+      
+      imageUrl = imgbbUrl;
+      this.logger.log(`Profile image uploaded successfully to ImgBB: ${imageUrl}`);
+    } catch (error) {
+      this.logger.error(`Failed to upload profile image to ImgBB: ${error.message}`, error.stack);
+      // Fallback to local storage if ImgBB fails
+      const publicBaseUrl = (
+        process.env.PUBLIC_BASE_URL ||
+        process.env.BASE_URL ||
+        'http://localhost:3000'
+      ).replace(/\/$/, '');
+      imageUrl = `${publicBaseUrl}/uploads/profiles/${file.filename}`;
+      this.logger.warn(`Using local storage fallback for profile image: ${imageUrl}`);
+    }
     
     // Update user profile with image URL
     const user = await this.userService.updateProfile(req.user.sub, {
