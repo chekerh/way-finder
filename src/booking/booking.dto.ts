@@ -25,6 +25,11 @@ export class ConfirmBookingDto {
   @IsNumber({}, { message: 'total_price must be a number' })
   @Type(() => Number)
   total_price?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TripDetailsDto)
+  trip_details?: TripDetailsDto;
 }
 
 export class TripDetailsDto {

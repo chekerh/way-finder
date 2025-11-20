@@ -49,6 +49,7 @@ export class BookingService {
       booking_date: new Date(),
       confirmation_number,
       total_price,
+      trip_details: dto.trip_details, // Include trip details (destination, etc.)
     });
     return booking.save();
   }
