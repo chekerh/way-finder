@@ -7,9 +7,17 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Journey, JourneyDocument, JourneyLike, JourneyLikeDocument, JourneyComment, JourneyCommentDocument } from './journey.schema';
+import {
+  Journey,
+  JourneyDocument,
+  JourneyLike,
+  JourneyLikeDocument,
+  JourneyComment,
+  JourneyCommentDocument,
+} from './journey.schema';
 import { CreateJourneyDto, UpdateJourneyDto, CreateJourneyCommentDto } from './journey.dto';
 import { BookingService } from '../booking/booking.service';
+import { VideoProcessingService } from '../video-processing/video-processing.service';
 
 @Injectable()
 export class JourneyService {
@@ -20,6 +28,7 @@ export class JourneyService {
     @InjectModel(JourneyLike.name) private readonly journeyLikeModel: Model<JourneyLikeDocument>,
     @InjectModel(JourneyComment.name) private readonly journeyCommentModel: Model<JourneyCommentDocument>,
     private readonly bookingService: BookingService,
+    private readonly videoProcessingService: VideoProcessingService,
   ) {}
 
   private toObjectId(id: string, label: string) {
@@ -89,11 +98,38 @@ export class JourneyService {
       );
     }
 
+    const slides =
+      dto.slides && dto.slides.length > 0
+        ? dto.slides.map((slide) => ({
+            imageUrl: slide.imageUrl,
+            caption: slide.caption,
+          }))
+        : imageUrls.map((url) => ({ imageUrl: url }));
+
+    const publicBaseUrl = (
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
+
+    const queueSlides = slides.map((slide) => {
+      const imageUrl = slide.imageUrl.startsWith('http')
+        ? slide.imageUrl
+        : `${publicBaseUrl}${slide.imageUrl.startsWith('/') ? '' : '/'}${slide.imageUrl}`;
+      return {
+        imageUrl,
+        caption: slide.caption,
+      };
+    });
+
     const journey = new this.journeyModel({
       user_id: this.toObjectId(userId, 'user id'),
       booking_id: this.toObjectId(bookingId, 'booking id'), // Now always required
       destination,
       image_urls: imageUrls,
+      slides,
+      music_theme: dto.music_theme || null,
+      caption_text: dto.caption_text || null,
       description: dto.description || '',
       tags: dto.tags || [],
       is_public: dto.is_public !== undefined ? dto.is_public : true,
@@ -102,10 +138,18 @@ export class JourneyService {
 
     const savedJourney = await journey.save();
 
-    // Trigger video generation asynchronously
-    this.generateVideoAsync(savedJourney._id.toString(), imageUrls).catch((error) => {
-      this.logger.error(`Failed to generate video for journey ${savedJourney._id}:`, error);
-    });
+    try {
+      await this.videoProcessingService.enqueueJourneyVideo({
+        journeyId: savedJourney._id.toString(),
+        userId,
+        destination,
+        musicTheme: journey.music_theme || null,
+        captionText: journey.caption_text || null,
+        slides: queueSlides,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to enqueue video job for journey ${savedJourney._id}`, error as Error);
+    }
 
     return savedJourney;
   }
@@ -286,6 +330,8 @@ export class JourneyService {
     if (dto.description !== undefined) journey.description = dto.description;
     if (dto.tags !== undefined) journey.tags = dto.tags;
     if (dto.is_public !== undefined) journey.is_public = dto.is_public;
+    if (dto.music_theme !== undefined) journey.music_theme = dto.music_theme;
+    if (dto.caption_text !== undefined) journey.caption_text = dto.caption_text;
 
     return journey.save();
   }
@@ -399,47 +445,5 @@ export class JourneyService {
     return { message: 'Comment deleted successfully' };
   }
 
-  // Video generation (placeholder - integrate with AI service)
-  private async generateVideoAsync(journeyId: string, imageUrls: string[]) {
-    try {
-      // Update status to processing
-      await this.journeyModel.findByIdAndUpdate(journeyId, {
-        video_status: 'processing',
-      }).exec();
-
-      // TODO: Integrate with AI video generation service
-      // For now, this is a placeholder that simulates video generation
-      // In production, you would:
-      // 1. Use a service like Cloudinary, AWS Rekognition, or custom AI model
-      // 2. Process images to create a video montage
-      // 3. Upload the video to cloud storage
-      // 4. Update the journey with the video URL
-
-      this.logger.log(`Starting video generation for journey ${journeyId} with ${imageUrls.length} images`);
-
-      // Simulate processing delay
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      // For now, we'll leave video_url as null and status as 'processing'
-      // In production, update with actual video URL:
-      // const videoUrl = await this.aiVideoService.generateVideo(imageUrls);
-      // await this.journeyModel.findByIdAndUpdate(journeyId, {
-      //   video_url: videoUrl,
-      //   video_status: 'completed',
-      // }).exec();
-
-      // Placeholder: Mark as completed with no video (can be implemented later)
-      await this.journeyModel.findByIdAndUpdate(journeyId, {
-        video_status: 'completed',
-      }).exec();
-
-      this.logger.log(`Video generation completed for journey ${journeyId}`);
-    } catch (error) {
-      this.logger.error(`Video generation failed for journey ${journeyId}:`, error);
-      await this.journeyModel.findByIdAndUpdate(journeyId, {
-        video_status: 'failed',
-      }).exec();
-    }
-  }
 }
 

@@ -15,6 +15,23 @@ export class Journey {
   @Prop({ type: [String], default: [] })
   image_urls: string[]; // Array of uploaded image URLs
 
+  @Prop({
+    type: [
+      {
+        imageUrl: { type: String, required: true },
+        caption: { type: String, default: null },
+      },
+    ],
+    default: [],
+  })
+  slides: { imageUrl: string; caption?: string }[];
+
+  @Prop({ type: String, default: null, trim: true })
+  music_theme?: string;
+
+  @Prop({ type: String, default: null, trim: true, maxlength: 280 })
+  caption_text?: string;
+
   @Prop({ type: String, default: null })
   video_url?: string; // AI-generated video URL
 

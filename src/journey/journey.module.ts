@@ -4,6 +4,7 @@ import { JourneyController } from './journey.controller';
 import { JourneyService } from './journey.service';
 import { Journey, JourneySchema, JourneyLike, JourneyLikeSchema, JourneyComment, JourneyCommentSchema } from './journey.schema';
 import { BookingModule } from '../booking/booking.module';
+import { VideoProcessingModule } from '../video-processing/video-processing.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { BookingModule } from '../booking/booking.module';
       { name: JourneyComment.name, schema: JourneyCommentSchema },
     ]),
     BookingModule,
+    VideoProcessingModule,
   ],
   controllers: [JourneyController],
   providers: [JourneyService],
