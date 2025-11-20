@@ -12,26 +12,7 @@ import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
 import { BookingStatus } from '../common/enums/booking-status.enum';
 
-export class ConfirmBookingDto {
-  @IsNotEmpty()
-  @IsString()
-  offer_id: string;
-
-  @IsNotEmpty()
-  @IsObject()
-  payment_details: Record<string, any>;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'total_price must be a number' })
-  @Type(() => Number)
-  total_price?: number;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => TripDetailsDto)
-  trip_details?: TripDetailsDto;
-}
-
+// Define TripDetailsDto before ConfirmBookingDto to avoid reference errors
 export class TripDetailsDto {
   @IsOptional()
   @IsString()
@@ -56,6 +37,26 @@ export class TripDetailsDto {
   @IsOptional()
   @IsString()
   seats?: string;
+}
+
+export class ConfirmBookingDto {
+  @IsNotEmpty()
+  @IsString()
+  offer_id: string;
+
+  @IsNotEmpty()
+  @IsObject()
+  payment_details: Record<string, any>;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'total_price must be a number' })
+  @Type(() => Number)
+  total_price?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TripDetailsDto)
+  trip_details?: TripDetailsDto;
 }
 
 export class PassengerDto {
