@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { VideoJobPayload } from './interfaces/video-job-payload.interface';
+import type { Queue } from 'bull';
+import type { VideoJobPayload } from './interfaces/video-job-payload.interface';
 
 @Injectable()
 export class VideoProcessingService {

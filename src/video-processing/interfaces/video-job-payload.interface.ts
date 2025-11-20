@@ -1,6 +1,6 @@
 export interface VideoSlideInput {
   imageUrl: string;
-  caption?: string;
+  caption?: string | null;
 }
 
 export interface VideoJobPayload {

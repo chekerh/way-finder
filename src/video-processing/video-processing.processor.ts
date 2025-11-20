@@ -1,9 +1,9 @@
 import { Process, Processor } from '@nestjs/bull';
-import { Job } from 'bull';
+import type { Job } from 'bull';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Journey, JourneyDocument } from '../journey/journey.schema';
-import { VideoJobPayload } from './interfaces/video-job-payload.interface';
+import type { VideoJobPayload } from './interfaces/video-job-payload.interface';
 import { AiVideoService } from './ai-video.service';
 
 @Processor('video-montage')

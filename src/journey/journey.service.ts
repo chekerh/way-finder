@@ -102,9 +102,9 @@ export class JourneyService {
       dto.slides && dto.slides.length > 0
         ? dto.slides.map((slide) => ({
             imageUrl: slide.imageUrl,
-            caption: slide.caption,
+            caption: slide.caption ?? null,
           }))
-        : imageUrls.map((url) => ({ imageUrl: url }));
+        : imageUrls.map((url) => ({ imageUrl: url, caption: null }));
 
     const publicBaseUrl = (
       process.env.PUBLIC_BASE_URL ||
