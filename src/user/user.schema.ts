@@ -28,8 +28,20 @@ bio?: string;
   @Prop({ trim: true, default: null })
   profile_image_url?: string;
 
-  @Prop({ required: true })
-  password: string;
+  @Prop({ required: false }) // Made optional for Google OAuth users
+  password?: string;
+
+  @Prop({ type: String, unique: true, sparse: true, trim: true, default: null })
+  google_id?: string; // Google user ID for OAuth
+
+  @Prop({ type: Boolean, default: false })
+  email_verified: boolean; // Email verification status
+
+  @Prop({ type: String, default: null })
+  email_verification_token?: string; // Token for email verification
+
+  @Prop({ type: Date, default: null })
+  email_verified_at?: Date; // When email was verified
 
   @Prop({ type: [String], default: [] })
   preferences: string[];
