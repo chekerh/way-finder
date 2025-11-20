@@ -112,47 +112,92 @@ export class JourneyService {
     let destination: string;
     let booking: any;
 
-    // REQUIRE: User must have at least one confirmed booking to share a journey
-    if (!bookingId) {
-      // Auto-link to user's most recent confirmed booking
-      const bookings = await this.bookingService.history(userId);
-      const confirmedBookings = bookings.filter((b: any) => b.status === 'confirmed');
+    // If destination is provided in DTO, use it directly (from catalog selection)
+    if (dto.destination && dto.destination.trim().length > 0) {
+      destination = dto.destination.trim();
       
-      if (confirmedBookings.length === 0) {
-        throw new BadRequestException(
-          'You must have at least one confirmed booking to share your journey. Please make a reservation first.'
-        );
-      }
-
-      // Get the most recent confirmed booking
-      const confirmedBooking = confirmedBookings
-        .sort((a: any, b: any) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())[0];
-
-      bookingId = confirmedBooking._id?.toString() || confirmedBooking.id?.toString() || '';
-      booking = confirmedBooking;
-      destination = confirmedBooking.trip_details?.destination || 
-                   'Unknown Destination';
-    } else {
-      // Verify that the provided booking exists and belongs to the user
-      try {
-        booking = await this.bookingService.findOne(userId, bookingId);
+      // Still need a booking_id for the schema, so get the most recent confirmed booking
+      // or use the provided booking_id if available
+      if (!bookingId) {
+        const bookings = await this.bookingService.history(userId);
+        const confirmedBookings = bookings.filter((b: any) => b.status === 'confirmed');
         
-        // Verify booking is confirmed
-        if (booking.status !== 'confirmed') {
+        if (confirmedBookings.length === 0) {
           throw new BadRequestException(
-            'You can only share journeys from confirmed bookings. Please wait for your booking to be confirmed.'
+            'You must have at least one confirmed booking to share your journey. Please make a reservation first.'
           );
         }
-        
-        destination = booking.trip_details?.destination || 
-                     'Unknown Destination';
-      } catch (error) {
-        if (error instanceof BadRequestException) {
-          throw error;
+
+        // Get the most recent confirmed booking for booking_id
+        const confirmedBooking = confirmedBookings
+          .sort((a: any, b: any) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())[0];
+
+        bookingId = confirmedBooking._id?.toString() || confirmedBooking.id?.toString() || '';
+        booking = confirmedBooking;
+      } else {
+        // Verify that the provided booking exists and belongs to the user
+        try {
+          booking = await this.bookingService.findOne(userId, bookingId);
+          
+          // Verify booking is confirmed
+          if (booking.status !== 'confirmed') {
+            throw new BadRequestException(
+              'You can only share journeys from confirmed bookings. Please wait for your booking to be confirmed.'
+            );
+          }
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(
+            'Invalid booking. Please make sure you have a confirmed reservation before sharing your journey.'
+          );
         }
-        throw new BadRequestException(
-          'Invalid booking. Please make sure you have a confirmed reservation before sharing your journey.'
-        );
+      }
+    } else {
+      // No destination provided in DTO, use booking-based logic
+      // REQUIRE: User must have at least one confirmed booking to share a journey
+      if (!bookingId) {
+        // Auto-link to user's most recent confirmed booking
+        const bookings = await this.bookingService.history(userId);
+        const confirmedBookings = bookings.filter((b: any) => b.status === 'confirmed');
+        
+        if (confirmedBookings.length === 0) {
+          throw new BadRequestException(
+            'You must have at least one confirmed booking to share your journey. Please make a reservation first.'
+          );
+        }
+
+        // Get the most recent confirmed booking
+        const confirmedBooking = confirmedBookings
+          .sort((a: any, b: any) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())[0];
+
+        bookingId = confirmedBooking._id?.toString() || confirmedBooking.id?.toString() || '';
+        booking = confirmedBooking;
+        destination = confirmedBooking.trip_details?.destination || 
+                     'Unknown Destination';
+      } else {
+        // Verify that the provided booking exists and belongs to the user
+        try {
+          booking = await this.bookingService.findOne(userId, bookingId);
+          
+          // Verify booking is confirmed
+          if (booking.status !== 'confirmed') {
+            throw new BadRequestException(
+              'You can only share journeys from confirmed bookings. Please wait for your booking to be confirmed.'
+            );
+          }
+          
+          destination = booking.trip_details?.destination || 
+                       'Unknown Destination';
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(
+            'Invalid booking. Please make sure you have a confirmed reservation before sharing your journey.'
+          );
+        }
       }
     }
 

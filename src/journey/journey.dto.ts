@@ -29,6 +29,12 @@ export class CreateJourneyDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(200)
+  destination?: string; // Destination name (e.g., "Paris, France") - used if provided instead of booking destination
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
   @MaxLength(500)
   description?: string;
 
