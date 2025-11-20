@@ -49,35 +49,46 @@ export class JourneyService {
    */
   async uploadImagesToImgBB(files: Express.Multer.File[]): Promise<string[]> {
     try {
-      const uploadPromises = files.map(async (file) => {
-        const filePath = path.join(file.destination, file.filename);
-        try {
-          const imgbbUrl = await this.imgbbService.uploadImage(filePath, file.originalname);
-          
-          // Clean up local file after successful upload
+      // Limit concurrent uploads to avoid overwhelming ImgBB API (max 3 at a time)
+      const MAX_CONCURRENT_UPLOADS = 3;
+      const imageUrls: string[] = [];
+      
+      for (let i = 0; i < files.length; i += MAX_CONCURRENT_UPLOADS) {
+        const batch = files.slice(i, i + MAX_CONCURRENT_UPLOADS);
+        const uploadPromises = batch.map(async (file) => {
+          const filePath = path.join(file.destination, file.filename);
           try {
-            if (fs.existsSync(filePath)) {
-              fs.unlinkSync(filePath);
-              this.logger.debug(`Deleted local file: ${filePath}`);
+            this.logger.debug(`Uploading image ${file.originalname} to ImgBB...`);
+            const imgbbUrl = await this.imgbbService.uploadImage(filePath, file.originalname);
+            
+            // Clean up local file after successful upload
+            try {
+              if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                this.logger.debug(`Deleted local file: ${filePath}`);
+              }
+            } catch (cleanupError) {
+              this.logger.warn(`Failed to delete local file ${filePath}: ${cleanupError.message}`);
             }
-          } catch (cleanupError) {
-            this.logger.warn(`Failed to delete local file ${filePath}: ${cleanupError.message}`);
+            
+            return imgbbUrl;
+          } catch (error) {
+            this.logger.error(`Failed to upload image ${file.originalname} to ImgBB: ${error.message}`);
+            // If ImgBB fails, fallback to local URL
+            const publicBaseUrl = (
+              process.env.PUBLIC_BASE_URL ||
+              process.env.BASE_URL ||
+              'http://localhost:3000'
+            ).replace(/\/$/, '');
+            return `${publicBaseUrl}/uploads/journeys/${file.filename}`;
           }
-          
-          return imgbbUrl;
-        } catch (error) {
-          this.logger.error(`Failed to upload image ${file.originalname} to ImgBB: ${error.message}`);
-          // If ImgBB fails, fallback to local URL
-          const publicBaseUrl = (
-            process.env.PUBLIC_BASE_URL ||
-            process.env.BASE_URL ||
-            'http://localhost:3000'
-          ).replace(/\/$/, '');
-          return `${publicBaseUrl}/uploads/journeys/${file.filename}`;
-        }
-      });
+        });
 
-      const imageUrls = await Promise.all(uploadPromises);
+        const batchUrls = await Promise.all(uploadPromises);
+        imageUrls.push(...batchUrls);
+        this.logger.log(`Uploaded batch ${Math.floor(i / MAX_CONCURRENT_UPLOADS) + 1}/${Math.ceil(files.length / MAX_CONCURRENT_UPLOADS)}: ${batchUrls.length} images`);
+      }
+
       this.logger.log(`Successfully processed ${imageUrls.length} images`);
       return imageUrls;
     } catch (error) {

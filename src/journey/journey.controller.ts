@@ -63,11 +63,32 @@ export class JourneyController {
 
     this.logger.log(`Uploading ${files.length} images to ImgBB for user ${req.user.sub}`);
     
-    // Upload images to ImgBB and get URLs (parallel processing for better performance)
-    const imageUrls = await this.journeyService.uploadImagesToImgBB(files);
+    try {
+      // Upload images to ImgBB and get URLs (parallel processing for better performance)
+      // Set a timeout for the entire upload process (2 minutes per image max)
+      const uploadPromise = this.journeyService.uploadImagesToImgBB(files);
+      const timeoutPromise = new Promise<string[]>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Image upload timeout: ImgBB upload took too long'));
+        }, files.length * 120000); // 2 minutes per image
+      });
 
-    this.logger.log(`Successfully uploaded images, creating journey...`);
-    return this.journeyService.createJourney(req.user.sub, dto, imageUrls);
+      const imageUrls = await Promise.race([uploadPromise, timeoutPromise]) as string[];
+
+      this.logger.log(`Successfully uploaded ${imageUrls.length} images, creating journey...`);
+      return this.journeyService.createJourney(req.user.sub, dto, imageUrls);
+    } catch (error) {
+      this.logger.error(`Error uploading images: ${error.message}`, error.stack);
+      // If ImgBB upload fails or times out, fallback to local storage
+      const publicBaseUrl = (
+        process.env.PUBLIC_BASE_URL ||
+        process.env.BASE_URL ||
+        'http://localhost:3000'
+      ).replace(/\/$/, '');
+      const imageUrls = files.map((file) => `${publicBaseUrl}/uploads/journeys/${file.filename}`);
+      this.logger.warn(`Using local storage fallback for ${imageUrls.length} images`);
+      return this.journeyService.createJourney(req.user.sub, dto, imageUrls);
+    }
   }
 
   @Get()
