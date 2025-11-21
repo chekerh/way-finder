@@ -55,8 +55,14 @@ RUN set +e; \
       python3 -c "import numpy" 2>/dev/null && echo "numpy: OK" || echo "numpy: NOT INSTALLED"; \
       \
       echo "[2/4] Installing Pillow (this may take a while)..."; \
-      python3 -m pip install --no-cache-dir --verbose Pillow>=10.0.0 2>&1 | tail -10 || echo "Pillow install: FAILED"; \
-      python3 -c "from PIL import Image" 2>/dev/null && echo "Pillow: OK" || echo "Pillow: NOT INSTALLED - video generation will fail"; \
+      python3 -m pip install --no-cache-dir --verbose Pillow>=10.0.0 2>&1 | tail -20; \
+      if python3 -c "from PIL import Image; print('Pillow installed successfully')" 2>/dev/null; then \
+        echo "Pillow: ✓ INSTALLED"; \
+      else \
+        echo "Pillow: ✗ FAILED TO INSTALL - Trying alternative installation..."; \
+        python3 -m pip install --no-cache-dir --force-reinstall --no-binary Pillow Pillow>=10.0.0 2>&1 | tail -20 || echo "Alternative Pillow install also failed"; \
+        python3 -c "from PIL import Image; print('Pillow OK after retry')" 2>/dev/null && echo "Pillow: ✓ INSTALLED (after retry)" || echo "Pillow: ✗ NOT INSTALLED - video generation will fail"; \
+      fi; \
       \
       echo "[3/4] Installing requests..."; \
       python3 -m pip install --no-cache-dir requests>=2.31.0 2>&1 | tail -3 || echo "requests: FAILED"; \
