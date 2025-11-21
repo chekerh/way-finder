@@ -44,8 +44,7 @@ COPY . .
 
 # Install Python dependencies for video generation
 # Try to install but don't fail the build - video generation will show errors at runtime if deps are missing
-RUN set -e; \
-    if command -v python3 > /dev/null 2>&1 && [ -f video_generation/requirements.txt ]; then \
+RUN (if command -v python3 > /dev/null 2>&1 && [ -f video_generation/requirements.txt ]; then \
       echo "=== Installing Python dependencies for video generation ==="; \
       python3 --version || true; \
       python3 -m pip --version || true; \
@@ -71,7 +70,7 @@ RUN set -e; \
       echo "Build continuing..."; \
     else \
       echo "Python3 or requirements.txt not found - video generation disabled"; \
-    fi || true
+    fi) || echo "Python dependencies installation had errors but build continues"
 
 # Build the NestJS application
 RUN npm run build
