@@ -114,11 +114,27 @@ export class DestinationVideoService {
     await destinationVideo.save();
 
     // Start video generation asynchronously
-    this.generateVideoAsync(destinationVideo, aggregatedImages).catch((error) => {
-      this.logger.error(`Video generation failed: ${error.message}`, error.stack);
-      destinationVideo.status = 'failed';
-      destinationVideo.error_message = error.message;
-      destinationVideo.save();
+    this.generateVideoAsync(destinationVideo, aggregatedImages).catch(async (error) => {
+      const errorMessage = error.message || 'Unknown error occurred during video generation';
+      const errorStack = error.stack || 'No stack trace available';
+      
+      this.logger.error(
+        `Video generation failed for user ${userId}, destination ${destination}: ${errorMessage}`,
+        errorStack,
+      );
+      
+      try {
+        // Reload the document to ensure we have the latest version
+        const updatedVideo = await this.destinationVideoModel.findById(destinationVideo._id).exec();
+        if (updatedVideo) {
+          updatedVideo.status = 'failed';
+          updatedVideo.error_message = `Video generation failed: ${errorMessage}. ${errorStack.substring(0, 200)}`;
+          await updatedVideo.save();
+          this.logger.log(`Updated destination video status to failed with error message`);
+        }
+      } catch (saveError) {
+        this.logger.error(`Failed to save error message to database: ${saveError.message}`);
+      }
     });
 
     return destinationVideo;
@@ -131,7 +147,9 @@ export class DestinationVideoService {
     destinationVideo: DestinationVideoDocument,
     aggregatedImages: any,
   ): Promise<void> {
+    let step = 'initialization';
     try {
+      step = 'music_selection';
       // Select and download music
       this.logger.log('Selecting music...');
       const musicResult = await this.musicSelector.selectAndDownloadMusic(
@@ -139,6 +157,7 @@ export class DestinationVideoService {
         aggregatedImages.tags,
         60, // Default duration
       );
+      this.logger.log(`Music selected: ${musicResult.source} from ${musicResult.originalUrl}`);
 
       // Prepare Python script config
       const config = {
@@ -156,27 +175,68 @@ export class DestinationVideoService {
       const configJson = JSON.stringify(config);
 
       // Run Python video generator
+      step = 'python_execution';
       this.logger.log('Running Python video generator...');
-      const { stdout, stderr } = await execAsync(
-        `python3 "${this.pythonScriptPath}" '${configJson.replace(/'/g, "'\\''")}'`,
-        {
-          timeout: 600000, // 10 minutes timeout
-          maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-        },
-      );
+      this.logger.debug(`Python script path: ${this.pythonScriptPath}`);
+      this.logger.debug(`Number of images: ${aggregatedImages.imageUrls.length}`);
+      
+      let stdout: string;
+      let stderr: string;
+      try {
+        const execResult = await execAsync(
+          `python3 "${this.pythonScriptPath}" '${configJson.replace(/'/g, "'\\''")}'`,
+          {
+            timeout: 600000, // 10 minutes timeout
+            maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+          },
+        );
+        stdout = execResult.stdout;
+        stderr = execResult.stderr || '';
+      } catch (execError: any) {
+        // Handle execution errors (timeout, command not found, etc.)
+        const errorMsg = execError.message || 'Unknown execution error';
+        const errorCode = execError.code || 'UNKNOWN';
+        throw new Error(
+          `Python script execution failed at step ${step}: ${errorMsg} (code: ${errorCode}). ` +
+          `Stderr: ${execError.stderr || 'No stderr'}. ` +
+          `Stdout: ${execError.stdout || 'No stdout'}`,
+        );
+      }
 
-      if (stderr && !stderr.includes('WARNING')) {
-        this.logger.warn(`Python script stderr: ${stderr}`);
+      if (stderr && !stderr.includes('WARNING') && !stderr.includes('INFO')) {
+        this.logger.warn(`Python script stderr: ${stderr.substring(0, 500)}`);
       }
 
       // Parse result
-      const result = JSON.parse(stdout);
+      step = 'result_parsing';
+      let result: any;
+      try {
+        result = JSON.parse(stdout);
+      } catch (parseError: any) {
+        throw new Error(
+          `Failed to parse Python script output at step ${step}: ${parseError.message}. ` +
+          `Output: ${stdout.substring(0, 500)}`,
+        );
+      }
       
       if (!result.success) {
-        throw new Error(result.error || 'Video generation failed');
+        throw new Error(
+          `Video generation failed at step ${step}: ${result.error || 'Unknown error from Python script'}. ` +
+          `Script output: ${stdout.substring(0, 500)}`,
+        );
+      }
+
+      // Verify video file exists
+      step = 'video_verification';
+      if (!result.video_path || !fs.existsSync(result.video_path)) {
+        throw new Error(
+          `Video file not found at path: ${result.video_path || 'undefined'}. ` +
+          `Python script reported success but file is missing.`,
+        );
       }
 
       // Upload video to cloud storage (ImgBB)
+      step = 'video_upload';
       this.logger.log('Uploading video to ImgBB...');
       const videoFileName = path.basename(result.video_path);
       let videoUrl: string | null = null;
@@ -243,9 +303,22 @@ export class DestinationVideoService {
         }
       }
 
-    } catch (error) {
-      this.logger.error(`Video generation error: ${error.message}`, error.stack);
-      throw error;
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error occurred during video generation';
+      const errorStack = error.stack || 'No stack trace available';
+      const stepInfo = step ? ` (failed at step: ${step})` : '';
+      
+      this.logger.error(
+        `Video generation error${stepInfo}: ${errorMessage}`,
+        errorStack,
+      );
+      
+      // Add more context to the error message
+      const detailedError = `Step: ${step}. Error: ${errorMessage}. ` +
+        (error.code ? `Error code: ${error.code}. ` : '') +
+        (error.stderr ? `Stderr: ${error.stderr.substring(0, 200)}. ` : '');
+      
+      throw new Error(detailedError);
     }
   }
 
@@ -301,13 +374,21 @@ export class DestinationVideoService {
       videos.map((v) => [v.destination, v]),
     );
 
+    const imageCountMap = new Map<string, number>();
+    for (const dest of destinations) {
+      const aggregated = await this.imageAggregator.aggregateImagesByDestination(userId, dest);
+      imageCountMap.set(dest, aggregated.totalCount);
+    }
+
     return destinations.map((destination) => {
       const video = videoMap.get(destination);
+      const imageCount = imageCountMap.get(destination) || 0;
       return {
         destination,
         videoStatus: video?.status || 'not_started',
         videoUrl: video?.video_url || undefined,
-        imageCount: video?.image_count || 0,
+        imageCount: imageCount,
+        errorMessage: video?.error_message || undefined,
       };
     });
   }

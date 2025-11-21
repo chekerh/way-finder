@@ -84,6 +84,9 @@ export class DestinationVideoController {
       imageCount: destinationVideo.image_count,
       generatedAt: destinationVideo.generated_at || null,
       errorMessage: destinationVideo.error_message || null,
+      errorDetails: destinationVideo.error_message 
+        ? `Video generation failed: ${destinationVideo.error_message}` 
+        : null,
     };
   }
 
