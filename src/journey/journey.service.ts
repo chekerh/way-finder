@@ -17,7 +17,6 @@ import {
 } from './journey.schema';
 import { CreateJourneyDto, UpdateJourneyDto, CreateJourneyCommentDto } from './journey.dto';
 import { BookingService } from '../booking/booking.service';
-import { VideoProcessingService } from '../video-processing/video-processing.service';
 import { ImgBBService } from './imgbb.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -31,7 +30,6 @@ export class JourneyService {
     @InjectModel(JourneyLike.name) private readonly journeyLikeModel: Model<JourneyLikeDocument>,
     @InjectModel(JourneyComment.name) private readonly journeyCommentModel: Model<JourneyCommentDocument>,
     private readonly bookingService: BookingService,
-    private readonly videoProcessingService: VideoProcessingService,
     private readonly imgbbService: ImgBBService,
   ) {}
 
@@ -208,58 +206,27 @@ export class JourneyService {
       );
     }
 
-    const slides =
-      dto.slides && dto.slides.length > 0
-        ? dto.slides.map((slide) => ({
-            imageUrl: slide.imageUrl,
-            caption: slide.caption ?? null,
-          }))
-        : imageUrls.map((url) => ({ imageUrl: url, caption: null }));
-
-    const publicBaseUrl = (
-      process.env.PUBLIC_BASE_URL ||
-      process.env.BASE_URL ||
-      'http://localhost:3000'
-    ).replace(/\/$/, '');
-
-    const queueSlides = slides.map((slide) => {
-      const imageUrl = slide.imageUrl.startsWith('http')
-        ? slide.imageUrl
-        : `${publicBaseUrl}${slide.imageUrl.startsWith('/') ? '' : '/'}${slide.imageUrl}`;
-      return {
-        imageUrl,
-        caption: slide.caption,
-      };
-    });
+    // Create slides from image URLs (no captions, no AI processing)
+    const slides = imageUrls.map((url) => ({ imageUrl: url, caption: null }));
 
     const journey = new this.journeyModel({
       user_id: this.toObjectId(userId, 'user id'),
-      booking_id: this.toObjectId(bookingId, 'booking id'), // Now always required
+      booking_id: this.toObjectId(bookingId, 'booking id'),
       destination,
       image_urls: imageUrls,
       slides,
-      music_theme: dto.music_theme || null,
-      caption_text: dto.caption_text || null,
+      music_theme: null, // No AI music theme
+      caption_text: null, // No AI caption text
       description: dto.description || '',
       tags: dto.tags || [],
       is_public: dto.is_public !== undefined ? dto.is_public : true,
-      video_status: 'pending',
+      video_status: 'pending', // Keep for schema compatibility, but no video will be generated
     });
 
     const savedJourney = await journey.save();
 
-    try {
-      await this.videoProcessingService.enqueueJourneyVideo({
-        journeyId: savedJourney._id.toString(),
-        userId,
-        destination,
-        musicTheme: journey.music_theme || null,
-        captionText: journey.caption_text || null,
-        slides: queueSlides,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to enqueue video job for journey ${savedJourney._id}`, error as Error);
-    }
+    // No video processing - AI features disabled
+    this.logger.log(`Journey ${savedJourney._id} created without AI processing`);
 
     return savedJourney;
   }
@@ -555,62 +522,7 @@ export class JourneyService {
     return { message: 'Comment deleted successfully' };
   }
 
-  async regenerateVideo(userId: string, journeyId: string) {
-    const journey = await this.journeyModel.findById(journeyId).exec();
-
-    if (!journey || !journey.is_visible) {
-      throw new NotFoundException('Journey not found');
-    }
-
-    // Verify that the journey belongs to the user
-    if (journey.user_id.toString() !== userId) {
-      throw new ForbiddenException('You can only regenerate videos for your own journeys');
-    }
-
-    // Reset video status to pending
-    journey.video_status = 'pending';
-    journey.video_url = undefined;
-    await journey.save();
-
-    // Prepare slides for video generation
-    const publicBaseUrl = (
-      process.env.PUBLIC_BASE_URL ||
-      process.env.BASE_URL ||
-      'http://localhost:3000'
-    ).replace(/\/$/, '');
-
-    const queueSlides = journey.slides.map((slide) => {
-      const imageUrl = slide.imageUrl.startsWith('http')
-        ? slide.imageUrl
-        : `${publicBaseUrl}${slide.imageUrl.startsWith('/') ? '' : '/'}${slide.imageUrl}`;
-      return {
-        imageUrl,
-        caption: slide.caption,
-      };
-    });
-
-    // Enqueue video generation job
-    try {
-      await this.videoProcessingService.enqueueJourneyVideo({
-        journeyId: journey._id.toString(),
-        userId,
-        destination: journey.destination,
-        musicTheme: journey.music_theme || null,
-        captionText: journey.caption_text || null,
-        slides: queueSlides,
-      });
-      this.logger.log(`Video regeneration queued for journey ${journeyId} by user ${userId}`);
-    } catch (error) {
-      this.logger.error(`Failed to enqueue video regeneration for journey ${journeyId}`, error as Error);
-      throw error;
-    }
-
-    return {
-      message: 'Video generation started',
-      journey_id: journeyId,
-      video_status: 'pending',
-    };
-  }
+  // regenerateVideo method removed - AI features disabled
 
 }
 

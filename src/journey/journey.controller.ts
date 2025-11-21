@@ -61,26 +61,25 @@ export class JourneyController {
       throw new BadRequestException('At least one image is required');
     }
 
-    this.logger.log(`Uploading ${files.length} images to ImgBB for user ${req.user.sub} (5s timeout)`);
+    this.logger.log(`Uploading ${files.length} images to ImgBB for user ${req.user.sub} (15s timeout)`);
     
     try {
-      // Upload images to ImgBB and get URLs with strict 5 second timeout
+      // Upload images to ImgBB and get URLs with 15 second timeout
       const uploadPromise = this.journeyService.uploadImagesToImgBB(files);
       const timeoutPromise = new Promise<string[]>((_, reject) => {
         setTimeout(() => {
-          reject(new Error('Image upload timeout: Upload exceeded 5 seconds'));
-        }, 5000); // 5 seconds strict timeout
+          reject(new Error('Image upload timeout: Upload exceeded 15 seconds'));
+        }, 15000); // 15 seconds timeout
       });
 
       const imageUrls = await Promise.race([uploadPromise, timeoutPromise]) as string[];
 
-      this.logger.log(`Successfully uploaded ${imageUrls.length} images within 5s, creating journey...`);
+      this.logger.log(`Successfully uploaded ${imageUrls.length} images within 15s, creating journey...`);
       return this.journeyService.createJourney(req.user.sub, dto, imageUrls);
     } catch (error) {
       this.logger.error(`Error uploading images (timeout or error): ${error.message}`, error.stack);
-      // If upload fails or times out, throw error (don't fallback to local storage for strict 5s requirement)
       throw new BadRequestException(
-        'Image upload failed or exceeded 5 seconds. Please try again with fewer or smaller images.'
+        'Image upload failed or exceeded 15 seconds. Please try again.'
       );
     }
   }
@@ -170,10 +169,6 @@ export class JourneyController {
     return this.journeyService.deleteComment(req.user.sub, commentId);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Post(':id/regenerate-video')
-  async regenerateVideo(@Req() req: any, @Param('id') id: string) {
-    return this.journeyService.regenerateVideo(req.user.sub, id);
-  }
+  // regenerate-video endpoint removed - AI features disabled
 }
 
