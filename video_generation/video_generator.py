@@ -17,21 +17,27 @@ from urllib.request import urlretrieve
 # Check if PIL/Pillow is installed
 try:
     from PIL import Image, ImageDraw, ImageFont
-except ImportError:
-    print(json.dumps({
+except ImportError as e:
+    error_json = json.dumps({
         "success": False,
-        "error": "Pillow (PIL) is not installed. Please install it with: pip install Pillow>=10.0.0"
-    }), file=sys.stderr)
+        "error": "Pillow (PIL) is not installed. Please install it with: pip install Pillow>=10.0.0",
+        "details": str(e)
+    })
+    print(error_json, file=sys.stderr)
+    print(error_json, file=sys.stdout)  # Also print to stdout for easier parsing
     sys.exit(1)
 
 # Check if requests is installed
 try:
     import requests
-except ImportError:
-    print(json.dumps({
+except ImportError as e:
+    error_json = json.dumps({
         "success": False,
-        "error": "requests is not installed. Please install it with: pip install requests>=2.31.0"
-    }), file=sys.stderr)
+        "error": "requests is not installed. Please install it with: pip install requests>=2.31.0",
+        "details": str(e)
+    })
+    print(error_json, file=sys.stderr)
+    print(error_json, file=sys.stdout)
     sys.exit(1)
 
 # Check if moviepy is installed
@@ -47,11 +53,14 @@ try:
         CompositeAudioClip,
     )
     from moviepy.video.fx import resize, fadein, fadeout
-except ImportError:
-    print(json.dumps({
+except ImportError as e:
+    error_json = json.dumps({
         "success": False,
-        "error": "moviepy is not installed. Please install it with: pip install moviepy>=1.0.3"
-    }), file=sys.stderr)
+        "error": "moviepy is not installed. Please install it with: pip install moviepy>=1.0.3",
+        "details": str(e)
+    })
+    print(error_json, file=sys.stderr)
+    print(error_json, file=sys.stdout)
     sys.exit(1)
 
 

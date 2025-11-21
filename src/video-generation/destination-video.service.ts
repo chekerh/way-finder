@@ -185,29 +185,44 @@ export class DestinationVideoService {
 
       // Verify Python dependencies before running script
       step = 'python_dependencies_check';
-      try {
-        const checkResult = await execAsync(
-          `python3 -c "from PIL import Image; import requests; import moviepy; print('OK')"`,
-          { timeout: 5000, maxBuffer: 1024 * 1024 },
-        );
-        this.logger.log('Python dependencies verified successfully');
-      } catch (depError: any) {
-        const depStderr = depError.stderr || '';
-        let missingDep = 'unknown';
-        if (depStderr.includes("No module named 'PIL'")) {
-          missingDep = 'Pillow (PIL)';
-        } else if (depStderr.includes("No module named 'requests'")) {
-          missingDep = 'requests';
-        } else if (depStderr.includes("No module named 'moviepy'")) {
-          missingDep = 'moviepy';
+      this.logger.log('Checking Python dependencies...');
+      
+      // Check each dependency individually for better error reporting
+      const dependencies = [
+        { name: 'Pillow (PIL)', import: 'from PIL import Image' },
+        { name: 'numpy', import: 'import numpy' },
+        { name: 'requests', import: 'import requests' },
+        { name: 'moviepy', import: 'import moviepy' },
+      ];
+      
+      const missingDeps: string[] = [];
+      
+      for (const dep of dependencies) {
+        try {
+          await execAsync(
+            `python3 -c "${dep.import}; print('OK')"`,
+            { timeout: 3000, maxBuffer: 1024 * 1024 },
+          );
+          this.logger.debug(`${dep.name}: OK`);
+        } catch (depError: any) {
+          const depStderr = depError.stderr || depError.message || '';
+          this.logger.warn(`${dep.name}: MISSING - ${depStderr.substring(0, 100)}`);
+          missingDeps.push(dep.name);
         }
-        
-        throw new Error(
-          `Python dependencies missing: ${missingDep} is not installed. ` +
-          `Please install Python dependencies: pip install numpy Pillow requests moviepy. ` +
-          `Error: ${depStderr.substring(0, 200)}`,
-        );
       }
+      
+      if (missingDeps.length > 0) {
+        const errorMessage = 
+          `Python dependencies missing: ${missingDeps.join(', ')}. ` +
+          `Please install with: pip install ${missingDeps.includes('Pillow (PIL)') ? 'Pillow ' : ''}${missingDeps.includes('numpy') ? 'numpy ' : ''}${missingDeps.includes('requests') ? 'requests ' : ''}${missingDeps.includes('moviepy') ? 'moviepy ' : ''}. ` +
+          `These dependencies are required for video generation. ` +
+          `Check Dockerfile build logs to see why installation failed.`;
+        
+        this.logger.error(errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      this.logger.log('All Python dependencies verified successfully');
 
       // Run Python video generator
       step = 'python_execution';
@@ -228,45 +243,105 @@ export class DestinationVideoService {
         stdout = execResult.stdout;
         stderr = execResult.stderr || '';
       } catch (execError: any) {
-        // Try to parse JSON error from Python script if available
         const errorStdout = execError.stdout || '';
         const errorStderr = execError.stderr || '';
-        
-        // Check if Python script returned JSON error
-        try {
-          const jsonMatch = errorStdout.match(/\{.*"success".*"error".*\}/s);
-          if (jsonMatch) {
-            const pythonError = JSON.parse(jsonMatch[0]);
-            if (!pythonError.success && pythonError.error) {
-              throw new Error(
-                `Python script error at step ${step}: ${pythonError.error}. ` +
-                `This usually means Python dependencies are not installed correctly.`,
-              );
-            }
-          }
-        } catch (parseError) {
-          // If JSON parsing fails, use original error
-        }
-        
-        // Handle execution errors (timeout, command not found, etc.)
         const errorMsg = execError.message || 'Unknown execution error';
         const errorCode = execError.code || 'UNKNOWN';
         
-        // Check for specific dependency errors in stderr
-        if (errorStderr.includes("No module named 'PIL'") || errorStderr.includes("ModuleNotFoundError: No module named 'PIL'")) {
-          throw new Error(
-            `Python dependencies missing: Pillow (PIL) is not installed. ` +
-            `Please install with: pip install Pillow>=10.0.0. ` +
-            `Check Dockerfile logs to see why Pillow installation failed during build.`,
-          );
+        // Check for specific dependency errors first (most common issue)
+        if (errorStderr.includes("No module named 'PIL'") || 
+            errorStderr.includes("ModuleNotFoundError: No module named 'PIL'") ||
+            errorMsg.includes("No module named 'PIL'")) {
+          const detailedError = 
+            `Python dependency error: Pillow (PIL) is not installed in the container. ` +
+            `This should have been caught during dependency check. ` +
+            `Please verify Dockerfile installation logs. ` +
+            `Attempting to install Pillow via pip may be required. ` +
+            `Stderr: ${errorStderr.substring(0, 300)}`;
+          
+          this.logger.error(detailedError);
+          throw new Error(detailedError);
         }
         
-        throw new Error(
+        // Try to parse JSON error from Python script if available
+        // Python script now outputs JSON to both stdout and stderr
+        try {
+          // Check stdout first (where we now print JSON errors)
+          let jsonError: any = null;
+          
+          // Try to find JSON in stdout
+          if (errorStdout) {
+            const stdoutJsonMatch = errorStdout.match(/\{[^{}]*(?:"success"|"error")[^{}]*\}/s);
+            if (stdoutJsonMatch) {
+              try {
+                jsonError = JSON.parse(stdoutJsonMatch[0]);
+              } catch (e) {
+                // Try to find complete JSON object
+                const fullJsonMatch = errorStdout.match(/\{[^}]+\}/s);
+                if (fullJsonMatch) {
+                  jsonError = JSON.parse(fullJsonMatch[0]);
+                }
+              }
+            }
+          }
+          
+          // If not found in stdout, try stderr
+          if (!jsonError && errorStderr) {
+            const stderrJsonMatch = errorStderr.match(/\{[^{}]*(?:"success"|"error")[^{}]*\}/s);
+            if (stderrJsonMatch) {
+              try {
+                jsonError = JSON.parse(stderrJsonMatch[0]);
+              } catch (e) {
+                // Try to find complete JSON object
+                const fullJsonMatch = errorStderr.match(/\{[^}]+\}/s);
+                if (fullJsonMatch) {
+                  jsonError = JSON.parse(fullJsonMatch[0]);
+                }
+              }
+            }
+          }
+          
+          // If we found a valid JSON error, use it
+          if (jsonError && !jsonError.success && jsonError.error) {
+            const detailedError = 
+              `Python script error: ${jsonError.error}${jsonError.details ? ` (${jsonError.details})` : ''}. ` +
+              `This indicates missing Python dependencies. ` +
+              `Please check Dockerfile build logs for dependency installation errors.`;
+            
+            this.logger.error(detailedError);
+            throw new Error(detailedError);
+          }
+        } catch (parseError) {
+          // If JSON parsing fails or throws, continue with original error handling
+          if (parseError instanceof Error && parseError.message.includes('Python script error')) {
+            throw parseError; // Re-throw our custom error
+          }
+          this.logger.warn(`Failed to parse JSON error from Python script: ${parseError}`);
+        }
+        
+        // Check for other common dependency errors
+        if (errorStderr.includes("No module named") || errorStderr.includes("ModuleNotFoundError")) {
+          const moduleMatch = errorStderr.match(/No module named ['"]([^'"]+)['"]/);
+          const missingModule = moduleMatch ? moduleMatch[1] : 'unknown';
+          
+          const detailedError = 
+            `Python dependency missing: '${missingModule}' is not installed. ` +
+            `Please install it with: pip install ${missingModule}. ` +
+            `Stderr: ${errorStderr.substring(0, 300)}`;
+          
+          this.logger.error(detailedError);
+          throw new Error(detailedError);
+        }
+        
+        // Generic execution error
+        const detailedError = 
           `Python script execution failed at step ${step}: ${errorMsg} (code: ${errorCode}). ` +
           `Stderr: ${errorStderr.substring(0, 500)}. ` +
           `Stdout: ${errorStdout.substring(0, 500)}. ` +
-          `If this is a dependency error, check that Python dependencies are installed.`,
-        );
+          `Check Python script and dependencies installation.`;
+        
+        this.logger.error(detailedError);
+        throw new Error(detailedError);
       }
 
       if (stderr && !stderr.includes('WARNING') && !stderr.includes('INFO')) {
