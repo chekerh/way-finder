@@ -170,5 +170,65 @@ export class ImgBBService {
       throw error;
     }
   }
+
+  /**
+   * Upload video file to ImgBB
+   * Note: ImgBB primarily supports images, but we'll try to upload MP4 files
+   * If this fails, consider using Cloudinary or another video hosting service
+   * @param filePath - Path to the video file
+   * @param fileName - Optional custom filename
+   * @returns The ImgBB URL of the uploaded video (or null if upload fails)
+   */
+  async uploadVideo(filePath: string, fileName?: string): Promise<string | null> {
+    if (!this.apiKey) {
+      this.logger.warn('IMGBB_API_KEY is not configured. Video upload skipped.');
+      return null;
+    }
+
+    if (!fs.existsSync(filePath)) {
+      this.logger.error(`Video file not found: ${filePath}`);
+      return null;
+    }
+
+    try {
+      const formData = new FormData();
+      const fileStream = fs.createReadStream(filePath);
+      
+      // Get file size for logging
+      const stats = fs.statSync(filePath);
+      const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+      
+      this.logger.log(`Uploading video ${fileName || filePath} (${fileSizeMB}MB) to ImgBB...`);
+      
+      formData.append('key', this.apiKey);
+      // ImgBB API accepts 'image' field even for videos (we'll try)
+      formData.append('image', fileStream, {
+        filename: fileName || filePath.split('/').pop() || 'video.mp4',
+        contentType: 'video/mp4',
+      });
+
+      // Increase timeout for large video files (5 minutes)
+      const response = await firstValueFrom(
+        this.httpService.post<ImgBBResponse>(this.apiUrl, formData, {
+          headers: formData.getHeaders(),
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          timeout: 300000, // 5 minutes timeout for video uploads
+        }),
+      );
+
+      if (response.data.success && response.data.data?.url) {
+        this.logger.log(`Video uploaded successfully to ImgBB: ${response.data.data.url}`);
+        return response.data.data.url;
+      } else {
+        this.logger.warn(`ImgBB upload failed (may not support videos): ${JSON.stringify(response.data)}`);
+        return null;
+      }
+    } catch (error) {
+      // ImgBB may not support video files, so we log as warning instead of error
+      this.logger.warn(`ImgBB video upload failed (service may not support videos): ${error.message}`);
+      return null;
+    }
+  }
 }
 

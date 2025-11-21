@@ -24,6 +24,7 @@ import { PriceAlertsModule } from './price-alerts/price-alerts.module';
 import { TravelTipsModule } from './travel-tips/travel-tips.module';
 import { JourneyModule } from './journey/journey.module';
 import { VideoProcessingModule } from './video-processing/video-processing.module';
+import { DestinationVideoModule } from './video-generation/destination-video.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {
@@ -65,6 +66,7 @@ const mongoUri = (() => {
     TravelTipsModule,
     JourneyModule,
     VideoProcessingModule,
+    DestinationVideoModule,
   ],
   controllers: [AppController],
   providers: [

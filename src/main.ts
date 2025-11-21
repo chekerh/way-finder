@@ -27,6 +27,15 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/',
   });
+  
+  // Serve destination videos
+  const destinationVideosDir = join(__dirname, '..', 'uploads', 'destination-videos');
+  if (!existsSync(destinationVideosDir)) {
+    mkdirSync(destinationVideosDir, { recursive: true });
+  }
+  app.useStaticAssets(destinationVideosDir, {
+    prefix: '/uploads/destination-videos/',
+  });
 
   app.enableCors({
     origin: process.env.FRONTEND_ORIGIN || '*',
