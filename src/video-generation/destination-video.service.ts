@@ -187,12 +187,12 @@ export class DestinationVideoService {
       step = 'python_dependencies_check';
       this.logger.log('Checking Python dependencies...');
       
-      // Check each dependency individually for better error reporting
+      // Check each dependency individually and install if missing
       const dependencies = [
-        { name: 'Pillow (PIL)', import: 'from PIL import Image' },
-        { name: 'numpy', import: 'import numpy' },
-        { name: 'requests', import: 'import requests' },
-        { name: 'moviepy', import: 'import moviepy' },
+        { name: 'Pillow (PIL)', import: 'from PIL import Image', pip: 'Pillow>=10.0.0' },
+        { name: 'numpy', import: 'import numpy', pip: 'numpy>=1.24.0' },
+        { name: 'requests', import: 'import requests', pip: 'requests>=2.31.0' },
+        { name: 'moviepy', import: 'import moviepy', pip: 'moviepy>=1.0.3' },
       ];
       
       const missingDeps: string[] = [];
@@ -206,17 +206,37 @@ export class DestinationVideoService {
           this.logger.debug(`${dep.name}: OK`);
         } catch (depError: any) {
           const depStderr = depError.stderr || depError.message || '';
-          this.logger.warn(`${dep.name}: MISSING - ${depStderr.substring(0, 100)}`);
+          this.logger.warn(`${dep.name}: MISSING - Attempting to install...`);
           missingDeps.push(dep.name);
+          
+          // Try to install the missing dependency
+          try {
+            this.logger.log(`Installing ${dep.name} via pip...`);
+            await execAsync(
+              `python3 -m pip install --no-cache-dir ${dep.pip}`,
+              { timeout: 120000, maxBuffer: 10 * 1024 * 1024 }, // 2 minutes timeout
+            );
+            
+            // Verify installation
+            await execAsync(
+              `python3 -c "${dep.import}; print('OK')"`,
+              { timeout: 3000, maxBuffer: 1024 * 1024 },
+            );
+            this.logger.log(`✓ ${dep.name} installed successfully`);
+            missingDeps.pop(); // Remove from missing list if successfully installed
+          } catch (installError: any) {
+            this.logger.error(`Failed to install ${dep.name}: ${installError.message}`);
+            // Continue to try other dependencies
+          }
         }
       }
       
+      // If there are still missing dependencies after installation attempts
       if (missingDeps.length > 0) {
         const errorMessage = 
-          `Python dependencies missing: ${missingDeps.join(', ')}. ` +
-          `Please install with: pip install ${missingDeps.includes('Pillow (PIL)') ? 'Pillow ' : ''}${missingDeps.includes('numpy') ? 'numpy ' : ''}${missingDeps.includes('requests') ? 'requests ' : ''}${missingDeps.includes('moviepy') ? 'moviepy ' : ''}. ` +
-          `These dependencies are required for video generation. ` +
-          `Check Dockerfile build logs to see why installation failed.`;
+          `Python dependencies missing after installation attempt: ${missingDeps.join(', ')}. ` +
+          `Please check Dockerfile build logs or install manually with pip. ` +
+          `These dependencies are required for video generation.`;
         
         this.logger.error(errorMessage);
         throw new Error(errorMessage);
