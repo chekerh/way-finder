@@ -238,8 +238,8 @@ export class JourneyService {
       destination,
       image_urls: imageUrls,
       slides,
-      music_theme: dto.music_theme || null,
-      caption_text: dto.caption_text || null,
+      music_theme: null, // No longer used - removed from UI
+      caption_text: null, // No longer used - removed from UI
       description: dto.description || '',
       tags: dto.tags || [],
       is_public: dto.is_public !== undefined ? dto.is_public : true,
@@ -248,18 +248,19 @@ export class JourneyService {
 
     const savedJourney = await journey.save();
 
-    try {
-      await this.videoProcessingService.enqueueJourneyVideo({
-        journeyId: savedJourney._id.toString(),
-        userId,
-        destination,
-        musicTheme: journey.music_theme || null,
-        captionText: journey.caption_text || null,
-        slides: queueSlides,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to enqueue video job for journey ${savedJourney._id}`, error as Error);
-    }
+    // Note: Video generation is disabled - only image posting is supported
+    // try {
+    //   await this.videoProcessingService.enqueueJourneyVideo({
+    //     journeyId: savedJourney._id.toString(),
+    //     userId,
+    //     destination,
+    //     musicTheme: null,
+    //     captionText: null,
+    //     slides: queueSlides,
+    //   });
+    // } catch (error) {
+    //   this.logger.error(`Failed to enqueue video job for journey ${savedJourney._id}`, error as Error);
+    // }
 
     return savedJourney;
   }
