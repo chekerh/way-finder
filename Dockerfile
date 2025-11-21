@@ -44,15 +44,21 @@ RUN npm ci --silent
 COPY . .
 
 # Install Python dependencies for video generation
-# NOTE: Build will continue even if Python deps fail - errors will be caught at runtime
-RUN set +e || true; \
-    echo "=== Installing Python dependencies ==="; \
-    python3 -c "from PIL import Image" 2>/dev/null && echo "✓ Pillow OK" || (echo "Installing Pillow..." && python3 -m pip install --no-cache-dir Pillow>=10.0.0 2>&1 | tail -3 || echo "Pillow install failed"); \
-    python3 -m pip install --no-cache-dir numpy>=1.24.0 2>&1 | tail -2 || echo "numpy install failed"; \
-    python3 -m pip install --no-cache-dir requests>=2.31.0 2>&1 | tail -2 || echo "requests install failed"; \
-    python3 -m pip install --no-cache-dir moviepy>=1.0.3 2>&1 | tail -3 || echo "moviepy install failed"; \
-    echo "Python deps installation step completed"; \
-    exit 0
+# Verify Pillow is installed (via py3-pillow), then install other dependencies
+RUN echo "=== Installing Python dependencies ===" && \
+    python3 -c "from PIL import Image; print('✓ Pillow OK')" 2>&1 || (echo "Installing Pillow..." && python3 -m pip install --no-cache-dir Pillow>=10.0.0) && \
+    echo "Installing numpy..." && \
+    python3 -m pip install --no-cache-dir numpy>=1.24.0 && \
+    echo "Installing requests..." && \
+    python3 -m pip install --no-cache-dir requests>=2.31.0 && \
+    echo "Installing moviepy (this may take several minutes)..." && \
+    python3 -m pip install --no-cache-dir moviepy>=1.0.3 && \
+    echo "=== Verifying installations ===" && \
+    python3 -c "from PIL import Image; print('✓ Pillow')" && \
+    python3 -c "import numpy; print('✓ numpy')" && \
+    python3 -c "import requests; print('✓ requests')" && \
+    python3 -c "import moviepy; print('✓ moviepy')" && \
+    echo "All Python dependencies installed successfully"
 
 # Build the NestJS application
 RUN npm run build
