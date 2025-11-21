@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apk add --no-cache \
     python3 \
     py3-pip \
+    py3-pillow \
     imagemagick \
     imagemagick-dev \
     ffmpeg \
@@ -50,19 +51,18 @@ RUN set +e; \
       echo "Python version: $(python3 --version 2>&1 || echo 'unknown')"; \
       echo "Pip version: $(python3 -m pip --version 2>&1 || echo 'unknown')"; \
       \
-      echo "[1/4] Installing numpy..."; \
+      echo "[1/4] Verifying Pillow (should be installed via apk)..."; \
+      if python3 -c "from PIL import Image; print('Pillow OK')" 2>/dev/null; then \
+        echo "Pillow: ✓ INSTALLED (via apk)"; \
+      else \
+        echo "Pillow: ✗ NOT FOUND - Installing via pip as fallback..."; \
+        python3 -m pip install --no-cache-dir --verbose Pillow>=10.0.0 2>&1 | tail -20 || echo "Pillow pip install failed"; \
+        python3 -c "from PIL import Image; print('Pillow OK after pip')" 2>/dev/null && echo "Pillow: ✓ INSTALLED (via pip)" || echo "Pillow: ✗ NOT INSTALLED - video generation will fail"; \
+      fi; \
+      \
+      echo "[2/4] Installing numpy..."; \
       python3 -m pip install --no-cache-dir numpy>=1.24.0 2>&1 | tail -3 || echo "numpy: FAILED"; \
       python3 -c "import numpy" 2>/dev/null && echo "numpy: OK" || echo "numpy: NOT INSTALLED"; \
-      \
-      echo "[2/4] Installing Pillow (this may take a while)..."; \
-      python3 -m pip install --no-cache-dir --verbose Pillow>=10.0.0 2>&1 | tail -20 || true; \
-      if python3 -c "from PIL import Image; print('Pillow installed successfully')" 2>/dev/null; then \
-        echo "Pillow: ✓ INSTALLED"; \
-      else \
-        echo "Pillow: ✗ FAILED TO INSTALL - Trying alternative installation..."; \
-        python3 -m pip install --no-cache-dir --force-reinstall --no-binary Pillow Pillow>=10.0.0 2>&1 | tail -20 || echo "Alternative Pillow install also failed"; \
-        python3 -c "from PIL import Image; print('Pillow OK after retry')" 2>/dev/null && echo "Pillow: ✓ INSTALLED (after retry)" || echo "Pillow: ✗ NOT INSTALLED - video generation will fail"; \
-      fi; \
       \
       echo "[3/4] Installing requests..."; \
       python3 -m pip install --no-cache-dir requests>=2.31.0 2>&1 | tail -3 || echo "requests: FAILED"; \
@@ -71,6 +71,12 @@ RUN set +e; \
       echo "[4/4] Installing moviepy (this may take 5-10 minutes)..."; \
       python3 -m pip install --no-cache-dir --verbose moviepy>=1.0.3 2>&1 | tail -10 || echo "moviepy install: FAILED"; \
       python3 -c "import moviepy" 2>/dev/null && echo "moviepy: OK" || echo "moviepy: NOT INSTALLED - video generation will fail"; \
+      \
+      echo "=== Final verification of all Python dependencies ==="; \
+      python3 -c "from PIL import Image; print('✓ Pillow')" 2>/dev/null || echo "✗ Pillow MISSING"; \
+      python3 -c "import numpy; print('✓ numpy')" 2>/dev/null || echo "✗ numpy MISSING"; \
+      python3 -c "import requests; print('✓ requests')" 2>/dev/null || echo "✗ requests MISSING"; \
+      python3 -c "import moviepy; print('✓ moviepy')" 2>/dev/null || echo "✗ moviepy MISSING" \
       \
       echo "=== Python dependencies status summary ==="; \
       python3 -m pip list 2>/dev/null | grep -E "(numpy|Pillow|requests|moviepy)" || echo "Warning: Some dependencies may not be installed. Check logs above."; \
