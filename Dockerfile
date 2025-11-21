@@ -20,19 +20,24 @@ RUN apk add --no-cache \
     openblas-dev \
     libjpeg-turbo-dev \
     zlib-dev \
-    && pip3 install --upgrade pip setuptools wheel
+    && python3 -m pip install --upgrade --no-cache-dir pip setuptools wheel
 
 # Copy package files first (for better caching)
 COPY package*.json ./
 RUN npm ci --silent
 
-# Copy Python requirements and install dependencies
-COPY video_generation/ ./video_generation/
-RUN pip3 install --no-cache-dir -r video_generation/requirements.txt || \
-    (echo "Warning: Python dependencies installation had issues, but continuing..." && true)
-
-# Copy all application files
+# Copy all application files (including Python scripts)
 COPY . .
+
+# Install Python dependencies for video generation (optional - won't fail build if it fails)
+# Note: Video generation feature may not work if Python dependencies fail to install
+RUN if [ -f video_generation/requirements.txt ]; then \
+      echo "Installing Python dependencies..."; \
+      python3 -m pip install --no-cache-dir -r video_generation/requirements.txt || \
+      (echo "WARNING: Python dependencies installation failed. Video generation may not work." && exit 0); \
+    else \
+      echo "WARNING: video_generation/requirements.txt not found. Skipping Python dependencies."; \
+    fi
 
 # Build the NestJS application
 RUN npm run build
