@@ -13,9 +13,28 @@ import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 from urllib.request import urlretrieve
-from PIL import Image, ImageDraw, ImageFont
-import requests
 
+# Check if PIL/Pillow is installed
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    print(json.dumps({
+        "success": False,
+        "error": "Pillow (PIL) is not installed. Please install it with: pip install Pillow>=10.0.0"
+    }), file=sys.stderr)
+    sys.exit(1)
+
+# Check if requests is installed
+try:
+    import requests
+except ImportError:
+    print(json.dumps({
+        "success": False,
+        "error": "requests is not installed. Please install it with: pip install requests>=2.31.0"
+    }), file=sys.stderr)
+    sys.exit(1)
+
+# Check if moviepy is installed
 try:
     from moviepy.editor import (
         VideoFileClip,
@@ -29,7 +48,10 @@ try:
     )
     from moviepy.video.fx import resize, fadein, fadeout
 except ImportError:
-    print("ERROR: moviepy not installed. Run: pip install moviepy pillow requests")
+    print(json.dumps({
+        "success": False,
+        "error": "moviepy is not installed. Please install it with: pip install moviepy>=1.0.3"
+    }), file=sys.stderr)
     sys.exit(1)
 
 

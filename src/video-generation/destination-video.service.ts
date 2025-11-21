@@ -174,6 +174,41 @@ export class DestinationVideoService {
 
       const configJson = JSON.stringify(config);
 
+      // Check if Python script exists and is executable
+      step = 'python_verification';
+      if (!fs.existsSync(this.pythonScriptPath)) {
+        throw new Error(
+          `Python script not found at: ${this.pythonScriptPath}. ` +
+          `Please ensure video_generator.py exists in the video_generation directory.`,
+        );
+      }
+
+      // Verify Python dependencies before running script
+      step = 'python_dependencies_check';
+      try {
+        const checkResult = await execAsync(
+          `python3 -c "from PIL import Image; import requests; import moviepy; print('OK')"`,
+          { timeout: 5000, maxBuffer: 1024 * 1024 },
+        );
+        this.logger.log('Python dependencies verified successfully');
+      } catch (depError: any) {
+        const depStderr = depError.stderr || '';
+        let missingDep = 'unknown';
+        if (depStderr.includes("No module named 'PIL'")) {
+          missingDep = 'Pillow (PIL)';
+        } else if (depStderr.includes("No module named 'requests'")) {
+          missingDep = 'requests';
+        } else if (depStderr.includes("No module named 'moviepy'")) {
+          missingDep = 'moviepy';
+        }
+        
+        throw new Error(
+          `Python dependencies missing: ${missingDep} is not installed. ` +
+          `Please install Python dependencies: pip install numpy Pillow requests moviepy. ` +
+          `Error: ${depStderr.substring(0, 200)}`,
+        );
+      }
+
       // Run Python video generator
       step = 'python_execution';
       this.logger.log('Running Python video generator...');
@@ -193,13 +228,44 @@ export class DestinationVideoService {
         stdout = execResult.stdout;
         stderr = execResult.stderr || '';
       } catch (execError: any) {
+        // Try to parse JSON error from Python script if available
+        const errorStdout = execError.stdout || '';
+        const errorStderr = execError.stderr || '';
+        
+        // Check if Python script returned JSON error
+        try {
+          const jsonMatch = errorStdout.match(/\{.*"success".*"error".*\}/s);
+          if (jsonMatch) {
+            const pythonError = JSON.parse(jsonMatch[0]);
+            if (!pythonError.success && pythonError.error) {
+              throw new Error(
+                `Python script error at step ${step}: ${pythonError.error}. ` +
+                `This usually means Python dependencies are not installed correctly.`,
+              );
+            }
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, use original error
+        }
+        
         // Handle execution errors (timeout, command not found, etc.)
         const errorMsg = execError.message || 'Unknown execution error';
         const errorCode = execError.code || 'UNKNOWN';
+        
+        // Check for specific dependency errors in stderr
+        if (errorStderr.includes("No module named 'PIL'") || errorStderr.includes("ModuleNotFoundError: No module named 'PIL'")) {
+          throw new Error(
+            `Python dependencies missing: Pillow (PIL) is not installed. ` +
+            `Please install with: pip install Pillow>=10.0.0. ` +
+            `Check Dockerfile logs to see why Pillow installation failed during build.`,
+          );
+        }
+        
         throw new Error(
           `Python script execution failed at step ${step}: ${errorMsg} (code: ${errorCode}). ` +
-          `Stderr: ${execError.stderr || 'No stderr'}. ` +
-          `Stdout: ${execError.stdout || 'No stdout'}`,
+          `Stderr: ${errorStderr.substring(0, 500)}. ` +
+          `Stdout: ${errorStdout.substring(0, 500)}. ` +
+          `If this is a dependency error, check that Python dependencies are installed.`,
         );
       }
 
