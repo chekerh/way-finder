@@ -407,8 +407,7 @@ export class JourneyService {
     if (dto.description !== undefined) journey.description = dto.description;
     if (dto.tags !== undefined) journey.tags = dto.tags;
     if (dto.is_public !== undefined) journey.is_public = dto.is_public;
-    if (dto.music_theme !== undefined) journey.music_theme = dto.music_theme;
-    if (dto.caption_text !== undefined) journey.caption_text = dto.caption_text;
+    // AI fields (music_theme, caption_text) removed - no longer supported
 
     return journey.save();
   }
