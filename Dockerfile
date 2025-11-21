@@ -42,35 +42,20 @@ RUN npm ci --silent
 # Copy all application files (including Python scripts)
 COPY . .
 
-# Install Python dependencies for video generation
-# Try to install but don't fail the build - video generation will show errors at runtime if deps are missing
-RUN (if command -v python3 > /dev/null 2>&1 && [ -f video_generation/requirements.txt ]; then \
-      echo "=== Installing Python dependencies for video generation ==="; \
-      python3 --version || true; \
-      python3 -m pip --version || true; \
-      \
-      echo "Installing numpy..."; \
-      python3 -m pip install --no-cache-dir numpy>=1.24.0 || echo "numpy install failed"; \
-      python3 -c "import numpy; print('numpy OK')" 2>/dev/null || echo "numpy import failed"; \
-      \
-      echo "Installing Pillow..."; \
-      python3 -m pip install --no-cache-dir Pillow>=10.0.0 || echo "Pillow install failed"; \
-      python3 -c "from PIL import Image; print('Pillow OK')" 2>/dev/null || echo "Pillow import failed"; \
-      \
-      echo "Installing requests..."; \
-      python3 -m pip install --no-cache-dir requests>=2.31.0 || echo "requests install failed"; \
-      python3 -c "import requests; print('requests OK')" 2>/dev/null || echo "requests import failed"; \
-      \
-      echo "Installing moviepy (may take 5-10 minutes)..."; \
-      python3 -m pip install --no-cache-dir moviepy>=1.0.3 || echo "moviepy install failed"; \
-      python3 -c "import moviepy; print('moviepy OK')" 2>/dev/null || echo "moviepy import failed"; \
-      \
-      echo "=== Python dependencies summary ==="; \
-      python3 -m pip list 2>/dev/null | grep -E "(numpy|Pillow|requests|moviepy)" || echo "Some deps may not be installed"; \
-      echo "Build continuing..."; \
+# Install Python dependencies for video generation (optional - won't fail build)
+# Video generation will show clear errors at runtime if dependencies are missing
+RUN set +e; \
+    if command -v python3 > /dev/null 2>&1 && [ -f video_generation/requirements.txt ]; then \
+      echo "=== Attempting to install Python dependencies ==="; \
+      python3 -m pip install --no-cache-dir numpy>=1.24.0 || true; \
+      python3 -m pip install --no-cache-dir Pillow>=10.0.0 || true; \
+      python3 -m pip install --no-cache-dir requests>=2.31.0 || true; \
+      python3 -m pip install --no-cache-dir moviepy>=1.0.3 || true; \
+      echo "Python dependencies installation attempt completed (check logs above for status)"; \
     else \
-      echo "Python3 or requirements.txt not found - video generation disabled"; \
-    fi) || echo "Python dependencies installation had errors but build continues"
+      echo "Skipping Python dependencies (python3 or requirements.txt not found)"; \
+    fi; \
+    set -e
 
 # Build the NestJS application
 RUN npm run build
