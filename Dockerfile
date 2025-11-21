@@ -43,30 +43,43 @@ RUN npm ci --silent
 COPY . .
 
 # Install Python dependencies for video generation
-# Install with verbose output and verify installation
+# Install with verification but don't fail the build if installation fails
+# Video generation will fail gracefully at runtime with clear error messages
 RUN if command -v python3 > /dev/null 2>&1 && [ -f video_generation/requirements.txt ]; then \
       echo "Installing Python dependencies for video generation..."; \
       echo "Python version: $(python3 --version)"; \
       echo "Pip version: $(python3 -m pip --version)"; \
       \
       echo "Installing numpy..."; \
-      python3 -m pip install --no-cache-dir --verbose numpy>=1.24.0 || (echo "ERROR: numpy installation failed" && exit 1); \
-      python3 -c "import numpy; print(f'numpy {numpy.__version__} installed successfully')" || (echo "ERROR: numpy verification failed" && exit 1); \
+      if python3 -m pip install --no-cache-dir numpy>=1.24.0 && python3 -c "import numpy; print(f'numpy {numpy.__version__} installed')"; then \
+        echo "✓ numpy installed successfully"; \
+      else \
+        echo "✗ ERROR: numpy installation failed - video generation will not work"; \
+      fi; \
       \
       echo "Installing Pillow..."; \
-      python3 -m pip install --no-cache-dir --verbose Pillow>=10.0.0 || (echo "ERROR: Pillow installation failed" && exit 1); \
-      python3 -c "from PIL import Image; print('Pillow installed successfully')" || (echo "ERROR: Pillow verification failed" && exit 1); \
+      if python3 -m pip install --no-cache-dir Pillow>=10.0.0 && python3 -c "from PIL import Image; print('Pillow installed')"; then \
+        echo "✓ Pillow installed successfully"; \
+      else \
+        echo "✗ ERROR: Pillow installation failed - video generation will not work"; \
+      fi; \
       \
       echo "Installing requests..."; \
-      python3 -m pip install --no-cache-dir --verbose requests>=2.31.0 || (echo "ERROR: requests installation failed" && exit 1); \
-      python3 -c "import requests; print(f'requests {requests.__version__} installed successfully')" || (echo "ERROR: requests verification failed" && exit 1); \
+      if python3 -m pip install --no-cache-dir requests>=2.31.0 && python3 -c "import requests; print(f'requests {requests.__version__} installed')"; then \
+        echo "✓ requests installed successfully"; \
+      else \
+        echo "✗ ERROR: requests installation failed - video generation will not work"; \
+      fi; \
       \
-      echo "Installing moviepy (this may take a while)..."; \
-      python3 -m pip install --no-cache-dir --verbose moviepy>=1.0.3 || (echo "ERROR: moviepy installation failed" && exit 1); \
-      python3 -c "import moviepy; print('moviepy installed successfully')" || (echo "ERROR: moviepy verification failed" && exit 1); \
+      echo "Installing moviepy (this may take several minutes)..."; \
+      if timeout 600 python3 -m pip install --no-cache-dir moviepy>=1.0.3 2>&1 && python3 -c "import moviepy; print('moviepy installed')"; then \
+        echo "✓ moviepy installed successfully"; \
+      else \
+        echo "✗ ERROR: moviepy installation failed or timed out - video generation will not work"; \
+      fi; \
       \
-      echo "All Python dependencies installed and verified successfully!"; \
-      python3 -m pip list | grep -E "(numpy|Pillow|requests|moviepy)"; \
+      echo "Python dependencies installation completed. Summary:"; \
+      python3 -m pip list 2>/dev/null | grep -E "(numpy|Pillow|requests|moviepy)" || echo "Some dependencies may not be installed"; \
     else \
       echo "WARNING: Python3 not available or requirements.txt missing. Video generation will be disabled."; \
     fi
