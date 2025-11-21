@@ -262,7 +262,12 @@ export class JourneyService {
     //   this.logger.error(`Failed to enqueue video job for journey ${savedJourney._id}`, error as Error);
     // }
 
-    return savedJourney;
+    // Ensure image_urls is always an array
+    const journeyObj = savedJourney.toObject ? savedJourney.toObject() : savedJourney;
+    return {
+      ...journeyObj,
+      image_urls: Array.isArray(journeyObj.image_urls) ? journeyObj.image_urls : [],
+    };
   }
 
   async getJourneys(userId?: string, limit: number = 20, skip: number = 0) {
@@ -312,7 +317,19 @@ export class JourneyService {
               }
             : null,
           booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
-          image_urls: Array.isArray(journeyObj.image_urls) ? journeyObj.image_urls : [],
+          image_urls: (() => {
+            const urls = journeyObj.image_urls;
+            if (Array.isArray(urls)) return urls;
+            if (typeof urls === 'string') {
+              try {
+                const parsed = JSON.parse(urls);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          })(),
           likes_count: likesCount,
           comments_count: commentsCount,
         };
@@ -363,7 +380,19 @@ export class JourneyService {
           }
         : null,
       booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
-      image_urls: Array.isArray(journeyObj.image_urls) ? journeyObj.image_urls : [],
+      image_urls: (() => {
+        const urls = journeyObj.image_urls;
+        if (Array.isArray(urls)) return urls;
+        if (typeof urls === 'string') {
+          try {
+            const parsed = JSON.parse(urls);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      })(),
       likes_count: likesCount,
       comments_count: commentsCount,
       is_liked: !!isLiked,
@@ -425,7 +454,19 @@ export class JourneyService {
             }
           : null,
         booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
-        image_urls: Array.isArray(journeyObj.image_urls) ? journeyObj.image_urls : [],
+        image_urls: (() => {
+          const urls = journeyObj.image_urls;
+          if (Array.isArray(urls)) return urls;
+          if (typeof urls === 'string') {
+            try {
+              const parsed = JSON.parse(urls);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          }
+          return [];
+        })(),
       };
     });
   }
