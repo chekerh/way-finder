@@ -7,8 +7,19 @@ import {
   IsMongoId,
   MinLength,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+
+export class SlideInputDto {
+  @IsString()
+  imageUrl: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  caption?: string;
+}
 
 export class CreateJourneyDto {
   @IsOptional()
@@ -52,6 +63,32 @@ export class CreateJourneyDto {
   })
   @IsBoolean()
   is_public?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  music_theme?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(280)
+  caption_text?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SlideInputDto)
+  slides?: SlideInputDto[];
 }
 
 export class UpdateJourneyDto {
@@ -69,6 +106,16 @@ export class UpdateJourneyDto {
   @IsOptional()
   @IsBoolean()
   is_public?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  music_theme?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(280)
+  caption_text?: string;
 }
 
 export class CreateJourneyCommentDto {
