@@ -312,6 +312,7 @@ export class JourneyService {
               }
             : null,
           booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
+          image_urls: Array.isArray(journeyObj.image_urls) ? journeyObj.image_urls : [],
           likes_count: likesCount,
           comments_count: commentsCount,
         };
@@ -362,6 +363,7 @@ export class JourneyService {
           }
         : null,
       booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
+      image_urls: Array.isArray(journeyObj.image_urls) ? journeyObj.image_urls : [],
       likes_count: likesCount,
       comments_count: commentsCount,
       is_liked: !!isLiked,
@@ -423,6 +425,7 @@ export class JourneyService {
             }
           : null,
         booking_id: journeyObj.booking_id?.toString() || journeyObj.booking_id,
+        image_urls: Array.isArray(journeyObj.image_urls) ? journeyObj.image_urls : [],
       };
     });
   }
