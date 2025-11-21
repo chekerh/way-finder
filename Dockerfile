@@ -43,46 +43,34 @@ RUN npm ci --silent
 COPY . .
 
 # Install Python dependencies for video generation
-# Install with verification but don't fail the build if installation fails
-# Video generation will fail gracefully at runtime with clear error messages
+# Try to install but don't fail the build - video generation will show errors at runtime if deps are missing
 RUN if command -v python3 > /dev/null 2>&1 && [ -f video_generation/requirements.txt ]; then \
-      echo "Installing Python dependencies for video generation..."; \
-      echo "Python version: $(python3 --version)"; \
-      echo "Pip version: $(python3 -m pip --version)"; \
+      echo "=== Installing Python dependencies for video generation ==="; \
+      echo "Python: $(python3 --version)"; \
+      echo "Pip: $(python3 -m pip --version)"; \
       \
       echo "Installing numpy..."; \
-      if python3 -m pip install --no-cache-dir numpy>=1.24.0 && python3 -c "import numpy; print(f'numpy {numpy.__version__} installed')"; then \
-        echo "✓ numpy installed successfully"; \
-      else \
-        echo "✗ ERROR: numpy installation failed - video generation will not work"; \
-      fi; \
+      python3 -m pip install --no-cache-dir numpy>=1.24.0 2>&1 | tail -5 || echo "numpy install had issues"; \
+      python3 -c "import numpy" 2>/dev/null && echo "✓ numpy OK" || echo "✗ numpy failed"; \
       \
       echo "Installing Pillow..."; \
-      if python3 -m pip install --no-cache-dir Pillow>=10.0.0 && python3 -c "from PIL import Image; print('Pillow installed')"; then \
-        echo "✓ Pillow installed successfully"; \
-      else \
-        echo "✗ ERROR: Pillow installation failed - video generation will not work"; \
-      fi; \
+      python3 -m pip install --no-cache-dir Pillow>=10.0.0 2>&1 | tail -5 || echo "Pillow install had issues"; \
+      python3 -c "from PIL import Image" 2>/dev/null && echo "✓ Pillow OK" || echo "✗ Pillow failed"; \
       \
       echo "Installing requests..."; \
-      if python3 -m pip install --no-cache-dir requests>=2.31.0 && python3 -c "import requests; print(f'requests {requests.__version__} installed')"; then \
-        echo "✓ requests installed successfully"; \
-      else \
-        echo "✗ ERROR: requests installation failed - video generation will not work"; \
-      fi; \
+      python3 -m pip install --no-cache-dir requests>=2.31.0 2>&1 | tail -5 || echo "requests install had issues"; \
+      python3 -c "import requests" 2>/dev/null && echo "✓ requests OK" || echo "✗ requests failed"; \
       \
-      echo "Installing moviepy (this may take several minutes)..."; \
-      if timeout 600 python3 -m pip install --no-cache-dir moviepy>=1.0.3 2>&1 && python3 -c "import moviepy; print('moviepy installed')"; then \
-        echo "✓ moviepy installed successfully"; \
-      else \
-        echo "✗ ERROR: moviepy installation failed or timed out - video generation will not work"; \
-      fi; \
+      echo "Installing moviepy (may take 5-10 minutes)..."; \
+      python3 -m pip install --no-cache-dir moviepy>=1.0.3 2>&1 | tail -10 || echo "moviepy install had issues"; \
+      python3 -c "import moviepy" 2>/dev/null && echo "✓ moviepy OK" || echo "✗ moviepy failed"; \
       \
-      echo "Python dependencies installation completed. Summary:"; \
-      python3 -m pip list 2>/dev/null | grep -E "(numpy|Pillow|requests|moviepy)" || echo "Some dependencies may not be installed"; \
+      echo "=== Python dependencies summary ==="; \
+      python3 -m pip list 2>/dev/null | grep -E "(numpy|Pillow|requests|moviepy)" || echo "Check logs above for installation status"; \
+      echo "Build continuing regardless of Python deps status..."; \
     else \
-      echo "WARNING: Python3 not available or requirements.txt missing. Video generation will be disabled."; \
-    fi
+      echo "Python3 or requirements.txt not found - video generation disabled"; \
+    fi || echo "Python dependencies installation encountered errors but build continues"
 
 # Build the NestJS application
 RUN npm run build
