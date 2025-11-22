@@ -4,6 +4,8 @@ import { Model, Types } from 'mongoose';
 import { DiscussionPost, DiscussionPostDocument } from './discussion.schema';
 import { DiscussionComment, DiscussionCommentDocument } from './discussion.schema';
 import { CreatePostDto, CreateCommentDto, UpdatePostDto } from './discussion.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class DiscussionService {
@@ -12,6 +14,8 @@ export class DiscussionService {
     private readonly postModel: Model<DiscussionPostDocument>,
     @InjectModel(DiscussionComment.name)
     private readonly commentModel: Model<DiscussionCommentDocument>,
+    private readonly notificationsService: NotificationsService,
+    private readonly userService: UserService,
   ) {}
 
   async createPost(userId: string, dto: CreatePostDto) {
@@ -101,12 +105,13 @@ export class DiscussionService {
   }
 
   async likePost(userId: string, postId: string) {
-    const post = await this.postModel.findById(this.toObjectId(postId, 'post id')).exec();
+    const post = await this.postModel.findById(this.toObjectId(postId, 'post id')).populate('user_id', 'username first_name last_name').exec();
     if (!post) {
       throw new NotFoundException('Post not found');
     }
 
     const userIdObj = this.toObjectId(userId, 'user id');
+    const postOwnerId = post.user_id.toString();
     const isLiked = post.liked_by.some((id) => id.toString() === userIdObj.toString());
 
     if (isLiked) {
@@ -117,13 +122,31 @@ export class DiscussionService {
       // Like
       post.liked_by.push(userIdObj);
       post.likes_count += 1;
+      
+      // Send notification to post owner if it's not the same user
+      if (postOwnerId !== userId) {
+        try {
+          const liker = await this.userService.findById(userId);
+          const likerName = liker?.username || liker?.firstName || 'Quelqu\'un';
+          await this.notificationsService.createNotification(postOwnerId, {
+            type: 'post_liked',
+            title: 'Votre post a été aimé',
+            message: `${likerName} a aimé votre post "${post.title.substring(0, 50)}${post.title.length > 50 ? '...' : ''}"`,
+            data: { postId: postId, likerId: userId },
+            actionUrl: `/post_detail/${postId}`,
+          });
+        } catch (error) {
+          // Log error but don't fail the like operation
+          console.error('Error sending like notification:', error);
+        }
+      }
     }
 
     return post.save();
   }
 
   async createComment(userId: string, postId: string, dto: CreateCommentDto) {
-    const post = await this.postModel.findById(this.toObjectId(postId, 'post id')).exec();
+    const post = await this.postModel.findById(this.toObjectId(postId, 'post id')).populate('user_id', 'username first_name last_name').exec();
     if (!post) {
       throw new NotFoundException('Post not found');
     }
@@ -139,6 +162,25 @@ export class DiscussionService {
     // Update post comment count
     post.comments_count += 1;
     await post.save();
+
+    // Send notification to post owner if it's not the same user
+    const postOwnerId = post.user_id.toString();
+    if (postOwnerId !== userId) {
+      try {
+        const commenter = await this.userService.findById(userId);
+        const commenterName = commenter?.username || commenter?.firstName || 'Quelqu\'un';
+        await this.notificationsService.createNotification(postOwnerId, {
+          type: 'post_commented',
+          title: 'Nouveau commentaire sur votre post',
+          message: `${commenterName} a commenté votre post "${post.title.substring(0, 50)}${post.title.length > 50 ? '...' : ''}"`,
+          data: { postId: postId, commentId: savedComment._id.toString(), commenterId: userId },
+          actionUrl: `/post_detail/${postId}`,
+        });
+      } catch (error) {
+        // Log error but don't fail the comment operation
+        console.error('Error sending comment notification:', error);
+      }
+    }
 
     return savedComment.populate('user_id', 'username first_name last_name profile_image_url');
   }

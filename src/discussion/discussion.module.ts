@@ -8,6 +8,8 @@ import {
   DiscussionComment,
   DiscussionCommentSchema,
 } from './discussion.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
@@ -15,6 +17,8 @@ import {
       { name: DiscussionPost.name, schema: DiscussionPostSchema },
       { name: DiscussionComment.name, schema: DiscussionCommentSchema },
     ]),
+    NotificationsModule,
+    UserModule,
   ],
   controllers: [DiscussionController],
   providers: [DiscussionService],

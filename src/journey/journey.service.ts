@@ -19,6 +19,8 @@ import { CreateJourneyDto, UpdateJourneyDto, CreateJourneyCommentDto } from './j
 import { BookingService } from '../booking/booking.service';
 import { VideoProcessingService } from '../video-processing/video-processing.service';
 import { ImgBBService } from './imgbb.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserService } from '../user/user.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -33,6 +35,8 @@ export class JourneyService {
     private readonly bookingService: BookingService,
     private readonly videoProcessingService: VideoProcessingService,
     private readonly imgbbService: ImgBBService,
+    private readonly notificationsService: NotificationsService,
+    private readonly userService: UserService,
   ) {}
 
   private toObjectId(id: string, label: string) {
@@ -507,7 +511,7 @@ export class JourneyService {
   }
 
   async likeJourney(userId: string, journeyId: string) {
-    const journey = await this.journeyModel.findById(journeyId).exec();
+    const journey = await this.journeyModel.findById(journeyId).populate('user_id', 'username firstName lastName').exec();
 
     if (!journey || !journey.is_visible) {
       throw new NotFoundException('Journey not found');
@@ -528,11 +532,30 @@ export class JourneyService {
       user_id: this.toObjectId(userId, 'user id'),
     });
 
+    // Send notification to journey owner if it's not the same user
+    const journeyOwnerId = journey.user_id.toString();
+    if (journeyOwnerId !== userId) {
+      try {
+        const liker = await this.userService.findById(userId);
+        const likerName = liker?.username || liker?.firstName || 'Quelqu\'un';
+        await this.notificationsService.createNotification(journeyOwnerId, {
+          type: 'journey_liked',
+          title: 'Votre voyage a été aimé',
+          message: `${likerName} a aimé votre voyage à ${journey.destination}`,
+          data: { journeyId: journeyId, likerId: userId },
+          actionUrl: `/journey_detail/${journeyId}`,
+        });
+      } catch (error) {
+        // Log error but don't fail the like operation
+        console.error('Error sending journey like notification:', error);
+      }
+    }
+
     return { liked: true, message: 'Journey liked' };
   }
 
   async addComment(userId: string, journeyId: string, dto: CreateJourneyCommentDto) {
-    const journey = await this.journeyModel.findById(journeyId).exec();
+    const journey = await this.journeyModel.findById(journeyId).populate('user_id', 'username firstName lastName').exec();
 
     if (!journey || !journey.is_visible) {
       throw new NotFoundException('Journey not found');
@@ -545,7 +568,28 @@ export class JourneyService {
       parent_comment_id: dto.parent_comment_id ? this.toObjectId(dto.parent_comment_id, 'parent comment id') : undefined,
     });
 
-    return comment.save();
+    const savedComment = await comment.save();
+
+    // Send notification to journey owner if it's not the same user
+    const journeyOwnerId = journey.user_id.toString();
+    if (journeyOwnerId !== userId) {
+      try {
+        const commenter = await this.userService.findById(userId);
+        const commenterName = commenter?.username || commenter?.firstName || 'Quelqu\'un';
+        await this.notificationsService.createNotification(journeyOwnerId, {
+          type: 'journey_commented',
+          title: 'Nouveau commentaire sur votre voyage',
+          message: `${commenterName} a commenté votre voyage à ${journey.destination}`,
+          data: { journeyId: journeyId, commentId: savedComment._id.toString(), commenterId: userId },
+          actionUrl: `/journey_detail/${journeyId}`,
+        });
+      } catch (error) {
+        // Log error but don't fail the comment operation
+        console.error('Error sending journey comment notification:', error);
+      }
+    }
+
+    return savedComment;
   }
 
   async getComments(journeyId: string, limit: number = 50, skip: number = 0) {
