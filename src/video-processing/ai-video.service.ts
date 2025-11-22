@@ -199,9 +199,10 @@ export class AiVideoService {
    * Get placeholder video URL for development/testing
    */
   private async getPlaceholderVideo(): Promise<AiVideoResponse> {
+    // Use a publicly accessible test video URL
     const placeholderUrl =
       process.env.DEFAULT_VIDEO_PLACEHOLDER_URL ||
-      'https://storage.googleapis.com/wayfinder-static/sample-journey-video.mp4';
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
     // Simulate processing latency
     await new Promise((resolve) => setTimeout(resolve, 2000));
