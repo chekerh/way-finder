@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { BullModule } from '@nestjs/bull';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
@@ -21,6 +22,9 @@ import { SocialModule } from './social/social.module';
 import { SearchHistoryModule } from './search-history/search-history.module';
 import { PriceAlertsModule } from './price-alerts/price-alerts.module';
 import { TravelTipsModule } from './travel-tips/travel-tips.module';
+import { JourneyModule } from './journey/journey.module';
+import { VideoProcessingModule } from './video-processing/video-processing.module';
+import { DestinationVideoModule } from './video-generation/destination-video.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {
@@ -37,6 +41,12 @@ const mongoUri = (() => {
 @Module({
   imports: [
     MongooseModule.forRoot(mongoUri),
+    BullModule.forRoot({
+      redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: Number(process.env.REDIS_PORT) || 6379,
+      },
+    }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     UserModule,
     AuthModule,
@@ -54,6 +64,9 @@ const mongoUri = (() => {
     SearchHistoryModule,
     PriceAlertsModule,
     TravelTipsModule,
+    JourneyModule,
+    VideoProcessingModule,
+    DestinationVideoModule,
   ],
   controllers: [AppController],
   providers: [

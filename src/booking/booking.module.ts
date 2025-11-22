@@ -8,6 +8,7 @@ import { BookingController } from './booking.controller';
   imports: [MongooseModule.forFeature([{ name: Booking.name, schema: BookingSchema }])],
   controllers: [BookingController],
   providers: [BookingService],
+  exports: [BookingService],
 })
 export class BookingModule {}
 

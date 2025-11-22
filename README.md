@@ -18,7 +18,7 @@ src/
 ├── auth/                    # Authentication (JWT, login, register)
 ├── user/                    # User profiles, image upload
 ├── booking/                 # Flight booking, offers, history
-├── payment/                 # Payment processing (Flouci integration)
+├── payment/                 # Payment processing (PayPal integration)
 ├── onboarding/              # AI-driven dynamic onboarding
 │   ├── ai/                  # Onboarding AI service
 │   └── questions/           # Question templates
@@ -107,8 +107,9 @@ Open http://localhost:3000/api-docs (use "Authorize" button with Bearer token fo
 #### Payment
 - `POST /api/payment/record` (Bearer) - Record payment
 - `GET /api/payment/history` (Bearer) - Get payment history
-- `POST /api/payment/flouci/create` (Bearer) - Create Flouci payment session
-- `POST /api/payment/flouci/verify` (Bearer) - Verify Flouci payment
+- `POST /api/payment/paypal/create` (Bearer) - Create PayPal order and approval link
+- `POST /api/payment/paypal/capture/:orderId` (Bearer) - Capture PayPal order
+- `GET /api/payment/paypal/status/:orderId` (Bearer) - Retrieve PayPal order status
 
 #### Discussion Forum
 - `GET /api/discussion/posts` - Get all posts

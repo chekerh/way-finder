@@ -23,8 +23,58 @@ export class UserService {
     return this.userModel.findOne({ email }).exec();
   }
 
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return this.userModel.findOne({ google_id: googleId }).exec();
+  }
+
+  async findByVerificationToken(token: string): Promise<User | null> {
+    return this.userModel.findOne({ email_verification_token: token }).exec();
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.userModel.findById(id).exec();
+  }
+
+  async updateGoogleId(userId: string, googleId: string): Promise<User> {
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $set: { google_id: googleId } },
+        { new: true, runValidators: true }
+      )
+      .exec();
+    if (!updated) throw new NotFoundException('User not found');
+    return updated;
+  }
+
+  async verifyEmail(userId: string): Promise<User> {
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { 
+          $set: { 
+            email_verified: true,
+            email_verified_at: new Date(),
+          },
+          $unset: { email_verification_token: '' },
+        },
+        { new: true, runValidators: true }
+      )
+      .exec();
+    if (!updated) throw new NotFoundException('User not found');
+    return updated;
+  }
+
+  async updateVerificationToken(userId: string, token: string): Promise<User> {
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $set: { email_verification_token: token } },
+        { new: true, runValidators: true }
+      )
+      .exec();
+    if (!updated) throw new NotFoundException('User not found');
+    return updated;
   }
 
   async updateProfile(userId: string, updateUserDto: UpdateUserDto): Promise<User> {

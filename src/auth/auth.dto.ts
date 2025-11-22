@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsIn } from 'class-validator';
 
 export class LoginDto {
   @IsString()
@@ -32,5 +32,22 @@ export class RegisterDto {
   @IsNotEmpty()
   @MinLength(6)
   password: string;
+}
+
+export class GoogleSignInDto {
+  @IsString()
+  @IsNotEmpty()
+  id_token: string; // Google ID token
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['web', 'android'])
+  client_type?: 'web' | 'android'; // Type of client (web or android)
+}
+
+export class VerifyEmailDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string; // Email verification token
 }
 

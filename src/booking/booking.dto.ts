@@ -12,16 +12,7 @@ import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
 import { BookingStatus } from '../common/enums/booking-status.enum';
 
-export class ConfirmBookingDto {
-  @IsNotEmpty()
-  @IsString()
-  offer_id: string;
-
-  @IsNotEmpty()
-  @IsObject()
-  payment_details: Record<string, any>;
-}
-
+// Define TripDetailsDto before ConfirmBookingDto to avoid reference errors
 export class TripDetailsDto {
   @IsOptional()
   @IsString()
@@ -48,6 +39,26 @@ export class TripDetailsDto {
   seats?: string;
 }
 
+export class ConfirmBookingDto {
+  @IsNotEmpty()
+  @IsString()
+  offer_id: string;
+
+  @IsNotEmpty()
+  @IsObject()
+  payment_details: Record<string, any>;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'total_price must be a number' })
+  @Type(() => Number)
+  total_price?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TripDetailsDto)
+  trip_details?: TripDetailsDto;
+}
+
 export class PassengerDto {
   @IsNotEmpty()
   @IsString()
@@ -63,10 +74,7 @@ export class PassengerDto {
 }
 
 export class CreateBookingDto extends ConfirmBookingDto {
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => TripDetailsDto)
-  trip_details?: TripDetailsDto;
+  // trip_details is inherited from ConfirmBookingDto, no need to redeclare
 
   @IsOptional()
   @IsArray()
@@ -77,10 +85,6 @@ export class CreateBookingDto extends ConfirmBookingDto {
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  @IsNumber()
-  total_price?: number;
 }
 
 export class UpdateBookingDto extends PartialType(CreateBookingDto) {

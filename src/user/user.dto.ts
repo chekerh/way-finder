@@ -18,10 +18,28 @@ export class CreateUserDto {
   @IsNotEmpty()
   last_name: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MinLength(6)
-  password: string;
+  password?: string; // Optional for Google OAuth users
+
+  @IsOptional()
+  @IsString()
+  google_id?: string;
+
+  @IsOptional()
+  email_verified?: boolean;
+
+  @IsOptional()
+  @IsString()
+  email_verification_token?: string;
+
+  @IsOptional()
+  email_verified_at?: Date;
+
+  @IsOptional()
+  @IsString()
+  profile_image_url?: string;
 }
 
 export class UpdateUserDto {

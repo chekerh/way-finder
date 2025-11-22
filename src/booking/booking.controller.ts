@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Req, Param, Put, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, Req, Param, Put, Delete, UsePipes, ValidationPipe } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { ConfirmBookingDto, CreateBookingDto, UpdateBookingDto } from './booking.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -19,7 +19,13 @@ export class BookingController {
 
   @UseGuards(JwtAuthGuard)
   @Post('confirm')
+  @UsePipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: false, // Allow extra properties (like null total_price)
+    transform: true,
+  }))
   async confirm(@Req() req: any, @Body() dto: ConfirmBookingDto) {
+    console.log('Confirm booking request:', JSON.stringify(dto, null, 2));
     return this.bookingService.confirm(req.user.sub, dto);
   }
 

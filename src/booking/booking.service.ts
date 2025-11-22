@@ -40,7 +40,7 @@ export class BookingService {
 
   async confirm(userId: string, dto: ConfirmBookingDto) {
     const confirmation_number = `CONF-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
-    const total_price = 200; // would be computed from compare
+    const total_price = dto.total_price ?? 0;
     const booking = new this.bookingModel({
       user_id: this.toObjectId(userId, 'user id'),
       offer_id: dto.offer_id,
@@ -49,6 +49,7 @@ export class BookingService {
       booking_date: new Date(),
       confirmation_number,
       total_price,
+      trip_details: dto.trip_details, // Include trip details (destination, etc.)
     });
     return booking.save();
   }

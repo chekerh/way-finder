@@ -4,14 +4,37 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   
+  // Create uploads directories if they don't exist
+  // NOTE: On Render, the filesystem is ephemeral. For production, consider using cloud storage (S3, Cloudinary, etc.)
+  const uploadsDir = join(__dirname, '..', 'uploads');
+  const profilesDir = join(uploadsDir, 'profiles');
+  const journeysDir = join(uploadsDir, 'journeys');
+  
+  [uploadsDir, profilesDir, journeysDir].forEach((dir) => {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+      console.log(`📁 Created directory: ${dir}`);
+    }
+  });
+  
   // Serve static files from uploads directory
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/',
+  });
+  
+  // Serve destination videos
+  const destinationVideosDir = join(__dirname, '..', 'uploads', 'destination-videos');
+  if (!existsSync(destinationVideosDir)) {
+    mkdirSync(destinationVideosDir, { recursive: true });
+  }
+  app.useStaticAssets(destinationVideosDir, {
+    prefix: '/uploads/destination-videos/',
   });
 
   app.enableCors({

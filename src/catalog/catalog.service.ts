@@ -54,14 +54,18 @@ export class CatalogService {
     }
 
     // Otherwise, search for multiple popular destinations to provide variety
+    // Always include diverse destinations to avoid showing only one city
+    // Include destinations from different regions: Europe, Asia, Americas
+    const defaultDestinations = ['CDG', 'FCO', 'BCN', 'DXB', 'JFK', 'LHR', 'MAD', 'AMS', 'ATH', 'IST', 'NRT', 'BKK', 'SIN', 'ICN'];
     const popularDestinations =
       preferences.destination_preferences?.length > 0
-        ? preferences.destination_preferences
-        : ['CDG', 'FCO', 'BCN', 'DXB', 'JFK'];
+        ? [...preferences.destination_preferences, ...defaultDestinations].slice(0, 10) // Mix preferences with defaults
+        : defaultDestinations;
 
     const allFlights: any[] = [];
     const totalRequested = overrides.maxResults ?? 15;
-    const numDestinations = Math.min(3, popularDestinations.length);
+    // Increase number of destinations to search for more variety
+    const numDestinations = Math.min(5, popularDestinations.length); // Search up to 5 different destinations
     const maxPerDestination = Math.max(2, Math.floor(totalRequested / numDestinations));
 
     if (this.shouldUseFallbackFlights()) {
@@ -188,15 +192,50 @@ export class CatalogService {
   private buildFallbackFlightResponse(preferredDestinations: string[], maxResults?: number) {
     const normalizedPrefs = preferredDestinations.map((code) => code.toUpperCase());
 
+    // First, try to get flights matching preferences
     let flights = FALLBACK_FLIGHT_OFFERS.filter((flight) =>
       normalizedPrefs.includes(flight.destinationCode),
     );
+
+    // If we don't have enough variety, add more destinations from fallback
+    // Ensure we always have at least 3-5 different destinations
+    const uniqueDestinations = flights.map(f => f.destinationCode).filter((v, i, a) => a.indexOf(v) === i);
+    const minDestinations = Math.min(5, FALLBACK_FLIGHT_OFFERS.length);
+    
+    if (uniqueDestinations.length < minDestinations) {
+      // Add more destinations from fallback to ensure variety
+      const additionalFlights = FALLBACK_FLIGHT_OFFERS.filter(
+        (flight) => !uniqueDestinations.includes(flight.destinationCode)
+      );
+      flights = [...flights, ...additionalFlights].slice(0, minDestinations * 2); // Take up to 2 per destination
+    }
 
     if (!flights.length) {
       flights = FALLBACK_FLIGHT_OFFERS;
     }
 
-    const slice = flights.slice(0, maxResults ?? flights.length);
+    // Ensure we return diverse destinations (at least one per unique destination code)
+    const diverseFlights: typeof FALLBACK_FLIGHT_OFFERS = [];
+    const seenDestinations = new Set<string>();
+    
+    // First pass: one flight per destination
+    for (const flight of flights) {
+      if (!seenDestinations.has(flight.destinationCode)) {
+        diverseFlights.push(flight);
+        seenDestinations.add(flight.destinationCode);
+      }
+    }
+    
+    // Second pass: add more flights from same destinations if we have space
+    for (const flight of flights) {
+      if (diverseFlights.length >= (maxResults ?? 15)) break;
+      if (seenDestinations.has(flight.destinationCode) && 
+          diverseFlights.filter(f => f.destinationCode === flight.destinationCode).length < 2) {
+        diverseFlights.push(flight);
+      }
+    }
+
+    const slice = diverseFlights.slice(0, maxResults ?? diverseFlights.length);
 
     return {
       data: slice.map((flight) => flight.offer),

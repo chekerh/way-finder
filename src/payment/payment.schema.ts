@@ -20,6 +20,12 @@ export class Payment {
 
   @Prop({ required: true })
   payment_method: string; // Stripe | PayPal
+
+  @Prop({ required: true, default: 'USD' })
+  currency: string;
+
+  @Prop({ type: Object, default: {} })
+  metadata: Record<string, any>;
 }
 
 export type PaymentDocument = HydratedDocument<Payment>;
