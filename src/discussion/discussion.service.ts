@@ -111,7 +111,8 @@ export class DiscussionService {
     }
 
     const userIdObj = this.toObjectId(userId, 'user id');
-    const postOwnerId = post.user_id.toString();
+    // Get post owner ID - handle both populated and non-populated cases
+    const postOwnerId = (post.user_id as any)?._id ? (post.user_id as any)._id.toString() : post.user_id.toString();
     const isLiked = post.liked_by.some((id) => id.toString() === userIdObj.toString());
 
     if (isLiked) {
@@ -128,17 +129,21 @@ export class DiscussionService {
         try {
           const liker = await this.userService.findById(userId);
           const likerName = liker?.username || liker?.first_name || 'Quelqu\'un';
-          await this.notificationsService.createNotification(postOwnerId, {
+          console.log(`[DiscussionService] Creating like notification for post ${postId}: owner=${postOwnerId}, liker=${userId}`);
+          const notification = await this.notificationsService.createNotification(postOwnerId, {
             type: 'post_liked',
             title: 'Votre post a été aimé',
             message: `${likerName} a aimé votre post "${post.title.substring(0, 50)}${post.title.length > 50 ? '...' : ''}"`,
             data: { postId: postId, likerId: userId },
             actionUrl: `/post_detail/${postId}`,
           });
+          console.log(`[DiscussionService] Notification created successfully: ${notification._id}`);
         } catch (error) {
           // Log error but don't fail the like operation
-          console.error('Error sending like notification:', error);
+          console.error('[DiscussionService] Error sending like notification:', error);
         }
+      } else {
+        console.log(`[DiscussionService] Skipping notification: user ${userId} liked their own post ${postId}`);
       }
     }
 
@@ -164,22 +169,27 @@ export class DiscussionService {
     await post.save();
 
     // Send notification to post owner if it's not the same user
-    const postOwnerId = post.user_id.toString();
+    // Get post owner ID - handle both populated and non-populated cases
+    const postOwnerId = (post.user_id as any)?._id ? (post.user_id as any)._id.toString() : post.user_id.toString();
     if (postOwnerId !== userId) {
       try {
         const commenter = await this.userService.findById(userId);
         const commenterName = commenter?.username || commenter?.first_name || 'Quelqu\'un';
-        await this.notificationsService.createNotification(postOwnerId, {
+        console.log(`[DiscussionService] Creating comment notification for post ${postId}: owner=${postOwnerId}, commenter=${userId}`);
+        const notification = await this.notificationsService.createNotification(postOwnerId, {
           type: 'post_commented',
           title: 'Nouveau commentaire sur votre post',
           message: `${commenterName} a commenté votre post "${post.title.substring(0, 50)}${post.title.length > 50 ? '...' : ''}"`,
           data: { postId: postId, commentId: savedComment._id.toString(), commenterId: userId },
           actionUrl: `/post_detail/${postId}`,
         });
+        console.log(`[DiscussionService] Notification created successfully: ${notification._id}`);
       } catch (error) {
         // Log error but don't fail the comment operation
-        console.error('Error sending comment notification:', error);
+        console.error('[DiscussionService] Error sending comment notification:', error);
       }
+    } else {
+      console.log(`[DiscussionService] Skipping notification: user ${userId} commented on their own post ${postId}`);
     }
 
     return savedComment.populate('user_id', 'username first_name last_name profile_image_url');
