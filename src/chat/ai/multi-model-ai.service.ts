@@ -108,16 +108,36 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
               Authorization: `Bearer ${this.huggingFaceApiKey}`,
               'Content-Type': 'application/json',
             },
-            timeout: 30000,
+            timeout: 60000, // Increased timeout for model loading
           },
         ),
       );
 
-      let generatedText = response.data[0]?.generated_text || '';
+      // Handle different response formats from Hugging Face API
+      let generatedText = '';
+      
+      if (Array.isArray(response.data)) {
+        // Response is an array
+        generatedText = response.data[0]?.generated_text || response.data[0] || '';
+      } else if (typeof response.data === 'string') {
+        // Response is a string
+        generatedText = response.data;
+      } else if (response.data?.generated_text) {
+        // Response is an object with generated_text
+        generatedText = response.data.generated_text;
+      } else {
+        // Fallback: try to extract text from any format
+        generatedText = JSON.stringify(response.data);
+      }
       
       // Extract the assistant's response (remove the prompt)
       if (generatedText.includes(prompt)) {
         generatedText = generatedText.split(prompt)[1]?.trim() || generatedText;
+      }
+
+      // If still empty or too short, provide fallback
+      if (!generatedText || generatedText.length < 10) {
+        generatedText = "I'm here to help you with your travel plans! Based on your preferences, I can suggest flight packages. What destination are you interested in?";
       }
 
       const flightPacks = this.extractFlightPacks(generatedText);
@@ -127,8 +147,18 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
         flightPacks,
       };
     } catch (error: any) {
-      this.logger.error('Hugging Face API error', error?.response?.data || error.message);
-      throw new Error('Failed to generate response from Hugging Face');
+      this.logger.error('Hugging Face API error', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+      });
+      
+      // Check if model is loading
+      if (error?.response?.data?.error?.includes('loading')) {
+        throw new Error('Model is loading. Please try again in a few seconds.');
+      }
+      
+      throw new Error('Failed to generate response from Hugging Face. Please try again or switch to a different model.');
     }
   }
 
@@ -175,16 +205,31 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
 
   private formatHuggingFacePrompt(messages: Array<{ role: string; content: string }>): string {
     // Format for Mistral instruct model
-    let prompt = '<s>';
-    for (const msg of messages) {
-      if (msg.role === 'system') {
-        prompt += `[INST] ${msg.content} [/INST]\n`;
-      } else if (msg.role === 'user') {
-        prompt += `[INST] ${msg.content} [/INST]\n`;
-      } else {
-        prompt += `${msg.content}</s>\n<s>`;
+    // Combine system prompt with user messages
+    const systemMsg = messages.find(m => m.role === 'system');
+    const userMessages = messages.filter(m => m.role === 'user');
+    const assistantMessages = messages.filter(m => m.role === 'assistant');
+    
+    let prompt = '';
+    
+    // Add system instruction
+    if (systemMsg) {
+      prompt += `[INST] System: ${systemMsg.content}\n\n`;
+    }
+    
+    // Add conversation history
+    for (let i = 0; i < Math.max(userMessages.length, assistantMessages.length); i++) {
+      if (userMessages[i]) {
+        prompt += `User: ${userMessages[i].content}\n`;
+      }
+      if (assistantMessages[i]) {
+        prompt += `Assistant: ${assistantMessages[i].content}\n`;
       }
     }
+    
+    // Add final instruction
+    prompt += `\nPlease respond as the Assistant: [/INST]`;
+    
     return prompt;
   }
 

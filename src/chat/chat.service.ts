@@ -81,11 +81,28 @@ export class ChatService {
         model,
       );
     } catch (error: any) {
-      this.logger.error('AI generation failed', error);
-      // Fallback response
-      aiResponse = {
-        response: 'I apologize, but I encountered an error. Please try again or switch to a different model.',
-      };
+      this.logger.error('AI generation failed', {
+        error: error?.message,
+        model,
+        userId,
+      });
+      
+      // Provide helpful fallback based on error type
+      const errorMessage = error?.message || 'Unknown error';
+      if (errorMessage.includes('loading')) {
+        aiResponse = {
+          response: 'The AI model is currently loading. Please wait a moment and try again, or switch to a different model.',
+        };
+      } else if (errorMessage.includes('not available') || errorMessage.includes('not configured')) {
+        aiResponse = {
+          response: 'This AI model is not available. Please switch to a different model using the settings icon.',
+        };
+      } else {
+        // Generic fallback with helpful message
+        aiResponse = {
+          response: 'I apologize, but I encountered an error processing your request. Please try again or switch to a different AI model. You can change models using the settings icon.',
+        };
+      }
     }
 
     // If user asked about flights and we got flight packs, enhance them with real data
