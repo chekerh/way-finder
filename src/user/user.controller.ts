@@ -113,4 +113,11 @@ export class UserController {
       user: result,
     };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('fcm-token')
+  async registerFcmToken(@Req() req: any, @Body() body: { token: string }) {
+    await this.userService.updateFcmToken(req.user.sub, body.token);
+    return { message: 'FCM token registered successfully' };
+  }
 }

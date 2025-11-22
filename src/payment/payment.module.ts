@@ -5,6 +5,7 @@ import { Payment, PaymentSchema } from './payment.schema';
 import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
 import { PaypalService } from './paypal.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { PaypalService } from './paypal.service';
       timeout: 10000,
       maxRedirects: 3,
     }),
+    NotificationsModule,
   ],
   controllers: [PaymentController],
   providers: [PaymentService, PaypalService],

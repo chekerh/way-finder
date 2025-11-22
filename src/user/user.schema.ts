@@ -67,6 +67,9 @@ bio?: string;
     climate_preference?: string;
     duration_preference?: string;
   };
+
+  @Prop({ type: String, default: null })
+  fcm_token?: string; // Firebase Cloud Messaging token for push notifications
 }
 
 export type UserDocument = HydratedDocument<User>;

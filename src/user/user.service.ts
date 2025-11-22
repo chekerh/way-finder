@@ -90,4 +90,21 @@ export class UserService {
     if (!updated) throw new NotFoundException('User not found');
     return updated;
   }
+
+  async updateFcmToken(userId: string, fcmToken: string): Promise<User> {
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $set: { fcm_token: fcmToken } },
+        { new: true, runValidators: true }
+      )
+      .exec();
+    if (!updated) throw new NotFoundException('User not found');
+    return updated;
+  }
+
+  async getFcmToken(userId: string): Promise<string | null> {
+    const user = await this.userModel.findById(userId).select('fcm_token').exec();
+    return user?.fcm_token || null;
+  }
 }

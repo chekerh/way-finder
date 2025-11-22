@@ -4,11 +4,13 @@ import { Model, Types } from 'mongoose';
 import { Booking, BookingDocument } from './booking.schema';
 import { ConfirmBookingDto, CreateBookingDto, UpdateBookingDto } from './booking.dto';
 import { BookingStatus } from '../common/enums/booking-status.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BookingService {
   constructor(
     @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async searchOffers(query: { destination?: string; dates?: string; type?: string }) {
@@ -51,7 +53,23 @@ export class BookingService {
       total_price,
       trip_details: dto.trip_details, // Include trip details (destination, etc.)
     });
-    return booking.save();
+    const savedBooking = await booking.save();
+    
+    // Send notification for confirmed booking
+    const destinationName = dto.trip_details?.destination || 'votre destination';
+    await this.notificationsService.createBookingNotification(
+      userId,
+      'booking_confirmed',
+      savedBooking._id.toString(),
+      `Votre réservation pour ${destinationName} a été confirmée. Numéro de confirmation: ${confirmation_number}`,
+      {
+        confirmationNumber: confirmation_number,
+        totalPrice: total_price,
+        tripDetails: dto.trip_details,
+      },
+    );
+    
+    return savedBooking;
   }
 
   async history(userId: string) {
@@ -92,6 +110,20 @@ export class BookingService {
   }
 
   async update(userId: string, bookingId: string, dto: UpdateBookingDto) {
+    // Get old booking to compare status changes
+    const oldBooking = await this.bookingModel
+      .findOne({
+        _id: this.toObjectId(bookingId, 'booking id'),
+        user_id: this.toObjectId(userId, 'user id'),
+      })
+      .exec();
+    
+    if (!oldBooking) {
+      throw new NotFoundException('Booking not found');
+    }
+    
+    const oldStatus = oldBooking.status;
+    
     const booking = await this.bookingModel
       .findOneAndUpdate(
         { _id: this.toObjectId(bookingId, 'booking id'), user_id: this.toObjectId(userId, 'user id') },
@@ -108,9 +140,53 @@ export class BookingService {
         { new: true, runValidators: true },
       )
       .exec();
+    
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
+    
+    // Send notification if status changed
+    if ('status' in dto && dto.status !== oldStatus) {
+      const destinationName = booking.trip_details?.destination || booking.trip_details?.origin || 'votre destination';
+      let message = '';
+      
+      if (dto.status === BookingStatus.CONFIRMED) {
+        message = `Votre réservation pour ${destinationName} a été confirmée. Numéro de confirmation: ${booking.confirmation_number}`;
+      } else if (dto.status === BookingStatus.CANCELLED) {
+        message = `Votre réservation pour ${destinationName} a été annulée.`;
+      } else {
+        message = `Votre réservation pour ${destinationName} a été mise à jour.`;
+      }
+      
+      await this.notificationsService.createBookingNotification(
+        userId,
+        dto.status === BookingStatus.CONFIRMED ? 'booking_confirmed' :
+        dto.status === BookingStatus.CANCELLED ? 'booking_cancelled' :
+        'booking_updated',
+        booking._id.toString(),
+        message,
+        {
+          confirmationNumber: booking.confirmation_number,
+          totalPrice: booking.total_price,
+          tripDetails: booking.trip_details,
+        },
+      );
+    } else if (dto.trip_details || dto.total_price || dto.passengers) {
+      // Send update notification if important fields changed (but status didn't)
+      const destinationName = booking.trip_details?.destination || booking.trip_details?.origin || 'votre destination';
+      await this.notificationsService.createBookingNotification(
+        userId,
+        'booking_updated',
+        booking._id.toString(),
+        `Votre réservation pour ${destinationName} a été mise à jour.`,
+        {
+          confirmationNumber: booking.confirmation_number,
+          totalPrice: booking.total_price,
+          tripDetails: booking.trip_details,
+        },
+      );
+    }
+    
     return booking;
   }
 
@@ -125,6 +201,21 @@ export class BookingService {
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
+    
+    // Send notification for cancelled booking
+    const destinationName = booking.trip_details?.destination || booking.trip_details?.origin || 'votre destination';
+    await this.notificationsService.createBookingNotification(
+      userId,
+      'booking_cancelled',
+      booking._id.toString(),
+      `Votre réservation pour ${destinationName} a été annulée. Numéro de confirmation: ${booking.confirmation_number}`,
+      {
+        confirmationNumber: booking.confirmation_number,
+        totalPrice: booking.total_price,
+        tripDetails: booking.trip_details,
+      },
+    );
+    
     return booking;
   }
 }

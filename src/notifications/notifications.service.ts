@@ -3,11 +3,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Notification, NotificationDocument, NotificationType } from './notifications.schema';
 import { CreateNotificationDto } from './notifications.dto';
+import { FcmService } from './fcm.service';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     @InjectModel(Notification.name) private readonly notificationModel: Model<NotificationDocument>,
+    private readonly fcmService: FcmService,
+    private readonly userService: UserService,
   ) {}
 
   async createNotification(userId: string, createNotificationDto: CreateNotificationDto): Promise<Notification> {
@@ -16,6 +20,30 @@ export class NotificationsService {
       ...createNotificationDto,
     });
     const savedNotification = await notification.save();
+    
+    // Send FCM push notification if FCM is initialized
+    if (this.fcmService.isInitialized()) {
+      try {
+        const fcmToken = await this.userService.getFcmToken(userId);
+        if (fcmToken) {
+          await this.fcmService.sendNotification(
+            fcmToken,
+            savedNotification.title,
+            savedNotification.message,
+            {
+              type: savedNotification.type,
+              notificationId: savedNotification._id.toString(),
+              actionUrl: savedNotification.actionUrl,
+              ...savedNotification.data,
+            },
+          );
+        }
+      } catch (error) {
+        // Log error but don't fail notification creation
+        console.error('Error sending FCM notification:', error);
+      }
+    }
+    
     return savedNotification;
   }
 

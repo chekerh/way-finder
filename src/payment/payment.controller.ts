@@ -43,10 +43,12 @@ export class PaymentController {
       payment_status: 'pending',
       transaction_id: order?.id,
       currency: purchaseUnit?.amount?.currency_code || dto.currency,
+      bookingId: (dto as any).bookingId, // Pass bookingId if provided
       metadata: {
         paypal_status: order?.status,
         approval_url: approvalUrl,
         reference_id: purchaseUnit?.reference_id,
+        bookingId: (dto as any).bookingId, // Store bookingId in metadata as well
       },
     });
 
@@ -60,13 +62,18 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Post('paypal/capture/:orderId')
-  async capturePaypalOrder(@Param('orderId') orderId: string) {
+  async capturePaypalOrder(@Param('orderId') orderId: string, @Body() body?: { bookingId?: string }) {
     const capture = await this.paypalService.captureOrder(orderId);
     const paymentStatus = capture?.status === 'COMPLETED' ? 'success' : 'failed';
+
+    // Find the payment to get the bookingId from metadata if not provided
+    const existingPayment = await this.paymentService.findByTransactionId(orderId);
+    const bookingId = body?.bookingId || existingPayment?.metadata?.bookingId;
 
     await this.paymentService.updateStatus(orderId, paymentStatus, {
       paypal_status: capture?.status,
       capture,
+      bookingId,
     });
 
     return capture;
