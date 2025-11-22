@@ -20,9 +20,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
-    "@nestjs/axios": "^4.0.1",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/mongoose": "^11.0.0",
     "@nestjs/passport": "^11.0.1",
@@ -38,6 +38,7 @@
     "helmet": "^7.1.0",
     "mongoose": "^8.8.1",
     "multer": "^2.0.2",
+    "openai": "^6.9.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",

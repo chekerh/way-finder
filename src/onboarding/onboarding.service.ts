@@ -183,7 +183,7 @@ export class OnboardingService {
     }
 
     // Fallback: use local AI service
-    const nextQuestion = this.aiService.generateNextQuestion(session);
+    const nextQuestion = await this.aiService.generateNextQuestion(session);
 
     // No more questions → complete onboarding locally
     if (!nextQuestion) {
