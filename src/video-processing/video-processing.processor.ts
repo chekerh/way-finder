@@ -21,16 +21,27 @@ export class VideoProcessingProcessor {
       return;
     }
 
+    // Set status to processing (frontend will hide video section during this time)
     journey.video_status = 'processing';
+    journey.video_url = undefined; // Ensure no URL is set during processing
     await journey.save();
 
     try {
       const response = await this.aiVideoService.generateVideo(job.data);
-      journey.video_url = response.videoUrl;
-      journey.video_status = 'completed';
+      
+      // Only set video_url and status to completed if we have a valid, non-empty URL
+      if (response.videoUrl && response.videoUrl.trim().length > 0) {
+        journey.video_url = response.videoUrl;
+        journey.video_status = 'completed';
+      } else {
+        // If no valid URL is returned, mark as failed
+        journey.video_status = 'failed';
+        journey.video_url = undefined;
+      }
       await journey.save();
     } catch (error) {
       journey.video_status = 'failed';
+      journey.video_url = undefined; // Ensure no URL is set on failure
       await journey.save();
       throw error;
     }
