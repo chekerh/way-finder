@@ -157,7 +157,7 @@ Remember: make it flow naturally from what they've already shared.`;
     }
 
     return history.join('\n\n');
-  }
+    }
 
   /**
    * Gets human-readable question text for history
@@ -176,7 +176,7 @@ Remember: make it flow naturally from what they've already shared.`;
     };
     
     return questionMap[questionId] || `Question about ${questionId}`;
-  }
+    }
 
   /**
    * Fallback question generator when AI is unavailable
