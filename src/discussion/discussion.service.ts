@@ -137,7 +137,7 @@ export class DiscussionService {
             data: { postId: postId, likerId: userId },
             actionUrl: `/post_detail/${postId}`,
           });
-          console.log(`[DiscussionService] Notification created successfully: ${notification._id}`);
+          console.log(`[DiscussionService] Notification created successfully: ${(notification as any)._id || 'unknown'}`);
         } catch (error) {
           // Log error but don't fail the like operation
           console.error('[DiscussionService] Error sending like notification:', error);
@@ -183,7 +183,7 @@ export class DiscussionService {
           data: { postId: postId, commentId: savedComment._id.toString(), commenterId: userId },
           actionUrl: `/post_detail/${postId}`,
         });
-        console.log(`[DiscussionService] Notification created successfully: ${notification._id}`);
+          console.log(`[DiscussionService] Notification created successfully: ${(notification as any)._id || 'unknown'}`);
       } catch (error) {
         // Log error but don't fail the comment operation
         console.error('[DiscussionService] Error sending comment notification:', error);
