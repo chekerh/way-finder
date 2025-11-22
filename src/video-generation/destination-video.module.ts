@@ -8,6 +8,7 @@ import { ImageAggregatorService } from './image-aggregator.service';
 import { MusicSelectorService } from './music-selector.service';
 import { Journey, JourneySchema } from '../journey/journey.schema';
 import { ImgBBService } from '../journey/imgbb.service';
+import { VideoProcessingModule } from '../video-processing/video-processing.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ImgBBService } from '../journey/imgbb.service';
       { name: Journey.name, schema: JourneySchema },
     ]),
     HttpModule,
+    VideoProcessingModule, // Import to access AiVideoService
   ],
   providers: [
     DestinationVideoService,

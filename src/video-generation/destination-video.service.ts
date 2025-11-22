@@ -5,18 +5,12 @@ import { DestinationVideo, DestinationVideoDocument } from './destination-video.
 import { ImageAggregatorService } from './image-aggregator.service';
 import { MusicSelectorService } from './music-selector.service';
 import { ImgBBService } from '../journey/imgbb.service';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import * as path from 'path';
-import * as fs from 'fs';
-
-const execAsync = promisify(exec);
+import { AiVideoService } from '../video-processing/ai-video.service';
+import { VideoJobPayload } from '../video-processing/interfaces/video-job-payload.interface';
 
 @Injectable()
 export class DestinationVideoService {
   private readonly logger = new Logger(DestinationVideoService.name);
-  private readonly pythonScriptPath: string;
-  private readonly videoOutputDir: string;
 
   constructor(
     @InjectModel(DestinationVideo.name)
@@ -24,22 +18,8 @@ export class DestinationVideoService {
     private readonly imageAggregator: ImageAggregatorService,
     private readonly musicSelector: MusicSelectorService,
     private readonly imgbbService: ImgBBService,
-  ) {
-    // Path to Python video generator script
-    this.pythonScriptPath = path.join(
-      process.cwd(),
-      'video_generation',
-      'video_generator.py',
-    );
-    
-    // Video output directory
-    this.videoOutputDir = path.join(process.cwd(), 'uploads', 'destination-videos');
-    
-    // Create output directory if it doesn't exist
-    if (!fs.existsSync(this.videoOutputDir)) {
-      fs.mkdirSync(this.videoOutputDir, { recursive: true });
-    }
-  }
+    private readonly aiVideoService: AiVideoService,
+  ) {}
 
   private toObjectId(id: string, label: string) {
     if (!id || typeof id !== 'string') {
@@ -141,7 +121,7 @@ export class DestinationVideoService {
   }
 
   /**
-   * Generate video asynchronously
+   * Generate video asynchronously using AI service
    */
   private async generateVideoAsync(
     destinationVideo: DestinationVideoDocument,
@@ -149,320 +129,43 @@ export class DestinationVideoService {
   ): Promise<void> {
     let step = 'initialization';
     try {
-      step = 'music_selection';
-      // Select and download music
-      this.logger.log('Selecting music...');
-      const musicResult = await this.musicSelector.selectAndDownloadMusic(
-        destinationVideo.destination,
-        aggregatedImages.tags,
-        60, // Default duration
-      );
-      this.logger.log(`Music selected: ${musicResult.source} from ${musicResult.originalUrl}`);
+      step = 'preparing_video_payload';
+      this.logger.log('Preparing video generation payload...');
 
-      // Prepare Python script config
-      const config = {
-        user_id: destinationVideo.user_id.toString(),
+      // Prepare slides for video generation
+      const slides = aggregatedImages.imageUrls.map((imageUrl: string) => ({
+        imageUrl,
+        caption: null, // Can be enhanced later to include captions
+      }));
+
+      // Create video job payload
+      const videoPayload: VideoJobPayload = {
+        journeyId: destinationVideo._id.toString(),
+        userId: destinationVideo.user_id.toString(),
         destination: destinationVideo.destination,
-        image_urls: aggregatedImages.imageUrls,
-        music_file_path: musicResult.filePath,
-        output_dir: this.videoOutputDir,
-        metadata: {
-          tags: aggregatedImages.tags,
-          descriptions: aggregatedImages.descriptions,
-        },
+        musicTheme: null, // Music selection can be handled by AI service
+        captionText: null,
+        slides,
       };
 
-      const configJson = JSON.stringify(config);
-
-      // Check if Python script exists and is executable
-      step = 'python_verification';
-      if (!fs.existsSync(this.pythonScriptPath)) {
-        throw new Error(
-          `Python script not found at: ${this.pythonScriptPath}. ` +
-          `Please ensure video_generator.py exists in the video_generation directory.`,
-        );
-      }
-
-      // Verify Python dependencies before running script
-      step = 'python_dependencies_check';
-      this.logger.log('Checking Python dependencies...');
+      step = 'ai_video_generation';
+      this.logger.log('Generating video using AI service...');
       
-      // Check each dependency individually and install if missing
-      const dependencies = [
-        { name: 'Pillow (PIL)', import: 'from PIL import Image', pip: 'Pillow>=10.0.0' },
-        { name: 'numpy', import: 'import numpy', pip: 'numpy>=1.24.0' },
-        { name: 'requests', import: 'import requests', pip: 'requests>=2.31.0' },
-        { name: 'moviepy', import: 'import moviepy', pip: 'moviepy>=1.0.3' },
-      ];
-      
-      const missingDeps: string[] = [];
-      
-      for (const dep of dependencies) {
-        try {
-          await execAsync(
-            `python3 -c "${dep.import}; print('OK')"`,
-            { timeout: 3000, maxBuffer: 1024 * 1024 },
-          );
-          this.logger.debug(`${dep.name}: OK`);
-        } catch (depError: any) {
-          const depStderr = depError.stderr || depError.message || '';
-          this.logger.warn(`${dep.name}: MISSING - Attempting to install...`);
-          missingDeps.push(dep.name);
-          
-          // Try to install the missing dependency
-          try {
-            this.logger.log(`Installing ${dep.name} via pip...`);
-            await execAsync(
-              `python3 -m pip install --no-cache-dir ${dep.pip}`,
-              { timeout: 120000, maxBuffer: 10 * 1024 * 1024 }, // 2 minutes timeout
-            );
-            
-            // Verify installation
-            await execAsync(
-              `python3 -c "${dep.import}; print('OK')"`,
-              { timeout: 3000, maxBuffer: 1024 * 1024 },
-            );
-            this.logger.log(`✓ ${dep.name} installed successfully`);
-            missingDeps.pop(); // Remove from missing list if successfully installed
-          } catch (installError: any) {
-            this.logger.error(`Failed to install ${dep.name}: ${installError.message}`);
-            // Continue to try other dependencies
-          }
-        }
-      }
-      
-      // If there are still missing dependencies after installation attempts
-      if (missingDeps.length > 0) {
-        const errorMessage = 
-          `Python dependencies missing after installation attempt: ${missingDeps.join(', ')}. ` +
-          `Please check Dockerfile build logs or install manually with pip. ` +
-          `These dependencies are required for video generation.`;
-        
-        this.logger.error(errorMessage);
-        throw new Error(errorMessage);
-      }
-      
-      this.logger.log('All Python dependencies verified successfully');
+      // Generate video using AI service
+      const videoResult = await this.aiVideoService.generateVideo(videoPayload);
 
-      // Run Python video generator
-      step = 'python_execution';
-      this.logger.log('Running Python video generator...');
-      this.logger.debug(`Python script path: ${this.pythonScriptPath}`);
-      this.logger.debug(`Number of images: ${aggregatedImages.imageUrls.length}`);
-      
-      let stdout: string;
-      let stderr: string;
-      try {
-        const execResult = await execAsync(
-          `python3 "${this.pythonScriptPath}" '${configJson.replace(/'/g, "'\\''")}'`,
-          {
-            timeout: 600000, // 10 minutes timeout
-            maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-          },
-        );
-        stdout = execResult.stdout;
-        stderr = execResult.stderr || '';
-      } catch (execError: any) {
-        const errorStdout = execError.stdout || '';
-        const errorStderr = execError.stderr || '';
-        const errorMsg = execError.message || 'Unknown execution error';
-        const errorCode = execError.code || 'UNKNOWN';
-        
-        // Check for specific dependency errors first (most common issue)
-        if (errorStderr.includes("No module named 'PIL'") || 
-            errorStderr.includes("ModuleNotFoundError: No module named 'PIL'") ||
-            errorMsg.includes("No module named 'PIL'")) {
-          const detailedError = 
-            `Python dependency error: Pillow (PIL) is not installed in the container. ` +
-            `This should have been caught during dependency check. ` +
-            `Please verify Dockerfile installation logs. ` +
-            `Attempting to install Pillow via pip may be required. ` +
-            `Stderr: ${errorStderr.substring(0, 300)}`;
-          
-          this.logger.error(detailedError);
-          throw new Error(detailedError);
-        }
-        
-        // Try to parse JSON error from Python script if available
-        // Python script now outputs JSON to both stdout and stderr
-        try {
-          // Check stdout first (where we now print JSON errors)
-          let jsonError: any = null;
-          
-          // Try to find JSON in stdout
-          if (errorStdout) {
-            const stdoutJsonMatch = errorStdout.match(/\{[^{}]*(?:"success"|"error")[^{}]*\}/s);
-            if (stdoutJsonMatch) {
-              try {
-                jsonError = JSON.parse(stdoutJsonMatch[0]);
-              } catch (e) {
-                // Try to find complete JSON object
-                const fullJsonMatch = errorStdout.match(/\{[^}]+\}/s);
-                if (fullJsonMatch) {
-                  jsonError = JSON.parse(fullJsonMatch[0]);
-                }
-              }
-            }
-          }
-          
-          // If not found in stdout, try stderr
-          if (!jsonError && errorStderr) {
-            const stderrJsonMatch = errorStderr.match(/\{[^{}]*(?:"success"|"error")[^{}]*\}/s);
-            if (stderrJsonMatch) {
-              try {
-                jsonError = JSON.parse(stderrJsonMatch[0]);
-              } catch (e) {
-                // Try to find complete JSON object
-                const fullJsonMatch = errorStderr.match(/\{[^}]+\}/s);
-                if (fullJsonMatch) {
-                  jsonError = JSON.parse(fullJsonMatch[0]);
-                }
-              }
-            }
-          }
-          
-          // If we found a valid JSON error, use it
-          if (jsonError && !jsonError.success && jsonError.error) {
-            const detailedError = 
-              `Python script error: ${jsonError.error}${jsonError.details ? ` (${jsonError.details})` : ''}. ` +
-              `This indicates missing Python dependencies. ` +
-              `Please check Dockerfile build logs for dependency installation errors.`;
-            
-            this.logger.error(detailedError);
-            throw new Error(detailedError);
-          }
-        } catch (parseError) {
-          // If JSON parsing fails or throws, continue with original error handling
-          if (parseError instanceof Error && parseError.message.includes('Python script error')) {
-            throw parseError; // Re-throw our custom error
-          }
-          this.logger.warn(`Failed to parse JSON error from Python script: ${parseError}`);
-        }
-        
-        // Check for other common dependency errors
-        if (errorStderr.includes("No module named") || errorStderr.includes("ModuleNotFoundError")) {
-          const moduleMatch = errorStderr.match(/No module named ['"]([^'"]+)['"]/);
-          const missingModule = moduleMatch ? moduleMatch[1] : 'unknown';
-          
-          const detailedError = 
-            `Python dependency missing: '${missingModule}' is not installed. ` +
-            `Please install it with: pip install ${missingModule}. ` +
-            `Stderr: ${errorStderr.substring(0, 300)}`;
-          
-          this.logger.error(detailedError);
-          throw new Error(detailedError);
-        }
-        
-        // Generic execution error
-        const detailedError = 
-          `Python script execution failed at step ${step}: ${errorMsg} (code: ${errorCode}). ` +
-          `Stderr: ${errorStderr.substring(0, 500)}. ` +
-          `Stdout: ${errorStdout.substring(0, 500)}. ` +
-          `Check Python script and dependencies installation.`;
-        
-        this.logger.error(detailedError);
-        throw new Error(detailedError);
+      if (!videoResult.videoUrl) {
+        throw new Error('AI video service did not return a video URL');
       }
 
-      if (stderr && !stderr.includes('WARNING') && !stderr.includes('INFO')) {
-        this.logger.warn(`Python script stderr: ${stderr.substring(0, 500)}`);
-      }
-
-      // Parse result
-      step = 'result_parsing';
-      let result: any;
-      try {
-        result = JSON.parse(stdout);
-      } catch (parseError: any) {
-        throw new Error(
-          `Failed to parse Python script output at step ${step}: ${parseError.message}. ` +
-          `Output: ${stdout.substring(0, 500)}`,
-        );
-      }
-      
-      if (!result.success) {
-        throw new Error(
-          `Video generation failed at step ${step}: ${result.error || 'Unknown error from Python script'}. ` +
-          `Script output: ${stdout.substring(0, 500)}`,
-        );
-      }
-
-      // Verify video file exists
-      step = 'video_verification';
-      if (!result.video_path || !fs.existsSync(result.video_path)) {
-        throw new Error(
-          `Video file not found at path: ${result.video_path || 'undefined'}. ` +
-          `Python script reported success but file is missing.`,
-        );
-      }
-
-      // Upload video to cloud storage (ImgBB)
-      step = 'video_upload';
-      this.logger.log('Uploading video to ImgBB...');
-      const videoFileName = path.basename(result.video_path);
-      let videoUrl: string | null = null;
-
-      try {
-        // Try to upload to ImgBB (may not support videos, but we try)
-        const imgbbUrl = await this.imgbbService.uploadVideo(
-          result.video_path,
-          `destination-video-${destinationVideo.user_id}-${destinationVideo.destination}-${Date.now()}.mp4`,
-        );
-
-        if (imgbbUrl) {
-          videoUrl = imgbbUrl;
-          this.logger.log(`Video uploaded successfully to ImgBB: ${videoUrl}`);
-        } else {
-          // Fallback to local/public URL if ImgBB doesn't support videos
-          this.logger.warn('ImgBB upload failed or not supported. Using local URL as fallback.');
-          const publicBaseUrl = (
-            process.env.PUBLIC_BASE_URL ||
-            process.env.BASE_URL ||
-            'http://localhost:3000'
-          ).replace(/\/$/, '');
-          videoUrl = `${publicBaseUrl}/uploads/destination-videos/${videoFileName}`;
-          this.logger.warn(`Using local URL: ${videoUrl} (Note: On Render, this will be lost on redeploy)`);
-        }
-      } catch (uploadError) {
-        // If upload fails, use local URL as fallback
-        this.logger.error(`Video upload to ImgBB failed: ${uploadError.message}. Using local URL as fallback.`);
-        const publicBaseUrl = (
-          process.env.PUBLIC_BASE_URL ||
-          process.env.BASE_URL ||
-          'http://localhost:3000'
-        ).replace(/\/$/, '');
-        videoUrl = `${publicBaseUrl}/uploads/destination-videos/${videoFileName}`;
-      }
-
+      step = 'updating_database';
       // Update destination video record
-      destinationVideo.video_url = videoUrl;
+      destinationVideo.video_url = videoResult.videoUrl;
       destinationVideo.status = 'ready';
-      destinationVideo.music_url = musicResult.originalUrl;
-      destinationVideo.music_source = musicResult.source;
       destinationVideo.generated_at = new Date();
       await destinationVideo.save();
 
-      this.logger.log(`Video generation completed successfully: ${videoUrl}`);
-
-      // Clean up local video file if uploaded to cloud storage
-      // Keep it for now in case of fallback, but in production with cloud storage, we can delete it
-      // if (imgbbUrl && fs.existsSync(result.video_path)) {
-      //   try {
-      //     fs.unlinkSync(result.video_path);
-      //     this.logger.log(`Deleted local video file: ${result.video_path}`);
-      //   } catch (cleanupError) {
-      //     this.logger.warn(`Failed to delete local video file: ${cleanupError.message}`);
-      //   }
-      // }
-
-      // Clean up music file after use
-      if (musicResult.filePath && fs.existsSync(musicResult.filePath)) {
-        try {
-          fs.unlinkSync(musicResult.filePath);
-        } catch (error) {
-          this.logger.warn(`Failed to delete music file: ${error.message}`);
-        }
-      }
+      this.logger.log(`Video generation completed successfully: ${videoResult.videoUrl}`);
 
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error occurred during video generation';
@@ -475,9 +178,7 @@ export class DestinationVideoService {
       );
       
       // Add more context to the error message
-      const detailedError = `Step: ${step}. Error: ${errorMessage}. ` +
-        (error.code ? `Error code: ${error.code}. ` : '') +
-        (error.stderr ? `Stderr: ${error.stderr.substring(0, 200)}. ` : '');
+      const detailedError = `Step: ${step}. Error: ${errorMessage}`;
       
       throw new Error(detailedError);
     }

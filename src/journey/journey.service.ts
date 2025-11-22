@@ -252,19 +252,21 @@ export class JourneyService {
 
     const savedJourney = await journey.save();
 
-    // Note: Video generation is disabled - only image posting is supported
-    // try {
-    //   await this.videoProcessingService.enqueueJourneyVideo({
-    //     journeyId: savedJourney._id.toString(),
-    //     userId,
-    //     destination,
-    //     musicTheme: null,
-    //     captionText: null,
-    //     slides: queueSlides,
-    //   });
-    // } catch (error) {
-    //   this.logger.error(`Failed to enqueue video job for journey ${savedJourney._id}`, error as Error);
-    // }
+    // Enqueue video generation job
+    try {
+      await this.videoProcessingService.enqueueJourneyVideo({
+        journeyId: savedJourney._id.toString(),
+        userId,
+        destination,
+        musicTheme: null,
+        captionText: null,
+        slides: queueSlides,
+      });
+      this.logger.log(`Video generation job enqueued for journey ${savedJourney._id}`);
+    } catch (error) {
+      this.logger.error(`Failed to enqueue video job for journey ${savedJourney._id}`, error as Error);
+      // Don't fail the journey creation if video generation fails
+    }
 
     // Ensure image_urls is always an array
     const journeyObj = savedJourney.toObject ? savedJourney.toObject() : savedJourney;

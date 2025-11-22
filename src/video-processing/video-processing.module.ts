@@ -16,7 +16,7 @@ import { AiVideoService } from './ai-video.service';
     HttpModule,
   ],
   providers: [VideoProcessingService, VideoProcessingProcessor, AiVideoService],
-  exports: [VideoProcessingService],
+  exports: [VideoProcessingService, AiVideoService], // Export AiVideoService for use in other modules
 })
 export class VideoProcessingModule {}
 
