@@ -46,7 +46,8 @@ Thumbs.db  # Windows
 
 # dotenv environment variable files
 .env
-.env.template
+# Keep .env.template for reference (don't ignore it)
+# .env.template
 
 .env.development.local
 .env.test.local
@@ -77,3 +78,10 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 #two files that dont have to be in gihub
 CURSOR_BACKEND_MASTER_PROMPT.md
 ANDROID_MASTER_PROMPT.md
+
+# TypeScript build cache
+*.tsbuildinfo
+tsconfig.build.tsbuildinfo
+
+# OS files (already covered above, but keeping explicit)
+.DS_Store
