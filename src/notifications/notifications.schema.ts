@@ -9,6 +9,10 @@ export type NotificationType =
   | 'payment_success'
   | 'payment_failed'
   | 'trip_reminder'
+  | 'post_liked'
+  | 'post_commented'
+  | 'journey_liked'
+  | 'journey_commented'
   | 'general';
 
 @Schema({ timestamps: true })
@@ -24,6 +28,10 @@ export class Notification {
     'payment_success',
     'payment_failed',
     'trip_reminder',
+    'post_liked',
+    'post_commented',
+    'journey_liked',
+    'journey_commented',
     'general'
   ] })
   type: NotificationType;

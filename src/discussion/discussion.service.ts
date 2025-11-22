@@ -127,7 +127,7 @@ export class DiscussionService {
       if (postOwnerId !== userId) {
         try {
           const liker = await this.userService.findById(userId);
-          const likerName = liker?.username || liker?.firstName || 'Quelqu\'un';
+          const likerName = liker?.username || liker?.first_name || 'Quelqu\'un';
           await this.notificationsService.createNotification(postOwnerId, {
             type: 'post_liked',
             title: 'Votre post a été aimé',
@@ -168,7 +168,7 @@ export class DiscussionService {
     if (postOwnerId !== userId) {
       try {
         const commenter = await this.userService.findById(userId);
-        const commenterName = commenter?.username || commenter?.firstName || 'Quelqu\'un';
+        const commenterName = commenter?.username || commenter?.first_name || 'Quelqu\'un';
         await this.notificationsService.createNotification(postOwnerId, {
           type: 'post_commented',
           title: 'Nouveau commentaire sur votre post',
