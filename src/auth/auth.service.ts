@@ -32,14 +32,16 @@ export class AuthService {
     // Check if username already exists
     const existing = await this.userService.findByUsername(username);
     if (existing) {
-      console.log(`[Register] Username conflict: ${username} already exists (user ID: ${existing._id})`);
+      const userId = (existing as any)._id || (existing as any).id || 'unknown';
+      console.log(`[Register] Username conflict: ${username} already exists (user ID: ${userId})`);
       throw new ConflictException('Username already exists');
     }
     
     // Check if email already exists
     const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) {
-      console.log(`[Register] Email conflict: ${email} already exists (user ID: ${existingEmail._id})`);
+      const userId = (existingEmail as any)._id || (existingEmail as any).id || 'unknown';
+      console.log(`[Register] Email conflict: ${email} already exists (user ID: ${userId})`);
       throw new ConflictException('Email already exists');
     }
     
