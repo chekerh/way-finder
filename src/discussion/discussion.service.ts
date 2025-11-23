@@ -157,7 +157,7 @@ export class DiscussionService {
     }
 
     // If parent_id is provided, verify the parent comment exists and belongs to the same post
-    let parentComment = null;
+    let parentComment: DiscussionCommentDocument | null = null;
     if (dto.parent_id) {
       parentComment = await this.commentModel.findById(this.toObjectId(dto.parent_id, 'parent comment id')).exec();
       if (!parentComment) {
@@ -254,11 +254,13 @@ export class DiscussionService {
     // Group replies by parent comment
     const repliesByParent = new Map();
     replies.forEach(reply => {
-      const parentId = reply.parent_id.toString();
-      if (!repliesByParent.has(parentId)) {
-        repliesByParent.set(parentId, []);
+      if (reply.parent_id) {
+        const parentId = reply.parent_id.toString();
+        if (!repliesByParent.has(parentId)) {
+          repliesByParent.set(parentId, []);
+        }
+        repliesByParent.get(parentId).push(reply);
       }
-      repliesByParent.get(parentId).push(reply);
     });
 
     // Attach replies to their parent comments
