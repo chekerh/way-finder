@@ -4,7 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
-import { RegisterDto, LoginDto, GoogleSignInDto, VerifyEmailDto, SendOTPDto, VerifyOTPDto } from './auth.dto';
+import { RegisterDto, LoginDto, GoogleSignInDto, VerifyEmailDto, SendOTPDto, VerifyOTPDto, RegisterWithOTPDto, SendOTPForRegistrationDto } from './auth.dto';
 import { GoogleAuthService } from './google-auth.service';
 import { EmailService } from './email.service';
 import { OTP, OTPDocument } from './otp.schema';
@@ -316,9 +316,9 @@ export class AuthService {
     // Generate 4-digit OTP code
     const otpCode = this.emailService.generateOTPCode();
     
-    // Calculate expiration time (10 minutes from now)
+    // Calculate expiration time (5 minutes from now)
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
 
     // Invalidate any existing OTPs for this email
     await this.otpModel.updateMany(
@@ -394,5 +394,164 @@ export class AuthService {
       user: userData,
       onboarding_completed: user.onboarding_completed || false,
     };
+  }
+
+  /**
+   * Send OTP for registration - checks that email does NOT exist
+   */
+  async sendOTPForRegistration(dto: SendOTPForRegistrationDto) {
+    const email = dto.email.trim().toLowerCase();
+    
+    // Check if user already exists with this email
+    const existingUser = await this.userService.findByEmail(email);
+    if (existingUser) {
+      console.log(`[Register OTP] Email already exists: ${email}`);
+      throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter ou utiliser un autre email.');
+    }
+
+    // Generate 4-digit OTP code
+    const otpCode = this.emailService.generateOTPCode();
+    
+    // Calculate expiration time (5 minutes from now)
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+
+    // Invalidate any existing OTPs for this email
+    await this.otpModel.updateMany(
+      { email, used: false },
+      { $set: { used: true } }
+    ).exec();
+
+    // Create new OTP record
+    const otp = new this.otpModel({
+      email,
+      code: otpCode,
+      expires_at: expiresAt,
+      used: false,
+    });
+    await otp.save();
+
+    // Send OTP email
+    try {
+      await this.emailService.sendOTPEmail(email, otpCode);
+      console.log(`[Register OTP] OTP sent successfully to ${email}`);
+    } catch (error) {
+      // If email fails, mark OTP as used so it can't be used
+      await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
+      console.error(`[Register OTP] Failed to send email to ${email}:`, error);
+      throw new BadRequestException('Impossible d\'envoyer l\'email. Veuillez réessayer plus tard.');
+    }
+
+    return {
+      message: 'Code de vérification envoyé avec succès',
+      email: email,
+    };
+  }
+
+  /**
+   * Register user with OTP verification
+   */
+  async registerWithOTP(dto: RegisterWithOTPDto) {
+    const email = dto.email.trim().toLowerCase();
+    const code = dto.otp_code.trim();
+    const username = dto.username.trim();
+    const firstName = dto.first_name.trim();
+    const lastName = dto.last_name.trim();
+
+    // Validate OTP code format
+    if (code.length !== 4 || !/^\d{4}$/.test(code)) {
+      throw new BadRequestException('Le code doit être composé de 4 chiffres');
+    }
+
+    // Verify OTP
+    const otp = await this.otpModel.findOne({
+      email,
+      code,
+      used: false,
+      expires_at: { $gt: new Date() }, // Not expired
+    }).exec();
+
+    if (!otp) {
+      console.log(`[Register OTP] Invalid or expired OTP for ${email}`);
+      throw new UnauthorizedException('Code invalide ou expiré. Veuillez demander un nouveau code.');
+    }
+
+    // Mark OTP as used
+    await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
+
+    // Double-check that email doesn't exist (race condition protection)
+    const existingEmail = await this.userService.findByEmail(email);
+    if (existingEmail) {
+      console.log(`[Register OTP] Email conflict detected: ${email} already exists`);
+      throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter.');
+    }
+
+    // Check if username already exists
+    const existing = await this.userService.findByUsername(username);
+    if (existing) {
+      console.log(`[Register OTP] Username conflict: ${username} already exists`);
+      throw new ConflictException('Ce nom d\'utilisateur est déjà utilisé. Veuillez en choisir un autre.');
+    }
+
+    if (!username || !email || !firstName || !lastName) {
+      throw new BadRequestException('Tous les champs sont requis');
+    }
+
+    const rawPassword = dto.password.trim();
+    if (!rawPassword) throw new BadRequestException('Le mot de passe est requis');
+
+    const hash = await bcrypt.hash(rawPassword, 10);
+    
+    // Generate email verification token (OTP already verified email)
+    const emailVerificationToken = this.emailService.generateVerificationToken();
+    
+    try {
+      const user = await this.userService.create({
+        username,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        password: hash,
+        email_verified: true, // Email verified via OTP
+        email_verification_token: emailVerificationToken,
+        email_verified_at: new Date(),
+      });
+      
+      console.log(`[Register OTP] User registered successfully: ${email}`);
+
+      const userObj = (user as any).toObject ? (user as any).toObject() : user;
+      const { password: _password, ...result } = userObj;
+      return { 
+        message: 'Compte créé avec succès', 
+        user: result 
+      };
+    } catch (error: any) {
+      // Handle MongoDB duplicate key errors
+      if (error.code === 11000) {
+        let duplicateField: string | null = null;
+        
+        if (error.keyPattern) {
+          duplicateField = Object.keys(error.keyPattern)[0];
+        }
+        
+        if (!duplicateField && error.message) {
+          const message = error.message.toLowerCase();
+          if (message.includes('email') || message.includes('email_1')) {
+            duplicateField = 'email';
+          } else if (message.includes('username') || message.includes('username_1')) {
+            duplicateField = 'username';
+          }
+        }
+        
+        if (duplicateField === 'email') {
+          throw new ConflictException('Cet email est déjà enregistré');
+        }
+        if (duplicateField === 'username') {
+          throw new ConflictException('Ce nom d\'utilisateur est déjà utilisé');
+        }
+        throw new ConflictException('Un utilisateur avec ces informations existe déjà');
+      }
+      throw error;
+    }
   }
 }

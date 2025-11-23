@@ -1,6 +1,6 @@
 import { Body, Controller, Post, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, GoogleSignInDto, VerifyEmailDto, SendOTPDto, VerifyOTPDto } from './auth.dto';
+import { LoginDto, RegisterDto, GoogleSignInDto, VerifyEmailDto, SendOTPDto, VerifyOTPDto, RegisterWithOTPDto, SendOTPForRegistrationDto } from './auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -44,6 +44,16 @@ export class AuthController {
   @Post('verify-otp')
   verifyOTP(@Body() dto: VerifyOTPDto) {
     return this.authService.verifyOTP(dto);
+  }
+
+  @Post('send-otp-for-registration')
+  sendOTPForRegistration(@Body() dto: SendOTPForRegistrationDto) {
+    return this.authService.sendOTPForRegistration(dto);
+  }
+
+  @Post('register-with-otp')
+  registerWithOTP(@Body() dto: RegisterWithOTPDto) {
+    return this.authService.registerWithOTP(dto);
   }
 }
 

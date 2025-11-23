@@ -67,3 +67,15 @@ export class VerifyOTPDto {
   code: string; // 4-digit OTP code
 }
 
+export class RegisterWithOTPDto extends RegisterDto {
+  @IsString()
+  @IsNotEmpty()
+  otp_code: string; // 4-digit OTP code for email verification
+}
+
+export class SendOTPForRegistrationDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
+
