@@ -36,37 +36,60 @@ export class IndexFixService implements OnApplicationBootstrap {
       const indexes = await collection.indexes();
       const googleIdIndex = indexes.find((idx) => idx.name === 'google_id_1');
 
-      if (!googleIdIndex) {
-        this.logger.log('No google_id_1 index found. Mongoose will create it with sparse: true.');
-        return;
+      // Always drop and recreate to ensure it's truly sparse
+      // MongoDB sometimes reports index as sparse when it's not working correctly
+      if (googleIdIndex) {
+        this.logger.warn(
+          '⚠️  Found google_id_1 index. Dropping it to ensure it\'s recreated with sparse: true...',
+        );
+        try {
+          await collection.dropIndex('google_id_1');
+          this.logger.log('✅ Dropped google_id_1 index.');
+        } catch (dropError: any) {
+          // If drop fails, try to continue anyway
+          if (dropError.code === 27 || dropError.message?.includes('index not found')) {
+            this.logger.log('Index already dropped or doesn\'t exist.');
+          } else {
+            this.logger.warn('Failed to drop index, will try to create anyway:', dropError.message);
+          }
+        }
+      } else {
+        this.logger.log('No google_id_1 index found. Creating new sparse index...');
       }
 
-      // Check if index is already sparse
-      if (googleIdIndex.sparse) {
-        this.logger.log('✅ google_id_1 index is already sparse. No action needed.');
-        return;
-      }
-
-      // Index exists but is not sparse - drop it
-      this.logger.warn(
-        '⚠️  Found non-sparse google_id_1 index. Dropping it to recreate with sparse: true...',
-      );
-      await collection.dropIndex('google_id_1');
-      this.logger.log(
-        '✅ Dropped old google_id_1 index. Mongoose will recreate it with sparse: true.',
-      );
+      // Check for existing users with null google_id before recreating index
+      const usersWithNullGoogleId = await collection.countDocuments({ google_id: null });
+      this.logger.log(`Found ${usersWithNullGoogleId} users with null google_id.`);
 
       // Force index recreation - create it explicitly with sparse: true
-      await collection.createIndex({ google_id: 1 }, { unique: true, sparse: true });
-      this.logger.log('✅ Created new sparse google_id_1 index.');
+      this.logger.log('Creating google_id_1 index with unique: true, sparse: true...');
+      try {
+        await collection.createIndex({ google_id: 1 }, { unique: true, sparse: true });
+        this.logger.log('✅ Created new sparse google_id_1 index.');
+      } catch (createError: any) {
+        // If creation fails due to duplicate null values, we need to handle it
+        if (createError.code === 11000 && createError.message?.includes('null')) {
+          this.logger.error('❌ Cannot create sparse index: duplicate null values exist.');
+          this.logger.error('This should not happen with sparse index. Checking index status...');
+          // Try to get more info
+          const allIndexes = await collection.indexes();
+          this.logger.error('All indexes:', JSON.stringify(allIndexes, null, 2));
+        }
+        throw createError;
+      }
       
       // Verify it was created correctly
       const newIndexes = await collection.indexes();
       const newGoogleIdIndex = newIndexes.find((idx) => idx.name === 'google_id_1');
-      if (newGoogleIdIndex?.sparse) {
-        this.logger.log('✅ Verified: google_id_1 index is now sparse.');
+      if (newGoogleIdIndex) {
+        if (newGoogleIdIndex.sparse) {
+          this.logger.log('✅ Verified: google_id_1 index is now sparse and working correctly.');
+        } else {
+          this.logger.error('❌ ERROR: google_id_1 index was created but is NOT sparse!');
+          this.logger.error('Index details:', JSON.stringify(newGoogleIdIndex, null, 2));
+        }
       } else {
-        this.logger.warn('⚠️  Warning: google_id_1 index may not be sparse. Please check manually.');
+        this.logger.error('❌ ERROR: google_id_1 index was not created!');
       }
     } catch (error: any) {
       // If index doesn't exist, that's okay - Mongoose will create it
