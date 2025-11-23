@@ -51,3 +51,19 @@ export class VerifyEmailDto {
   token: string; // Email verification token
 }
 
+export class SendOTPDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class VerifyOTPDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  code: string; // 4-digit OTP code
+}
+

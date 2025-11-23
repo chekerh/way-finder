@@ -1,6 +1,6 @@
 import { Body, Controller, Post, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, GoogleSignInDto, VerifyEmailDto } from './auth.dto';
+import { LoginDto, RegisterDto, GoogleSignInDto, VerifyEmailDto, SendOTPDto, VerifyOTPDto } from './auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -34,6 +34,16 @@ export class AuthController {
   @Post('resend-verification')
   resendVerificationEmail(@Body() body: { email: string }) {
     return this.authService.resendVerificationEmail(body.email);
+  }
+
+  @Post('send-otp')
+  sendOTP(@Body() dto: SendOTPDto) {
+    return this.authService.sendOTP(dto);
+  }
+
+  @Post('verify-otp')
+  verifyOTP(@Body() dto: VerifyOTPDto) {
+    return this.authService.verifyOTP(dto);
   }
 }
 

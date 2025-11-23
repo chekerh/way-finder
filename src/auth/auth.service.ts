@@ -1,10 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
-import { RegisterDto, LoginDto, GoogleSignInDto, VerifyEmailDto } from './auth.dto';
+import { RegisterDto, LoginDto, GoogleSignInDto, VerifyEmailDto, SendOTPDto, VerifyOTPDto } from './auth.dto';
 import { GoogleAuthService } from './google-auth.service';
 import { EmailService } from './email.service';
+import { OTP, OTPDocument } from './otp.schema';
 
 @Injectable()
 export class AuthService {
@@ -13,6 +16,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly googleAuthService: GoogleAuthService,
     private readonly emailService: EmailService,
+    @InjectModel(OTP.name) private readonly otpModel: Model<OTPDocument>,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -236,6 +240,102 @@ export class AuthService {
 
     return {
       message: 'Verification email sent successfully',
+    };
+  }
+
+  /**
+   * Send OTP code to user's email
+   * If user doesn't exist, return error
+   */
+  async sendOTP(dto: SendOTPDto) {
+    const email = dto.email.trim().toLowerCase();
+    
+    // Check if user exists with this email
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      throw new NotFoundException('Aucun compte trouvé avec cet email');
+    }
+
+    // Generate 4-digit OTP code
+    const otpCode = this.emailService.generateOTPCode();
+    
+    // Calculate expiration time (10 minutes from now)
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+    // Invalidate any existing OTPs for this email
+    await this.otpModel.updateMany(
+      { email, used: false },
+      { $set: { used: true } }
+    ).exec();
+
+    // Create new OTP record
+    const otp = new this.otpModel({
+      email,
+      code: otpCode,
+      expires_at: expiresAt,
+      used: false,
+    });
+    await otp.save();
+
+    // Send OTP email
+    try {
+      await this.emailService.sendOTPEmail(email, otpCode, user.first_name);
+    } catch (error) {
+      // If email fails, mark OTP as used so it can't be used
+      await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
+      throw new BadRequestException('Impossible d\'envoyer l\'email. Veuillez réessayer plus tard.');
+    }
+
+    return {
+      message: 'Code de vérification envoyé avec succès',
+      email: email, // Return email for client confirmation
+    };
+  }
+
+  /**
+   * Verify OTP code and login user
+   */
+  async verifyOTP(dto: VerifyOTPDto) {
+    const email = dto.email.trim().toLowerCase();
+    const code = dto.code.trim();
+
+    if (code.length !== 4 || !/^\d{4}$/.test(code)) {
+      throw new BadRequestException('Le code doit être composé de 4 chiffres');
+    }
+
+    // Find valid OTP
+    const otp = await this.otpModel.findOne({
+      email,
+      code,
+      used: false,
+      expires_at: { $gt: new Date() }, // Not expired
+    }).exec();
+
+    if (!otp) {
+      throw new UnauthorizedException('Code invalide ou expiré');
+    }
+
+    // Mark OTP as used
+    await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
+
+    // Find user by email
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    // Generate JWT token
+    const payload = { sub: (user as any)._id.toString(), username: user.username };
+    const token = await this.jwtService.signAsync(payload);
+    
+    const userObj = (user as any).toObject ? (user as any).toObject() : user;
+    const { password: _password, ...userData } = userObj;
+
+    return {
+      access_token: token,
+      user: userData,
+      onboarding_completed: user.onboarding_completed || false,
     };
   }
 }
