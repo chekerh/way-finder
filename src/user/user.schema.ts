@@ -74,3 +74,7 @@ bio?: string;
 
 export type UserDocument = HydratedDocument<User>;
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Ensure google_id index is sparse (allows multiple null values)
+// This fixes the duplicate key error when multiple users sign up without Google
+UserSchema.index({ google_id: 1 }, { unique: true, sparse: true });

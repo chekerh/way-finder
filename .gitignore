@@ -75,13 +75,54 @@ docker_data/
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-#two files that dont have to be in gihub
+# Documentation files that shouldn't be in git
 CURSOR_BACKEND_MASTER_PROMPT.md
 ANDROID_MASTER_PROMPT.md
+FIX_*.md
+*_SETUP.md
+*_GUIDE.md
+*_CHECKLIST.md
+*_SUMMARY.md
+*_COMPLETE.md
+*_MIGRATION.md
+QUICK_*.md
+NEXT_STEPS_*.md
+INSTALL_*.md
+VERIFY_*.md
+
+# Keep only essential README files
+!README.md
+
+# Migration and fix scripts (temporary)
+scripts/fix-*.js
+scripts/migrate-*.js
 
 # TypeScript build cache
 *.tsbuildinfo
 tsconfig.build.tsbuildinfo
 
+# Upload directories (user-generated content)
+uploads/
+**/uploads/
+
 # OS files (already covered above, but keeping explicit)
 .DS_Store
+
+# Python cache (if any Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Coverage and test reports
+coverage/
+.nyc_output/
+*.lcov
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
