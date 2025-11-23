@@ -46,7 +46,6 @@ export class AuthService {
     
     try {
       const user = await this.userService.create({
-        ...dto,
         username,
         email,
         first_name: firstName,
@@ -74,14 +73,46 @@ export class AuthService {
       // Handle MongoDB duplicate key errors
       if (error.code === 11000) {
         // MongoDB duplicate key error
-        const duplicateField = Object.keys(error.keyPattern || {})[0];
+        let duplicateField: string | null = null;
+        
+        // Try to get the field from keyPattern
+        if (error.keyPattern) {
+          duplicateField = Object.keys(error.keyPattern)[0];
+        }
+        
+        // If not found, try to extract from error message
+        if (!duplicateField && error.message) {
+          const message = error.message.toLowerCase();
+          if (message.includes('email') || message.includes('email_1')) {
+            duplicateField = 'email';
+          } else if (message.includes('username') || message.includes('username_1')) {
+            duplicateField = 'username';
+          }
+        }
+        
+        // If still not found, do a final check by querying the database
+        if (!duplicateField) {
+          const checkEmail = await this.userService.findByEmail(email);
+          const checkUsername = await this.userService.findByUsername(username);
+          
+          if (checkEmail) {
+            duplicateField = 'email';
+          } else if (checkUsername) {
+            duplicateField = 'username';
+          }
+        }
+        
+        // Determine the error message based on the duplicate field
         if (duplicateField === 'email') {
           throw new ConflictException('Email already exists');
         }
         if (duplicateField === 'username') {
           throw new ConflictException('Username already exists');
         }
-        throw new ConflictException('A user with this information already exists');
+        
+        // Fallback: check if we can determine from the values we tried to insert
+        // This handles cases where the error structure is unexpected
+        throw new ConflictException('Email or username already exists');
       }
       // Re-throw other errors
       throw error;
