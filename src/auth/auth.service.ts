@@ -29,12 +29,19 @@ export class AuthService {
       throw new BadRequestException('All fields are required');
     }
 
+    // Check if username already exists
     const existing = await this.userService.findByUsername(username);
-    if (existing) throw new ConflictException('Username already exists');
+    if (existing) {
+      console.log(`[Register] Username conflict: ${username} already exists (user ID: ${existing._id})`);
+      throw new ConflictException('Username already exists');
+    }
     
     // Check if email already exists
     const existingEmail = await this.userService.findByEmail(email);
-    if (existingEmail) throw new ConflictException('Email already exists');
+    if (existingEmail) {
+      console.log(`[Register] Email conflict: ${email} already exists (user ID: ${existingEmail._id})`);
+      throw new ConflictException('Email already exists');
+    }
     
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
