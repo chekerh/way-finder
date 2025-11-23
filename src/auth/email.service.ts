@@ -315,47 +315,59 @@ export class EmailService {
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
     const fromEmail = process.env.EMAIL_FROM || `WayFinder <${process.env.EMAIL_USER}>`;
 
-    const mailOptions = {
-      from: fromEmail,
-      to: email,
-      subject: 'Reset Your WayFinder Password',
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Password Reset</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #4A90E2; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">Password Reset Request</h1>
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Password Reset</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #4A90E2; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Password Reset Request</h1>
+        </div>
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hello ${firstName || 'there'},</p>
+          <p>We received a request to reset your password. Click the button below to reset it:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetLink}" 
+               style="display: inline-block; background-color: #4A90E2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+              Reset Password
+            </a>
           </div>
-          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
-            <p>Hello ${firstName || 'there'},</p>
-            <p>We received a request to reset your password. Click the button below to reset it:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetLink}" 
-                 style="display: inline-block; background-color: #4A90E2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                Reset Password
-              </a>
-            </div>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #4A90E2;">${resetLink}</p>
-            <p>This link will expire in 1 hour.</p>
-            <p>If you didn't request a password reset, you can safely ignore this email.</p>
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-            <p style="font-size: 12px; color: #777;">Best regards,<br>The WayFinder Team</p>
-          </div>
-        </body>
-        </html>
-      `,
-    };
+          <p>Or copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #4A90E2;">${resetLink}</p>
+          <p>This link will expire in 1 hour.</p>
+          <p>If you didn't request a password reset, you can safely ignore this email.</p>
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          <p style="font-size: 12px; color: #777;">Best regards,<br>The WayFinder Team</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      WayFinder - Password Reset Request
+      
+      Hello ${firstName || 'there'},
+      
+      We received a request to reset your password. Please visit this link to reset it:
+      
+      ${resetLink}
+      
+      This link will expire in 1 hour.
+      
+      If you didn't request a password reset, you can safely ignore this email.
+      
+      Best regards,
+      The WayFinder Team
+    `;
 
     if (this.useMailjet) {
-      await this.sendViaMailjet(email, 'Reset Your WayFinder Password', mailOptions.html, mailOptions.text);
+      await this.sendViaMailjet(email, 'Reset Your WayFinder Password', htmlContent, textContent);
     } else {
-      await this.sendViaSMTP(email, 'Reset Your WayFinder Password', mailOptions.html, mailOptions.text, fromEmail);
+      await this.sendViaSMTP(email, 'Reset Your WayFinder Password', htmlContent, textContent, fromEmail);
     }
   }
 }
