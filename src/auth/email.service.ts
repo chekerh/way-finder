@@ -14,8 +14,11 @@ export class EmailService {
   private mailjetFromName: string | undefined;
 
   constructor() {
-    // Check if using Mailjet
-    this.useMailjet = process.env.EMAIL_SERVICE === 'mailjet';
+    // Check if using Mailjet (case insensitive)
+    const emailService = process.env.EMAIL_SERVICE?.toLowerCase().trim();
+    this.useMailjet = emailService === 'mailjet';
+    
+    this.logger.log(`Email service configured: ${emailService || 'not set'} (using Mailjet: ${this.useMailjet})`);
     
     if (this.useMailjet) {
       // Use Mailjet API
@@ -26,18 +29,22 @@ export class EmailService {
       
       if (!this.mailjetApiKey || !this.mailjetApiSecret) {
         this.logger.warn('Mailjet API credentials not configured. Email sending will fail.');
+        this.logger.warn(`MAILJET_API_KEY: ${this.mailjetApiKey ? 'set' : 'missing'}`);
+        this.logger.warn(`MAILJET_API_SECRET: ${this.mailjetApiSecret ? 'set' : 'missing'}`);
+        this.logger.warn(`MAILJET_FROM_EMAIL: ${this.mailjetFromEmail || 'missing'}`);
       } else {
-        this.logger.log('Mailjet email service configured');
+        this.logger.log('Mailjet email service configured successfully');
       }
     } else {
-      // Use SMTP (Gmail or other SMTP servers)
-      const emailService = process.env.EMAIL_SERVICE || 'gmail';
+      // Use SMTP (Gmail or other SMTP servers) - Only if not using Mailjet
+      this.logger.log('Using SMTP transport (not Mailjet)');
+      const smtpService = process.env.EMAIL_SERVICE || 'gmail';
       const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
       const emailPort = parseInt(process.env.EMAIL_PORT || '587');
       const emailUser = process.env.EMAIL_USER;
       const emailPassword = process.env.EMAIL_PASSWORD;
 
-      if (emailService === 'gmail' || !emailHost) {
+      if (smtpService === 'gmail' || !emailHost) {
         // Use Gmail OAuth2 or App Password
         this.transporter = nodemailer.createTransport({
           service: 'gmail',
@@ -59,8 +66,8 @@ export class EmailService {
         });
       }
 
-      // Verify transporter configuration
-      if (this.transporter) {
+      // Verify transporter configuration only if credentials are provided
+      if (this.transporter && emailUser && emailPassword) {
         this.transporter.verify((error) => {
           if (error) {
             this.logger.error('Email transporter verification failed:', error);
@@ -68,6 +75,8 @@ export class EmailService {
             this.logger.log('Email transporter is ready to send emails');
           }
         });
+      } else {
+        this.logger.warn('SMTP credentials not fully configured. Email sending may fail.');
       }
     }
   }
