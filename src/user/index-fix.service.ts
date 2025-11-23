@@ -1,20 +1,23 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectConnection } from '@nestjs/mongoose';
-import { Connection } from 'mongoose';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User, UserDocument } from './user.schema';
 
 /**
  * Service to fix the google_id index on application startup
  * Drops the old non-sparse index and lets Mongoose recreate it with sparse: true
  */
 @Injectable()
-export class IndexFixService implements OnModuleInit {
+export class IndexFixService implements OnApplicationBootstrap {
   private readonly logger = new Logger(IndexFixService.name);
 
-  constructor(@InjectConnection() private connection: Connection) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+  ) {}
 
-  async onModuleInit() {
+  async onApplicationBootstrap() {
     // Wait a bit for MongoDB connection to be fully ready
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     
     try {
       await this.fixGoogleIdIndex();
@@ -26,8 +29,8 @@ export class IndexFixService implements OnModuleInit {
 
   private async fixGoogleIdIndex() {
     try {
-      const db = this.connection.db;
-      const collection = db.collection('users');
+      const connection = this.userModel.db;
+      const collection = connection.collection('users');
 
       // Get all indexes
       const indexes = await collection.indexes();
@@ -53,11 +56,18 @@ export class IndexFixService implements OnModuleInit {
         '✅ Dropped old google_id_1 index. Mongoose will recreate it with sparse: true.',
       );
 
-      // Force index recreation by calling ensureIndexes (Mongoose will use schema definition)
-      // Note: The index will be created automatically on next user creation,
-      // but we can trigger it explicitly
+      // Force index recreation - create it explicitly with sparse: true
       await collection.createIndex({ google_id: 1 }, { unique: true, sparse: true });
       this.logger.log('✅ Created new sparse google_id_1 index.');
+      
+      // Verify it was created correctly
+      const newIndexes = await collection.indexes();
+      const newGoogleIdIndex = newIndexes.find((idx) => idx.name === 'google_id_1');
+      if (newGoogleIdIndex?.sparse) {
+        this.logger.log('✅ Verified: google_id_1 index is now sparse.');
+      } else {
+        this.logger.warn('⚠️  Warning: google_id_1 index may not be sparse. Please check manually.');
+      }
     } catch (error: any) {
       // If index doesn't exist, that's okay - Mongoose will create it
       if (error.code === 27 || error.message?.includes('index not found')) {
