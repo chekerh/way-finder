@@ -50,6 +50,9 @@ export class DiscussionComment {
 
   @Prop({ type: [Types.ObjectId], ref: 'User', default: [] })
   liked_by: Types.ObjectId[];
+
+  @Prop({ type: Types.ObjectId, ref: 'DiscussionComment', default: null })
+  parent_id?: Types.ObjectId;
 }
 
 export type DiscussionCommentDocument = HydratedDocument<DiscussionComment>;

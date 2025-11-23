@@ -27,6 +27,10 @@ export class CreateCommentDto {
   @IsNotEmpty()
   @IsString()
   content: string;
+
+  @IsOptional()
+  @IsString()
+  parent_id?: string;
 }
 
 export class UpdatePostDto {
