@@ -306,23 +306,33 @@ export class DiscussionService {
   }
 
   async deleteComment(userId: string, commentId: string) {
+    // First, find the comment to check permissions
     const comment = await this.commentModel
-      .findOneAndDelete({
-        _id: this.toObjectId(commentId, 'comment id'),
-        user_id: this.toObjectId(userId, 'user id'),
-      })
+      .findById(this.toObjectId(commentId, 'comment id'))
       .exec();
 
     if (!comment) {
-      throw new NotFoundException('Comment not found or you do not have permission to delete it');
+      throw new NotFoundException('Comment not found');
     }
 
-    // Update post comment count
+    // Check if user is the comment owner OR the post owner
+    const isCommentOwner = comment.user_id.toString() === userId;
     const post = await this.postModel.findById(comment.post_id).exec();
-    if (post) {
-      post.comments_count = Math.max(0, post.comments_count - 1);
-      await post.save();
+    if (!post) {
+      throw new NotFoundException('Post not found');
     }
+    const isPostOwner = post.user_id.toString() === userId;
+
+    if (!isCommentOwner && !isPostOwner) {
+      throw new NotFoundException('You do not have permission to delete this comment');
+    }
+
+    // Delete the comment
+    await this.commentModel.findByIdAndDelete(comment._id).exec();
+
+    // Update post comment count
+    post.comments_count = Math.max(0, post.comments_count - 1);
+    await post.save();
 
     return { message: 'Comment deleted successfully' };
   }
