@@ -6,11 +6,13 @@ import { OnboardingService } from './onboarding.service';
 import { OnboardingController } from './onboarding.controller';
 import { OnboardingAIService } from './ai/onboarding-ai.service';
 import { UserModule } from '../user/user.module';
+import { RewardsModule } from '../rewards/rewards.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: OnboardingSession.name, schema: OnboardingSessionSchema }]),
     UserModule,
+    RewardsModule,
     HttpModule.register({
       timeout: 35000,
       maxRedirects: 5,

@@ -55,6 +55,9 @@ bio?: string;
   @Prop({ type: Date, default: null })
   onboarding_completed_at: Date;
 
+  @Prop({ type: Boolean, default: false })
+  onboarding_skipped: boolean;
+
   @Prop({ type: Object, default: {} })
   onboarding_preferences: {
     travel_type?: string;
@@ -70,6 +73,21 @@ bio?: string;
 
   @Prop({ type: String, default: null })
   fcm_token?: string; // Firebase Cloud Messaging token for push notifications
+
+  @Prop({ type: Number, default: 0 })
+  total_points: number; // Current available points
+
+  @Prop({ type: Number, default: 0 })
+  lifetime_points: number; // Total points earned over lifetime
+
+  @Prop({ type: Number, default: 0 })
+  current_streak: number; // Current daily login streak
+
+  @Prop({ type: Number, default: 0 })
+  longest_streak: number; // Longest streak achieved
+
+  @Prop({ type: Date, default: null })
+  last_login_date?: Date; // For streak calculation
 }
 
 export type UserDocument = HydratedDocument<User>;

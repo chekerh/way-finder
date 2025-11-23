@@ -87,6 +87,9 @@ export class UpdateUserDto {
   onboarding_completed_at?: Date;
 
   @IsOptional()
+  onboarding_skipped?: boolean;
+
+  @IsOptional()
   onboarding_preferences?: any;
 }
 

@@ -26,6 +26,7 @@ import { JourneyModule } from './journey/journey.module';
 import { VideoProcessingModule } from './video-processing/video-processing.module';
 import { DestinationVideoModule } from './video-generation/destination-video.module';
 import { ChatModule } from './chat/chat.module';
+import { RewardsModule } from './rewards/rewards.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {

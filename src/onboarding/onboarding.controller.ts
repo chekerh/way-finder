@@ -30,5 +30,17 @@ export class OnboardingController {
   async resume(@Req() req: any, @Body() dto: ResumeOnboardingDto) {
     return this.onboardingService.resumeSession(req.user.sub, dto.session_id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('skip')
+  async skip(@Req() req: any) {
+    return this.onboardingService.skipOnboarding(req.user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('reset')
+  async reset(@Req() req: any) {
+    return this.onboardingService.resetOnboarding(req.user.sub);
+  }
 }
 

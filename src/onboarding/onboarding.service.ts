@@ -12,6 +12,8 @@ import { OnboardingSession, OnboardingSessionDocument } from './onboarding.schem
 import { AnswerDto } from './onboarding.dto';
 import { OnboardingAIService } from './ai/onboarding-ai.service';
 import { UserService } from '../user/user.service';
+import { RewardsService } from '../rewards/rewards.service';
+import { PointsSource } from '../rewards/rewards.dto';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable()
@@ -21,6 +23,7 @@ export class OnboardingService {
     private readonly onboardingModel: Model<OnboardingSessionDocument>,
     private readonly aiService: OnboardingAIService,
     private readonly userService: UserService,
+    private readonly rewardsService: RewardsService,
     private readonly http: HttpService,
   ) {}
 
@@ -114,7 +117,23 @@ export class OnboardingService {
       onboarding_completed: true,
       onboarding_completed_at: session.completed_at,
       onboarding_preferences: preferences,
+      onboarding_skipped: false, // Clear skipped flag when user completes onboarding
     });
+
+    // Award points for completing onboarding
+    try {
+      const points = this.rewardsService.getPointsForAction(PointsSource.ONBOARDING);
+      await this.rewardsService.awardPoints({
+        userId,
+        points,
+        source: PointsSource.ONBOARDING,
+        description: 'Completed onboarding questionnaire',
+      });
+      this.logger.log(`Awarded ${points} points to user ${userId} for completing onboarding`);
+    } catch (error) {
+      this.logger.warn(`Failed to award points for onboarding: ${error.message}`);
+      // Don't fail onboarding if points fail
+    }
 
     return {
       session_id: session.session_id,
@@ -166,6 +185,58 @@ export class OnboardingService {
     }
 
     return this.forwardToEngine(session);
+  }
+
+  async skipOnboarding(userId: string): Promise<any> {
+    // Find or create session
+    let session = await this.onboardingModel.findOne({ user_id: new Types.ObjectId(userId) }).exec();
+
+    if (!session) {
+      const sessionId = this.generateSessionId();
+      session = new this.onboardingModel({
+        user_id: new Types.ObjectId(userId),
+        session_id: sessionId,
+        answers: {},
+        questions_answered: [],
+        completed: false,
+      });
+    }
+
+    // Mark as completed with empty preferences
+    session.completed = true;
+    session.completed_at = new Date();
+    session.extracted_preferences = {};
+    await session.save();
+
+    // Update user profile - mark as completed but with empty preferences
+    await this.userService.updateProfile(userId, {
+      preferences: [],
+      onboarding_completed: true,
+      onboarding_completed_at: session.completed_at,
+      onboarding_preferences: {},
+      onboarding_skipped: true, // Track that it was skipped
+    });
+
+    return {
+      session_id: session.session_id,
+      completed: true,
+      skipped: true,
+      message: 'Onboarding skipped. You can update your preferences later in your profile.',
+    };
+  }
+
+  async resetOnboarding(userId: string): Promise<any> {
+    // Delete existing session
+    await this.onboardingModel.deleteMany({ user_id: new Types.ObjectId(userId) }).exec();
+
+    // Reset user onboarding status
+    await this.userService.updateProfile(userId, {
+      onboarding_completed: false,
+      onboarding_preferences: null,
+    });
+
+    // Start a new session
+    return this.startSession(userId);
   }
 
   private generateSessionId(): string {
