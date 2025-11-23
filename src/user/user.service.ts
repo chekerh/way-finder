@@ -16,11 +16,15 @@ export class UserService {
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    return this.userModel.findOne({ username }).exec();
+    // Normalize username by trimming
+    const normalizedUsername = username.trim();
+    return this.userModel.findOne({ username: normalizedUsername }).exec();
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userModel.findOne({ email }).exec();
+    // Normalize email to lowercase to match schema behavior
+    const normalizedEmail = email.trim().toLowerCase();
+    return this.userModel.findOne({ email: normalizedEmail }).exec();
   }
 
   async findByGoogleId(googleId: string): Promise<User | null> {

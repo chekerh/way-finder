@@ -44,31 +44,48 @@ export class AuthService {
     // Generate email verification token
     const emailVerificationToken = this.emailService.generateVerificationToken();
     
-    const user = await this.userService.create({
-      ...dto,
-      username,
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      password: hash,
-      email_verified: false, // Email not verified yet
-      email_verification_token: emailVerificationToken,
-    });
-    
-    // Send verification email
     try {
-      await this.emailService.sendVerificationEmail(email, emailVerificationToken, firstName);
-    } catch (error) {
-      // Log error but don't fail registration if email fails
-      console.error('Failed to send verification email:', error);
+      const user = await this.userService.create({
+        ...dto,
+        username,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        password: hash,
+        email_verified: false, // Email not verified yet
+        email_verification_token: emailVerificationToken,
+      });
+      
+      // Send verification email
+      try {
+        await this.emailService.sendVerificationEmail(email, emailVerificationToken, firstName);
+      } catch (error) {
+        // Log error but don't fail registration if email fails
+        console.error('Failed to send verification email:', error);
+      }
+      
+      const userObj = (user as any).toObject ? (user as any).toObject() : user;
+      const { password: _password, ...result } = userObj;
+      return { 
+        message: 'User registered successfully. Please check your email to verify your account.', 
+        user: result 
+      };
+    } catch (error: any) {
+      // Handle MongoDB duplicate key errors
+      if (error.code === 11000) {
+        // MongoDB duplicate key error
+        const duplicateField = Object.keys(error.keyPattern || {})[0];
+        if (duplicateField === 'email') {
+          throw new ConflictException('Email already exists');
+        }
+        if (duplicateField === 'username') {
+          throw new ConflictException('Username already exists');
+        }
+        throw new ConflictException('A user with this information already exists');
+      }
+      // Re-throw other errors
+      throw error;
     }
-    
-    const userObj = (user as any).toObject ? (user as any).toObject() : user;
-    const { password: _password, ...result } = userObj;
-    return { 
-      message: 'User registered successfully. Please check your email to verify your account.', 
-      user: result 
-    };
   }
 
   async login(dto: LoginDto) {
