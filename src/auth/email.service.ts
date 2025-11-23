@@ -276,7 +276,7 @@ export class EmailService {
                 ${otpCode}
               </div>
             </div>
-            <p>Ce code est valide pendant <strong>10 minutes</strong>.</p>
+            <p>Ce code est valide pendant <strong>5 minutes</strong>.</p>
             <p>Si vous n'avez pas demandé ce code, vous pouvez ignorer cet email en toute sécurité.</p>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             <p style="font-size: 12px; color: #777;">Cordialement,<br>L'équipe WayFinder</p>
@@ -291,7 +291,7 @@ export class EmailService {
         
         Votre code de vérification à 4 chiffres est : ${otpCode}
         
-        Ce code est valide pendant 10 minutes.
+        Ce code est valide pendant 5 minutes.
         
         Si vous n'avez pas demandé ce code, vous pouvez ignorer cet email en toute sécurité.
         
