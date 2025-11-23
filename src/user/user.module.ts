@@ -5,6 +5,7 @@ import { User, UserSchema } from './user.schema';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { ImgBBService } from '../journey/imgbb.service';
+import { IndexFixService } from './index-fix.service';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { ImgBBService } from '../journey/imgbb.service';
     HttpModule,
   ],
   controllers: [UserController],
-  providers: [UserService, ImgBBService],
+  providers: [UserService, ImgBBService, IndexFixService],
   exports: [UserService],
 })
 export class UserModule {}
