@@ -66,17 +66,15 @@ export class EmailService {
         });
       }
 
-      // Verify transporter configuration only if credentials are provided
+      // Only verify transporter if credentials are provided (skip verification to avoid errors)
+      // Verification will happen on first email send
       if (this.transporter && emailUser && emailPassword) {
-        this.transporter.verify((error) => {
-          if (error) {
-            this.logger.error('Email transporter verification failed:', error);
-          } else {
-            this.logger.log('Email transporter is ready to send emails');
-          }
-        });
+        // Don't verify immediately - it can cause timeout errors
+        // Verification will happen automatically on first email send
+        this.logger.log('SMTP transporter configured (verification skipped)');
       } else {
         this.logger.warn('SMTP credentials not fully configured. Email sending may fail.');
+        this.transporter = null; // Don't use SMTP if credentials are missing
       }
     }
   }
