@@ -6,7 +6,7 @@ import { FlightSearchDto, RecommendedQueryDto } from './dto/flight-search.dto';
 import { ExploreSearchDto } from './dto/explore-search.dto';
 import { ActivitySearchDto } from './dto/activity-search.dto';
 import { UserService } from '../user/user.service';
-import { FALLBACK_EXPLORE_OFFERS, FALLBACK_FLIGHT_OFFERS } from './catalog.fallback';
+import { FALLBACK_EXPLORE_OFFERS, FALLBACK_FLIGHT_OFFERS, DESTINATION_DESCRIPTIONS } from './catalog.fallback';
 
 @Injectable()
 export class CatalogService {
@@ -42,7 +42,22 @@ export class CatalogService {
       };
 
       try {
-        return this.amadeus.searchFlights(search);
+        const result = await this.amadeus.searchFlights(search);
+        // Ajouter les descriptions aux offres de vol
+        if (result?.data?.length) {
+          const enrichedData = result.data.map((offer: any) => {
+            const destinationCode = offer.itineraries?.[0]?.segments?.[0]?.arrival?.iataCode;
+            if (destinationCode && DESTINATION_DESCRIPTIONS[destinationCode]) {
+              return {
+                ...offer,
+                description: DESTINATION_DESCRIPTIONS[destinationCode],
+              };
+            }
+            return offer;
+          });
+          return { ...result, data: enrichedData };
+        }
+        return result;
       } catch (error) {
         if (error instanceof AmadeusRateLimitError) {
           this.registerAmadeusRateLimit();
@@ -91,7 +106,18 @@ export class CatalogService {
         const result = await this.amadeus.searchFlights(search);
         if (result?.data?.length) {
           hadSuccessfulExternalCall = true;
-          return result.data;
+          // Ajouter les descriptions aux offres de vol
+          return result.data.map((offer: any) => {
+            // Extraire le code d'aéroport de destination depuis les segments
+            const destinationCode = offer.itineraries?.[0]?.segments?.[0]?.arrival?.iataCode;
+            if (destinationCode && DESTINATION_DESCRIPTIONS[destinationCode]) {
+              return {
+                ...offer,
+                description: DESTINATION_DESCRIPTIONS[destinationCode],
+              };
+            }
+            return offer;
+          });
         }
         return [];
       } catch (error) {
@@ -238,7 +264,15 @@ export class CatalogService {
     const slice = diverseFlights.slice(0, maxResults ?? diverseFlights.length);
 
     return {
-      data: slice.map((flight) => flight.offer),
+      data: slice.map((flight) => {
+        const offer = { ...flight.offer };
+        // Ajouter la description basée sur le code de destination
+        const description = DESTINATION_DESCRIPTIONS[flight.destinationCode];
+        if (description) {
+          offer.description = description;
+        }
+        return offer;
+      }),
       meta: { fallback: true },
     };
   }

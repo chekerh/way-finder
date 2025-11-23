@@ -3,6 +3,25 @@ export interface FallbackFlightOffer {
   offer: any;
 }
 
+// Mapping des descriptions par code d'aéroport
+export const DESTINATION_DESCRIPTIONS: Record<string, string> = {
+  CDG: 'Paris, la capitale de la France, est réputée pour sa culture, son art, sa gastronomie et ses monuments emblématiques comme la Tour Eiffel, le Louvre et Notre-Dame. Ville romantique par excellence, elle attire des millions de visiteurs chaque année.',
+  ORY: 'Paris, la capitale de la France, est réputée pour sa culture, son art, sa gastronomie et ses monuments emblématiques comme la Tour Eiffel, le Louvre et Notre-Dame. Ville romantique par excellence, elle attire des millions de visiteurs chaque année.',
+  FCO: 'Rome, la capitale de l\'Italie, est une ville riche en histoire avec ses monuments antiques, ses églises baroques et sa cuisine délicieuse. Découvrez le Colisée, le Forum romain et la Cité du Vatican.',
+  BCN: 'Barcelone, capitale de la Catalogne, est une ville dynamique connue pour son architecture moderniste de Gaudí, ses plages méditerranéennes, sa vie nocturne animée et sa cuisine catalane exceptionnelle.',
+  MAD: 'Madrid, la capitale de l\'Espagne, est une ville vibrante avec ses musées de renommée mondiale, ses parcs magnifiques, sa scène gastronomique et sa vie culturelle riche.',
+  LHR: 'Londres, capitale du Royaume-Uni, est une métropole cosmopolite célèbre pour son histoire, ses musées, ses théâtres, ses parcs royaux et sa diversité culturelle.',
+  AMS: 'Amsterdam, capitale des Pays-Bas, est réputée pour ses canaux pittoresques, ses musées d\'art, son architecture historique et son ambiance décontractée unique.',
+  ATH: 'Athènes, berceau de la civilisation occidentale, offre une combinaison unique d\'histoire ancienne avec l\'Acropole, de culture moderne et de cuisine méditerranéenne authentique.',
+  IST: 'Istanbul, ville à cheval entre l\'Europe et l\'Asie, est un carrefour culturel fascinant avec ses mosquées historiques, ses bazars animés et sa cuisine turque exceptionnelle.',
+  DXB: 'Dubaï, ville ultramoderne des Émirats arabes unis, est connue pour ses gratte-ciel impressionnants, ses centres commerciaux de luxe, ses plages et son hospitalité légendaire.',
+  JFK: 'New York, la ville qui ne dort jamais, est un centre culturel et financier mondial avec ses musées, ses théâtres de Broadway, ses parcs et son énergie incomparable.',
+  NRT: 'Tokyo, capitale du Japon, allie tradition et modernité avec ses temples anciens, sa technologie de pointe, sa cuisine raffinée et sa culture unique.',
+  BKK: 'Bangkok, capitale de la Thaïlande, est une ville animée avec ses temples bouddhistes, ses marchés flottants, sa cuisine de rue délicieuse et son hospitalité chaleureuse.',
+  SIN: 'Singapour, cité-État moderne, est réputée pour son architecture futuriste, sa cuisine fusion, ses jardins botaniques et son mélange harmonieux de cultures asiatiques.',
+  ICN: 'Séoul, capitale de la Corée du Sud, combine palais traditionnels, technologie de pointe, K-pop, cuisine coréenne authentique et une culture dynamique.',
+};
+
 export interface FallbackActivity {
   id: string;
   city: string;
