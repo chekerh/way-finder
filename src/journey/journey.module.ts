@@ -25,7 +25,7 @@ import { UserModule } from '../user/user.module';
   ],
   controllers: [JourneyController],
   providers: [JourneyService, ImgBBService],
-  exports: [JourneyService],
+  exports: [JourneyService, ImgBBService],
 })
 export class JourneyModule {}
 
