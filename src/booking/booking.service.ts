@@ -41,6 +41,17 @@ export class BookingService {
   }
 
   async confirm(userId: string, dto: ConfirmBookingDto) {
+    // Check if user already has a confirmed booking for this offer
+    const existingBooking = await this.bookingModel.findOne({
+      user_id: this.toObjectId(userId, 'user id'),
+      offer_id: dto.offer_id,
+      status: BookingStatus.CONFIRMED,
+    }).exec();
+
+    if (existingBooking) {
+      throw new BadRequestException('Vous avez déjà une réservation confirmée pour cette offre. Vous ne pouvez pas réserver deux fois le même voyage.');
+    }
+
     const confirmation_number = `CONF-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
     const total_price = dto.total_price ?? 0;
     const booking = new this.bookingModel({
