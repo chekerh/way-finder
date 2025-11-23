@@ -14,7 +14,7 @@ import { IndexFixService } from './index-fix.service';
   ],
   controllers: [UserController],
   providers: [UserService, ImgBBService, IndexFixService],
-  exports: [UserService],
+  exports: [UserService, MongooseModule], // Export MongooseModule so other modules can use UserModel
 })
 export class UserModule {}
 

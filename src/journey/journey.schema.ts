@@ -3,10 +3,10 @@ import { HydratedDocument, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Journey {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Booking', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Booking', required: true })
   booking_id: Types.ObjectId; // Required: Must be linked to a confirmed booking
 
   @Prop({ required: true, trim: true })

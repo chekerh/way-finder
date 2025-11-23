@@ -31,7 +31,7 @@ bio?: string;
   @Prop({ required: false }) // Made optional for Google OAuth users
   password?: string;
 
-  @Prop({ type: String, unique: true, sparse: true, trim: true, default: null })
+  @Prop({ type: String, trim: true, default: null })
   google_id?: string; // Google user ID for OAuth
 
   @Prop({ type: Boolean, default: false })
