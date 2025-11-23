@@ -27,7 +27,9 @@ export class DiscussionService {
       destination: dto.destination,
       image_url: dto.image_url,
     });
-    return post.save();
+    const savedPost = await post.save();
+    // Populate user_id before returning
+    return savedPost.populate('user_id', 'username first_name last_name profile_image_url');
   }
 
   async getPosts(limit: number = 20, skip: number = 0, destination?: string) {
