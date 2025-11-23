@@ -411,10 +411,12 @@ export class AuthService {
 
     // Generate 4-digit OTP code
     const otpCode = this.emailService.generateOTPCode();
+    console.log(`[Register OTP] Generated OTP code: ${otpCode} for ${email}`);
     
     // Calculate expiration time (5 minutes from now)
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+    console.log(`[Register OTP] OTP will expire at: ${expiresAt.toISOString()}`);
 
     // Invalidate any existing OTPs for this email
     await this.otpModel.updateMany(
@@ -422,14 +424,18 @@ export class AuthService {
       { $set: { used: true } }
     ).exec();
 
-    // Create new OTP record
+    // Create new OTP record - ensure code is normalized (4 digits, no spaces)
+    const normalizedCode = otpCode.replace(/\D/g, '').padStart(4, '0').slice(0, 4);
+    console.log(`[Register OTP] Saving OTP for ${email}, code: ${normalizedCode} (original: ${otpCode})`);
+    
     const otp = new this.otpModel({
       email,
-      code: otpCode,
+      code: normalizedCode,
       expires_at: expiresAt,
       used: false,
     });
     await otp.save();
+    console.log(`[Register OTP] OTP saved with ID: ${otp._id}`);
 
     // Send OTP email
     try {
@@ -453,7 +459,8 @@ export class AuthService {
    */
   async registerWithOTP(dto: RegisterWithOTPDto) {
     const email = dto.email.trim().toLowerCase();
-    const code = dto.otp_code.trim();
+    // Normalize code: remove all non-digit characters and ensure it's exactly 4 digits
+    const code = dto.otp_code.replace(/\D/g, '').padStart(4, '0').slice(0, 4);
     const username = dto.username.trim();
     const firstName = dto.first_name.trim();
     const lastName = dto.last_name.trim();
@@ -463,6 +470,16 @@ export class AuthService {
       throw new BadRequestException('Le code doit être composé de 4 chiffres');
     }
 
+    // Verify OTP - add detailed logging
+    console.log(`[Register OTP] Verifying OTP for ${email}, code: ${code}`);
+    
+    // First, find all OTPs for this email to debug
+    const allOtps = await this.otpModel.find({ email }).exec();
+    console.log(`[Register OTP] Found ${allOtps.length} OTP records for ${email}`);
+    allOtps.forEach((otp, index) => {
+      console.log(`[Register OTP] OTP ${index + 1}: code="${otp.code}", used=${otp.used}, expires_at=${otp.expires_at}, now=${new Date()}`);
+    });
+    
     // Verify OTP
     const otp = await this.otpModel.findOne({
       email,
@@ -472,9 +489,29 @@ export class AuthService {
     }).exec();
 
     if (!otp) {
-      console.log(`[Register OTP] Invalid or expired OTP for ${email}`);
-      throw new UnauthorizedException('Code invalide ou expiré. Veuillez demander un nouveau code.');
+      // Check if code exists but is used
+      const usedOtp = await this.otpModel.findOne({ email, code }).exec();
+      if (usedOtp) {
+        console.log(`[Register OTP] OTP found but already used for ${email}`);
+        throw new UnauthorizedException('Ce code a déjà été utilisé. Veuillez demander un nouveau code.');
+      }
+      
+      // Check if code exists but is expired
+      const expiredOtp = await this.otpModel.findOne({ 
+        email, 
+        code,
+        expires_at: { $lte: new Date() }
+      }).exec();
+      if (expiredOtp) {
+        console.log(`[Register OTP] OTP found but expired for ${email}`);
+        throw new UnauthorizedException('Ce code a expiré. Veuillez demander un nouveau code.');
+      }
+      
+      console.log(`[Register OTP] No valid OTP found for ${email} with code ${code}`);
+      throw new UnauthorizedException('Code invalide. Veuillez vérifier le code et réessayer.');
     }
+    
+    console.log(`[Register OTP] Valid OTP found for ${email}`);
 
     // Mark OTP as used
     await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
