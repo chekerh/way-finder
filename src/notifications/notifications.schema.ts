@@ -60,7 +60,7 @@ export class Notification {
   @Prop({ type: String, default: null })
   actionUrl?: string; // URL to navigate when notification is clicked
 
-  // Automatically managed by Mongoose timestamps option
+  // Added for TypeScript awareness (timestamps injected by Mongoose)
   createdAt?: Date;
   updatedAt?: Date;
 }

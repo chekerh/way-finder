@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Notification, NotificationDocument, NotificationType } from './notifications.schema';
+import { NotificationDocument } from './notifications.schema';
 import { CreateNotificationDto } from './notifications.dto';
 import { FcmService } from './fcm.service';
 import { UserService } from '../user/user.service';
@@ -14,7 +14,10 @@ export class NotificationsService {
     private readonly userService: UserService,
   ) {}
 
-  async createNotification(userId: string, createNotificationDto: CreateNotificationDto): Promise<Notification> {
+  async createNotification(
+    userId: string,
+    createNotificationDto: CreateNotificationDto,
+  ): Promise<NotificationDocument> {
     // For booking operations (cancelled, confirmed, updated), always create a new notification
     // to ensure user sees popup when action is performed
     // For likes/comments, prevent spam by checking recent notifications
@@ -48,7 +51,7 @@ export class NotificationsService {
       existingNotification = await this.notificationModel.findOne(existingNotificationQuery).exec();
     }
     
-    let notificationToReturn: Notification;
+    let notificationToReturn: NotificationDocument;
     
     if (existingNotification) {
       // For likes/comments: update existing notification if it's recent (within 1 hour)
@@ -81,16 +84,15 @@ export class NotificationsService {
       try {
         const fcmToken = await this.userService.getFcmToken(userId);
         if (fcmToken) {
-          const notificationDoc = notificationToReturn as NotificationDocument;
           const sent = await this.fcmService.sendNotification(
             fcmToken,
-            notificationDoc.title,
-            notificationDoc.message,
+            notificationToReturn.title,
+            notificationToReturn.message,
             {
-              type: notificationDoc.type,
-              notificationId: notificationDoc._id.toString(),
-              actionUrl: notificationDoc.actionUrl,
-              ...notificationDoc.data,
+              type: notificationToReturn.type,
+              notificationId: notificationToReturn._id.toString(),
+              actionUrl: notificationToReturn.actionUrl,
+              ...notificationToReturn.data,
             },
           );
           if (sent) {
@@ -113,7 +115,10 @@ export class NotificationsService {
     return notificationToReturn;
   }
 
-  async getUserNotifications(userId: string, unreadOnly: boolean = false): Promise<Notification[]> {
+  async getUserNotifications(
+    userId: string,
+    unreadOnly: boolean = false,
+  ): Promise<NotificationDocument[]> {
     const query: any = { userId };
     if (unreadOnly) {
       query.isRead = false;
@@ -140,7 +145,7 @@ export class NotificationsService {
     return this.notificationModel.countDocuments({ userId, isRead: false }).exec();
   }
 
-  async markAsRead(userId: string, notificationId: string): Promise<Notification> {
+  async markAsRead(userId: string, notificationId: string): Promise<NotificationDocument> {
     const notification = await this.notificationModel.findOne({ _id: notificationId, userId }).exec();
     if (!notification) {
       throw new NotFoundException('Notification not found');
@@ -171,7 +176,7 @@ export class NotificationsService {
     bookingId: string,
     message: string,
     data?: Record<string, any>
-  ): Promise<Notification> {
+  ): Promise<NotificationDocument> {
     const titles = {
       booking_confirmed: 'Réservation confirmée',
       booking_cancelled: 'Réservation annulée',
@@ -193,7 +198,7 @@ export class NotificationsService {
     destinationName: string,
     oldPrice: number,
     newPrice: number
-  ): Promise<Notification> {
+  ): Promise<NotificationDocument> {
     const discount = ((oldPrice - newPrice) / oldPrice) * 100;
     return this.createNotification(userId, {
       type: 'price_alert',
@@ -213,7 +218,7 @@ export class NotificationsService {
     type: 'payment_success' | 'payment_failed',
     bookingId: string,
     amount: number
-  ): Promise<Notification> {
+  ): Promise<NotificationDocument> {
     return this.createNotification(userId, {
       type,
       title: type === 'payment_success' ? 'Paiement réussi' : 'Échec du paiement',
