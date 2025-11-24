@@ -143,11 +143,13 @@ export class AuthService {
 
     // Check if user has a password (Google OAuth users might not have one)
     if (!user.password) {
-      throw new UnauthorizedException('Please sign in with Google');
+      throw new UnauthorizedException('Cet compte a été créé via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.');
     }
 
     const passwordMatch = await bcrypt.compare(rawPassword, user.password);
-    if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
+    if (!passwordMatch) {
+      throw new UnauthorizedException('Email ou mot de passe incorrect. Si vous avez oublié votre mot de passe, utilisez la connexion par code OTP.');
+    }
 
     const payload = { sub: (user as any)._id.toString(), username: user.username };
     const token = await this.jwtService.signAsync(payload);
@@ -443,7 +445,11 @@ export class AuthService {
     const existingUser = await this.userService.findByEmail(email);
     if (existingUser) {
       console.log(`[Register OTP] Email already exists: ${email}`);
-      throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter ou utiliser un autre email.');
+      // Check if user has a password or was created via OAuth
+      if (!existingUser.password) {
+        throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utiliser un autre email.');
+      }
+      throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utiliser la connexion par code OTP.');
     }
 
     // Check cooldown period (30 seconds)
@@ -576,7 +582,11 @@ export class AuthService {
     const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) {
       console.log(`[Register OTP] Email conflict detected: ${email} already exists`);
-      throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter.');
+      // Check if user has a password
+      if (!existingEmail.password) {
+        throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.');
+      }
+      throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
     }
 
     // Check if username already exists
@@ -637,12 +647,17 @@ export class AuthService {
         }
         
         if (duplicateField === 'email') {
-          throw new ConflictException('Cet email est déjà enregistré');
+          // Check if user has a password
+          const existingUser = await this.userService.findByEmail(email);
+          if (existingUser && !existingUser.password) {
+            throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.');
+          }
+          throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
         }
         if (duplicateField === 'username') {
-          throw new ConflictException('Ce nom d\'utilisateur est déjà utilisé');
+          throw new ConflictException('Ce nom d\'utilisateur est déjà utilisé. Veuillez en choisir un autre.');
         }
-        throw new ConflictException('Un utilisateur avec ces informations existe déjà');
+        throw new ConflictException('Un utilisateur avec ces informations existe déjà. Veuillez vous connecter ou utiliser d\'autres informations.');
       }
       throw error;
     }
