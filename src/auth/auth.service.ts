@@ -313,12 +313,26 @@ export class AuthService {
       throw new NotFoundException('Aucun compte trouvé avec cet email');
     }
 
+    // Check cooldown period (30 seconds)
+    const recentOTP = await this.otpModel.findOne({
+      email,
+      last_sent_at: { $gte: new Date(Date.now() - 30 * 1000) }, // Within last 30 seconds
+    }).sort({ last_sent_at: -1 }).exec();
+
+    if (recentOTP) {
+      const secondsRemaining = Math.ceil((30 * 1000 - (Date.now() - recentOTP.last_sent_at.getTime())) / 1000);
+      throw new BadRequestException(`Veuillez attendre ${secondsRemaining} seconde(s) avant de renvoyer le code.`);
+    }
+
     // Generate 4-digit OTP code
     const otpCode = this.emailService.generateOTPCode();
+    // Normalize code to ensure it's exactly 4 digits
+    const normalizedCode = otpCode.replace(/\D/g, '').padStart(4, '0').slice(0, 4);
     
     // Calculate expiration time (5 minutes from now)
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+    const now = new Date();
 
     // Invalidate any existing OTPs for this email
     await this.otpModel.updateMany(
@@ -326,18 +340,19 @@ export class AuthService {
       { $set: { used: true } }
     ).exec();
 
-    // Create new OTP record
+    // Create new OTP record - use normalized code
     const otp = new this.otpModel({
       email,
-      code: otpCode,
+      code: normalizedCode,
       expires_at: expiresAt,
       used: false,
+      last_sent_at: now,
     });
     await otp.save();
 
-    // Send OTP email
+    // Send OTP email - use normalized code to ensure consistency
     try {
-      await this.emailService.sendOTPEmail(email, otpCode, user.first_name);
+      await this.emailService.sendOTPEmail(email, normalizedCode, user.first_name);
     } catch (error) {
       // If email fails, mark OTP as used so it can't be used
       await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
@@ -355,10 +370,16 @@ export class AuthService {
    */
   async verifyOTP(dto: VerifyOTPDto) {
     const email = dto.email.trim().toLowerCase();
-    const code = dto.code.trim();
+    const code = dto.code.trim().replace(/\D/g, '').padStart(4, '0').slice(0, 4);
 
     if (code.length !== 4 || !/^\d{4}$/.test(code)) {
       throw new BadRequestException('Le code doit être composé de 4 chiffres');
+    }
+
+    // Check if any OTP was sent for this email
+    const anyOTP = await this.otpModel.findOne({ email }).sort({ last_sent_at: -1 }).exec();
+    if (!anyOTP) {
+      throw new BadRequestException('Aucun code n\'a été envoyé. Veuillez d\'abord demander un code.');
     }
 
     // Find valid OTP
@@ -370,7 +391,23 @@ export class AuthService {
     }).exec();
 
     if (!otp) {
-      throw new UnauthorizedException('Code invalide ou expiré');
+      // Check if code exists but is used
+      const usedOtp = await this.otpModel.findOne({ email, code, used: true }).exec();
+      if (usedOtp) {
+        throw new UnauthorizedException('Ce code a déjà été utilisé. Veuillez demander un nouveau code.');
+      }
+      
+      // Check if code exists but is expired
+      const expiredOtp = await this.otpModel.findOne({ 
+        email, 
+        code,
+        expires_at: { $lte: new Date() }
+      }).exec();
+      if (expiredOtp) {
+        throw new UnauthorizedException('Le code a expiré. Veuillez demander un nouveau code.');
+      }
+      
+      throw new UnauthorizedException('Code invalide. Veuillez vérifier le code et réessayer.');
     }
 
     // Mark OTP as used
@@ -409,6 +446,17 @@ export class AuthService {
       throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter ou utiliser un autre email.');
     }
 
+    // Check cooldown period (30 seconds)
+    const recentOTP = await this.otpModel.findOne({
+      email,
+      last_sent_at: { $gte: new Date(Date.now() - 30 * 1000) }, // Within last 30 seconds
+    }).sort({ last_sent_at: -1 }).exec();
+
+    if (recentOTP) {
+      const secondsRemaining = Math.ceil((30 * 1000 - (Date.now() - recentOTP.last_sent_at.getTime())) / 1000);
+      throw new BadRequestException(`Veuillez attendre ${secondsRemaining} seconde(s) avant de renvoyer le code.`);
+    }
+
     // Generate 4-digit OTP code
     const otpCode = this.emailService.generateOTPCode();
     console.log(`[Register OTP] Generated OTP code: ${otpCode} for ${email}`);
@@ -416,6 +464,7 @@ export class AuthService {
     // Calculate expiration time (5 minutes from now)
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+    const now = new Date();
     console.log(`[Register OTP] OTP will expire at: ${expiresAt.toISOString()}`);
 
     // Invalidate any existing OTPs for this email
@@ -433,13 +482,14 @@ export class AuthService {
       code: normalizedCode,
       expires_at: expiresAt,
       used: false,
+      last_sent_at: now,
     });
     await otp.save();
     console.log(`[Register OTP] OTP saved with ID: ${otp._id}`);
 
-    // Send OTP email
+    // Send OTP email - use normalized code to ensure consistency
     try {
-      await this.emailService.sendOTPEmail(email, otpCode);
+      await this.emailService.sendOTPEmail(email, normalizedCode);
       console.log(`[Register OTP] OTP sent successfully to ${email}`);
     } catch (error) {
       // If email fails, mark OTP as used so it can't be used
@@ -473,6 +523,12 @@ export class AuthService {
     // Verify OTP - add detailed logging
     console.log(`[Register OTP] Verifying OTP for ${email}, code: ${code}`);
     
+    // Check if any OTP was sent for this email
+    const anyOTP = await this.otpModel.findOne({ email }).sort({ last_sent_at: -1 }).exec();
+    if (!anyOTP) {
+      throw new BadRequestException('Aucun code n\'a été envoyé. Veuillez d\'abord demander un code.');
+    }
+    
     // First, find all OTPs for this email to debug
     const allOtps = await this.otpModel.find({ email }).exec();
     console.log(`[Register OTP] Found ${allOtps.length} OTP records for ${email}`);
@@ -490,7 +546,7 @@ export class AuthService {
 
     if (!otp) {
       // Check if code exists but is used
-      const usedOtp = await this.otpModel.findOne({ email, code }).exec();
+      const usedOtp = await this.otpModel.findOne({ email, code, used: true }).exec();
       if (usedOtp) {
         console.log(`[Register OTP] OTP found but already used for ${email}`);
         throw new UnauthorizedException('Ce code a déjà été utilisé. Veuillez demander un nouveau code.');
@@ -504,7 +560,7 @@ export class AuthService {
       }).exec();
       if (expiredOtp) {
         console.log(`[Register OTP] OTP found but expired for ${email}`);
-        throw new UnauthorizedException('Ce code a expiré. Veuillez demander un nouveau code.');
+        throw new UnauthorizedException('Le code a expiré. Veuillez demander un nouveau code.');
       }
       
       console.log(`[Register OTP] No valid OTP found for ${email} with code ${code}`);
