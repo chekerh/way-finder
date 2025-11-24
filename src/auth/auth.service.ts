@@ -581,12 +581,23 @@ export class AuthService {
     // Double-check that email doesn't exist (race condition protection)
     const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) {
-      console.log(`[Register OTP] Email conflict detected: ${email} already exists`);
-      // Check if user has a password
-      if (!existingEmail.password) {
-        throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.');
-      }
-      throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
+      console.log(`[Register OTP] Email already exists: ${email}. Auto-logging in user with valid OTP.`);
+      
+      // If user exists and OTP is valid, automatically log them in instead of rejecting
+      // This provides a better user experience
+      const payload = { sub: (existingEmail as any)._id.toString(), username: existingEmail.username };
+      const token = await this.jwtService.signAsync(payload);
+      
+      const userObj = (existingEmail as any).toObject ? (existingEmail as any).toObject() : existingEmail;
+      const { password: _password, ...userData } = userObj;
+      
+      return {
+        message: 'Connexion réussie avec le code OTP',
+        access_token: token,
+        user: userData,
+        onboarding_completed: existingEmail.onboarding_completed || false,
+        auto_login: true, // Flag to indicate this was an auto-login
+      };
     }
 
     // Check if username already exists
