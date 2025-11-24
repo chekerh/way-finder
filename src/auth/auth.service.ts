@@ -579,18 +579,24 @@ export class AuthService {
     await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
 
     // Double-check that email doesn't exist (race condition protection)
+    console.log(`[Register OTP] Checking if email exists: ${email}`);
     const existingEmail = await this.userService.findByEmail(email);
+    console.log(`[Register OTP] Email check result: ${existingEmail ? 'EXISTS' : 'NOT FOUND'}`);
+    
     if (existingEmail) {
       console.log(`[Register OTP] Email already exists: ${email}. Auto-logging in user with valid OTP.`);
+      console.log(`[Register OTP] User ID: ${(existingEmail as any)._id}, Username: ${existingEmail.username}`);
       
       // If user exists and OTP is valid, automatically log them in instead of rejecting
       // This provides a better user experience
       const payload = { sub: (existingEmail as any)._id.toString(), username: existingEmail.username };
       const token = await this.jwtService.signAsync(payload);
+      console.log(`[Register OTP] Token generated successfully for auto-login`);
       
       const userObj = (existingEmail as any).toObject ? (existingEmail as any).toObject() : existingEmail;
       const { password: _password, ...userData } = userObj;
       
+      console.log(`[Register OTP] Returning auto-login response for ${email}`);
       return {
         message: 'Connexion réussie avec le code OTP',
         access_token: token,
@@ -599,6 +605,8 @@ export class AuthService {
         auto_login: true, // Flag to indicate this was an auto-login
       };
     }
+    
+    console.log(`[Register OTP] Email does not exist, proceeding with registration for ${email}`);
 
     // Check if username already exists
     const existing = await this.userService.findByUsername(username);
