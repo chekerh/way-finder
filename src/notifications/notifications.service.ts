@@ -15,6 +15,42 @@ export class NotificationsService {
   ) {}
 
   async createNotification(userId: string, createNotificationDto: CreateNotificationDto): Promise<Notification> {
+    // Check for existing unread notification of the same type for the same action
+    // This prevents duplicate notifications for the same event
+    const existingNotificationQuery: any = {
+      userId,
+      type: createNotificationDto.type,
+      isRead: false,
+    };
+
+    // Add specific checks based on notification type to prevent duplicates
+    if (createNotificationDto.data) {
+      if (createNotificationDto.data.bookingId) {
+        existingNotificationQuery['data.bookingId'] = createNotificationDto.data.bookingId;
+      }
+      if (createNotificationDto.data.postId) {
+        existingNotificationQuery['data.postId'] = createNotificationDto.data.postId;
+      }
+      if (createNotificationDto.data.journeyId) {
+        existingNotificationQuery['data.journeyId'] = createNotificationDto.data.journeyId;
+      }
+      // For likes/comments, check if there's already a notification for the same post/journey
+      // within the last hour to prevent spam
+      if (createNotificationDto.type === 'post_liked' || createNotificationDto.type === 'post_commented' ||
+          createNotificationDto.type === 'journey_liked' || createNotificationDto.type === 'journey_commented') {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        existingNotificationQuery.createdAt = { $gte: oneHourAgo };
+      }
+    }
+
+    const existingNotification = await this.notificationModel.findOne(existingNotificationQuery).exec();
+    
+    if (existingNotification) {
+      // If notification already exists and is unread, return it instead of creating a duplicate
+      console.log(`[NotificationsService] Duplicate notification prevented for user ${userId}, type ${createNotificationDto.type}`);
+      return existingNotification;
+    }
+
     const notification = new this.notificationModel({
       userId,
       ...createNotificationDto,
@@ -57,6 +93,17 @@ export class NotificationsService {
       .sort({ createdAt: -1 })
       .limit(50)
       .exec();
+  }
+
+  async markNotificationsAsReadByAction(userId: string, actionUrl: string): Promise<number> {
+    // Mark all notifications with matching actionUrl as read when user navigates to that screen
+    const result = await this.notificationModel
+      .updateMany(
+        { userId, actionUrl, isRead: false },
+        { isRead: true, readAt: new Date() }
+      )
+      .exec();
+    return result.modifiedCount;
   }
 
   async getUnreadCount(userId: string): Promise<number> {

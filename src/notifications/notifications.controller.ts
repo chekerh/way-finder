@@ -60,6 +60,12 @@ export class NotificationsController {
     return { message: 'All notifications marked as read' };
   }
 
+  @Put('read-by-action')
+  async markAsReadByAction(@Req() req: any, @Body() body: { actionUrl: string }) {
+    const count = await this.notificationsService.markNotificationsAsReadByAction(req.user.sub, body.actionUrl);
+    return { message: `${count} notification(s) marked as read`, count };
+  }
+
   @Delete(':id')
   async deleteNotification(@Req() req: any, @Param('id') id: string) {
     await this.notificationsService.deleteNotification(req.user.sub, id);
