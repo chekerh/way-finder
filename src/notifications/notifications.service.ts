@@ -71,13 +71,14 @@ export class NotificationsService {
       notificationToReturn = await notification.save();
     }
     
-    // Always send FCM push notification if FCM is initialized
+    // Always try to send FCM push notification if FCM is initialized
     // This ensures the user sees the popup when an action is performed
+    // If FCM is not configured, notification is still saved to database
     if (this.fcmService.isInitialized()) {
       try {
         const fcmToken = await this.userService.getFcmToken(userId);
         if (fcmToken) {
-          await this.fcmService.sendNotification(
+          const sent = await this.fcmService.sendNotification(
             fcmToken,
             notificationToReturn.title,
             notificationToReturn.message,
@@ -88,16 +89,21 @@ export class NotificationsService {
               ...notificationToReturn.data,
             },
           );
-          console.log(`[NotificationsService] FCM push notification sent for user ${userId}, type ${createNotificationDto.type}`);
+          if (sent) {
+            console.log(`[NotificationsService] FCM push notification sent for user ${userId}, type ${createNotificationDto.type}`);
+          } else {
+            console.log(`[NotificationsService] FCM push notification failed (notification saved to database)`);
+          }
         } else {
-          console.log(`[NotificationsService] No FCM token found for user ${userId}`);
+          console.log(`[NotificationsService] No FCM token found for user ${userId} (notification saved to database)`);
         }
       } catch (error) {
         // Log error but don't fail notification creation
-        console.error('Error sending FCM notification:', error);
+        // Notification is still saved to database even if push fails
+        console.error('[NotificationsService] Error attempting to send FCM notification (notification saved to database):', error.message);
       }
     } else {
-      console.log(`[NotificationsService] FCM service not initialized, skipping push notification`);
+      console.log(`[NotificationsService] FCM service not initialized - notification saved to database (configure FIREBASE_SERVICE_ACCOUNT_KEY to enable push notifications)`);
     }
     
     return notificationToReturn;

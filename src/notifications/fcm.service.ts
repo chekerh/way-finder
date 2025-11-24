@@ -34,10 +34,16 @@ export class FcmService {
             this.firebaseApp = admin.initializeApp({
               credential: admin.credential.applicationDefault(),
             });
+            this.logger.log('Firebase Admin SDK initialized with application default credentials');
           } catch (error) {
             this.logger.warn(
               'Firebase Admin SDK not initialized. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_KEY environment variable.',
             );
+            this.logger.warn(
+              'Notifications will be saved to database but push notifications will not be sent.',
+            );
+            // Don't throw error - allow app to continue without FCM
+            this.firebaseApp = null;
           }
         }
       } else {
@@ -59,8 +65,13 @@ export class FcmService {
       [key: string]: any;
     },
   ): Promise<boolean> {
-    if (!this.firebaseApp || !fcmToken) {
-      this.logger.warn('FCM not initialized or token not provided');
+    if (!this.firebaseApp) {
+      this.logger.debug('FCM not initialized - skipping push notification (notification saved to database)');
+      return false;
+    }
+    
+    if (!fcmToken) {
+      this.logger.debug('FCM token not provided - skipping push notification (notification saved to database)');
       return false;
     }
 
@@ -106,7 +117,9 @@ export class FcmService {
       this.logger.log(`Successfully sent FCM notification: ${response}`);
       return true;
     } catch (error) {
-      this.logger.error(`Error sending FCM notification: ${error.message}`, error);
+      // Log as warning instead of error to avoid breaking the notification creation flow
+      this.logger.warn(`Failed to send FCM notification: ${error.message}`);
+      this.logger.debug('Notification was saved to database but push notification failed');
       return false;
     }
   }
