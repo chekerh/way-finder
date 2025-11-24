@@ -15,60 +15,63 @@ export class NotificationsService {
   ) {}
 
   async createNotification(userId: string, createNotificationDto: CreateNotificationDto): Promise<Notification> {
-    // Check for existing unread notification of the same type for the same action
-    // This prevents duplicate notifications for the same event
-    const existingNotificationQuery: any = {
-      userId,
-      type: createNotificationDto.type,
-      isRead: false,
-    };
+    // For booking operations (cancelled, confirmed, updated), always create a new notification
+    // to ensure user sees popup when action is performed
+    // For likes/comments, prevent spam by checking recent notifications
+    const shouldPreventDuplicates = 
+      createNotificationDto.type === 'post_liked' || 
+      createNotificationDto.type === 'post_commented' ||
+      createNotificationDto.type === 'journey_liked' || 
+      createNotificationDto.type === 'journey_commented';
 
-    // Add specific checks based on notification type to prevent duplicates
-    if (createNotificationDto.data) {
-      if (createNotificationDto.data.bookingId) {
-        existingNotificationQuery['data.bookingId'] = createNotificationDto.data.bookingId;
+    let existingNotification: Notification | null = null;
+    
+    if (shouldPreventDuplicates) {
+      // Only prevent duplicates for likes/comments within the last hour
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const existingNotificationQuery: any = {
+        userId,
+        type: createNotificationDto.type,
+        isRead: false,
+        createdAt: { $gte: oneHourAgo },
+      };
+
+      if (createNotificationDto.data) {
+        if (createNotificationDto.data.postId) {
+          existingNotificationQuery['data.postId'] = createNotificationDto.data.postId;
+        }
+        if (createNotificationDto.data.journeyId) {
+          existingNotificationQuery['data.journeyId'] = createNotificationDto.data.journeyId;
+        }
       }
-      if (createNotificationDto.data.postId) {
-        existingNotificationQuery['data.postId'] = createNotificationDto.data.postId;
-      }
-      if (createNotificationDto.data.journeyId) {
-        existingNotificationQuery['data.journeyId'] = createNotificationDto.data.journeyId;
-      }
-      // For likes/comments, check if there's already a notification for the same post/journey
-      // within the last hour to prevent spam
-      if (createNotificationDto.type === 'post_liked' || createNotificationDto.type === 'post_commented' ||
-          createNotificationDto.type === 'journey_liked' || createNotificationDto.type === 'journey_commented') {
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        existingNotificationQuery.createdAt = { $gte: oneHourAgo };
-      }
+
+      existingNotification = await this.notificationModel.findOne(existingNotificationQuery).exec();
     }
-
-    const existingNotification = await this.notificationModel.findOne(existingNotificationQuery).exec();
     
     let notificationToReturn: Notification;
     
     if (existingNotification) {
-      // If notification already exists and is unread, update it and send push notification
-      // This ensures the user sees the notification popup even if the notification already exists
-      console.log(`[NotificationsService] Notification already exists for user ${userId}, type ${createNotificationDto.type} - updating and sending push`);
+      // For likes/comments: update existing notification if it's recent (within 1 hour)
+      console.log(`[NotificationsService] Recent notification exists for user ${userId}, type ${createNotificationDto.type} - updating and sending push`);
       
-      // Update the existing notification with new data and reset createdAt to now
       existingNotification.title = createNotificationDto.title;
       existingNotification.message = createNotificationDto.message;
       existingNotification.data = createNotificationDto.data || existingNotification.data;
       existingNotification.actionUrl = createNotificationDto.actionUrl || existingNotification.actionUrl;
-      existingNotification.createdAt = new Date(); // Update timestamp so it appears as new
-      existingNotification.isRead = false; // Ensure it's marked as unread
+      existingNotification.createdAt = new Date();
+      existingNotification.isRead = false;
       existingNotification.readAt = null;
       
       notificationToReturn = await existingNotification.save();
     } else {
-      // Create new notification
+      // Always create new notification for booking operations
+      // This ensures user sees popup every time an action is performed
       const notification = new this.notificationModel({
         userId,
         ...createNotificationDto,
       });
       notificationToReturn = await notification.save();
+      console.log(`[NotificationsService] Created new notification for user ${userId}, type ${createNotificationDto.type}`);
     }
     
     // Always try to send FCM push notification if FCM is initialized
