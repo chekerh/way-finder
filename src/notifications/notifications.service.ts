@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { NotificationDocument } from './notifications.schema';
+import { Notification, NotificationDocument } from './notifications.schema';
 import { CreateNotificationDto } from './notifications.dto';
 import { FcmService } from './fcm.service';
 import { UserService } from '../user/user.service';
