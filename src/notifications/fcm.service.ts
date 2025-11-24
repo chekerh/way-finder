@@ -29,28 +29,25 @@ export class FcmService {
             credential: admin.credential.cert(serviceAccount),
           });
         } else {
-          // Try default credentials (for Google Cloud environments)
-          try {
-            this.firebaseApp = admin.initializeApp({
-              credential: admin.credential.applicationDefault(),
-            });
-            this.logger.log('Firebase Admin SDK initialized with application default credentials');
-          } catch (error) {
-            this.logger.warn(
-              'Firebase Admin SDK not initialized. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_KEY environment variable.',
-            );
-            this.logger.warn(
-              'Notifications will be saved to database but push notifications will not be sent.',
-            );
-            // Don't throw error - allow app to continue without FCM
-            this.firebaseApp = null;
-          }
+          // Don't try to initialize with default credentials on Render
+          // Default credentials don't work on Render without proper Google Cloud setup
+          this.logger.warn(
+            'Firebase Admin SDK not initialized. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_KEY environment variable.',
+          );
+          this.logger.warn(
+            'Notifications will be saved to database but push notifications will not be sent.',
+          );
+          // Don't initialize Firebase - allow app to continue without FCM
+          this.firebaseApp = null;
         }
       } else {
         this.firebaseApp = admin.app();
       }
     } catch (error) {
-      this.logger.error('Failed to initialize Firebase Admin SDK', error);
+      this.logger.warn('Failed to initialize Firebase Admin SDK', error);
+      this.logger.warn('Notifications will be saved to database but push notifications will not be sent.');
+      // Don't throw error - allow app to continue without FCM
+      this.firebaseApp = null;
     }
   }
 
