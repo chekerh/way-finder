@@ -55,10 +55,14 @@ export class Notification {
   isRead: boolean;
 
   @Prop({ type: Date, default: null })
-  readAt?: Date;
+  readAt?: Date | null;
 
   @Prop({ type: String, default: null })
   actionUrl?: string; // URL to navigate when notification is clicked
+
+  // Automatically managed by Mongoose timestamps option
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export type NotificationDocument = HydratedDocument<Notification>;

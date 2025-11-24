@@ -24,7 +24,7 @@ export class NotificationsService {
       createNotificationDto.type === 'journey_liked' || 
       createNotificationDto.type === 'journey_commented';
 
-    let existingNotification: Notification | null = null;
+    let existingNotification: NotificationDocument | null = null;
     
     if (shouldPreventDuplicates) {
       // Only prevent duplicates for likes/comments within the last hour
@@ -81,15 +81,16 @@ export class NotificationsService {
       try {
         const fcmToken = await this.userService.getFcmToken(userId);
         if (fcmToken) {
+          const notificationDoc = notificationToReturn as NotificationDocument;
           const sent = await this.fcmService.sendNotification(
             fcmToken,
-            notificationToReturn.title,
-            notificationToReturn.message,
+            notificationDoc.title,
+            notificationDoc.message,
             {
-              type: notificationToReturn.type,
-              notificationId: notificationToReturn._id.toString(),
-              actionUrl: notificationToReturn.actionUrl,
-              ...notificationToReturn.data,
+              type: notificationDoc.type,
+              notificationId: notificationDoc._id.toString(),
+              actionUrl: notificationDoc.actionUrl,
+              ...notificationDoc.data,
             },
           );
           if (sent) {
