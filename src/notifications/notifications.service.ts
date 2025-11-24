@@ -45,42 +45,62 @@ export class NotificationsService {
 
     const existingNotification = await this.notificationModel.findOne(existingNotificationQuery).exec();
     
-    if (existingNotification) {
-      // If notification already exists and is unread, return it instead of creating a duplicate
-      console.log(`[NotificationsService] Duplicate notification prevented for user ${userId}, type ${createNotificationDto.type}`);
-      return existingNotification;
-    }
-
-    const notification = new this.notificationModel({
-      userId,
-      ...createNotificationDto,
-    });
-    const savedNotification = await notification.save();
+    let notificationToReturn: Notification;
     
-    // Send FCM push notification if FCM is initialized
+    if (existingNotification) {
+      // If notification already exists and is unread, update it and send push notification
+      // This ensures the user sees the notification popup even if the notification already exists
+      console.log(`[NotificationsService] Notification already exists for user ${userId}, type ${createNotificationDto.type} - updating and sending push`);
+      
+      // Update the existing notification with new data and reset createdAt to now
+      existingNotification.title = createNotificationDto.title;
+      existingNotification.message = createNotificationDto.message;
+      existingNotification.data = createNotificationDto.data || existingNotification.data;
+      existingNotification.actionUrl = createNotificationDto.actionUrl || existingNotification.actionUrl;
+      existingNotification.createdAt = new Date(); // Update timestamp so it appears as new
+      existingNotification.isRead = false; // Ensure it's marked as unread
+      existingNotification.readAt = null;
+      
+      notificationToReturn = await existingNotification.save();
+    } else {
+      // Create new notification
+      const notification = new this.notificationModel({
+        userId,
+        ...createNotificationDto,
+      });
+      notificationToReturn = await notification.save();
+    }
+    
+    // Always send FCM push notification if FCM is initialized
+    // This ensures the user sees the popup when an action is performed
     if (this.fcmService.isInitialized()) {
       try {
         const fcmToken = await this.userService.getFcmToken(userId);
         if (fcmToken) {
           await this.fcmService.sendNotification(
             fcmToken,
-            savedNotification.title,
-            savedNotification.message,
+            notificationToReturn.title,
+            notificationToReturn.message,
             {
-              type: savedNotification.type,
-              notificationId: savedNotification._id.toString(),
-              actionUrl: savedNotification.actionUrl,
-              ...savedNotification.data,
+              type: notificationToReturn.type,
+              notificationId: notificationToReturn._id.toString(),
+              actionUrl: notificationToReturn.actionUrl,
+              ...notificationToReturn.data,
             },
           );
+          console.log(`[NotificationsService] FCM push notification sent for user ${userId}, type ${createNotificationDto.type}`);
+        } else {
+          console.log(`[NotificationsService] No FCM token found for user ${userId}`);
         }
       } catch (error) {
         // Log error but don't fail notification creation
         console.error('Error sending FCM notification:', error);
       }
+    } else {
+      console.log(`[NotificationsService] FCM service not initialized, skipping push notification`);
     }
     
-    return savedNotification;
+    return notificationToReturn;
   }
 
   async getUserNotifications(userId: string, unreadOnly: boolean = false): Promise<Notification[]> {
