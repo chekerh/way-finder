@@ -646,6 +646,17 @@ export class AuthService {
           }
         }
         
+        // If duplicateField is not determined, try to find it by checking the database
+        if (!duplicateField) {
+          const checkEmail = await this.userService.findByEmail(email);
+          const checkUsername = await this.userService.findByUsername(username);
+          if (checkEmail) {
+            duplicateField = 'email';
+          } else if (checkUsername) {
+            duplicateField = 'username';
+          }
+        }
+        
         if (duplicateField === 'email') {
           // Check if user has a password
           const existingUser = await this.userService.findByEmail(email);
@@ -657,7 +668,15 @@ export class AuthService {
         if (duplicateField === 'username') {
           throw new ConflictException('Ce nom d\'utilisateur est déjà utilisé. Veuillez en choisir un autre.');
         }
-        throw new ConflictException('Un utilisateur avec ces informations existe déjà. Veuillez vous connecter ou utiliser d\'autres informations.');
+        // Fallback: check email as it's the most common case
+        const existingUser = await this.userService.findByEmail(email);
+        if (existingUser) {
+          if (!existingUser.password) {
+            throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.');
+          }
+          throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
+        }
+        throw new ConflictException('Un utilisateur avec ces informations existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
       }
       throw error;
     }
