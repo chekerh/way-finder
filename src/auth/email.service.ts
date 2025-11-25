@@ -71,9 +71,13 @@ export class EmailService {
       if (this.transporter && emailUser && emailPassword) {
         // Don't verify immediately - it can cause timeout errors
         // Verification will happen automatically on first email send
-        this.logger.log('SMTP transporter configured (verification skipped)');
+        this.logger.log(`✅ SMTP transporter configured for ${emailHost}:${emailPort} with user: ${emailUser}`);
       } else {
-        this.logger.warn('SMTP credentials not fully configured. Email sending may fail.');
+        this.logger.error('❌ SMTP credentials not fully configured. Email sending will fail.');
+        this.logger.error(`EMAIL_USER: ${emailUser ? 'set (' + emailUser + ')' : 'MISSING'}`);
+        this.logger.error(`EMAIL_PASSWORD: ${emailPassword ? 'set' : 'MISSING'}`);
+        this.logger.error(`EMAIL_HOST: ${emailHost}`);
+        this.logger.error(`EMAIL_PORT: ${emailPort}`);
         this.transporter = null; // Don't use SMTP if credentials are missing
       }
     }
@@ -142,7 +146,9 @@ export class EmailService {
     fromEmail?: string,
   ): Promise<void> {
     if (!this.transporter) {
-      throw new Error('SMTP transporter not configured');
+      const errorMsg = 'SMTP transporter not configured. Please check EMAIL_USER and EMAIL_PASSWORD environment variables.';
+      this.logger.error(errorMsg);
+      throw new Error(errorMsg);
     }
 
     const from = fromEmail || process.env.EMAIL_FROM || `WayFinder <${process.env.EMAIL_USER}>`;
@@ -156,11 +162,18 @@ export class EmailService {
     };
 
     try {
+      this.logger.log(`Attempting to send email to ${to} via SMTP...`);
       const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Email sent to ${to}: ${info.messageId}`);
-    } catch (error) {
-      this.logger.error(`Failed to send email to ${to}:`, error);
-      throw new Error('Failed to send email');
+      this.logger.log(`✅ Email sent successfully to ${to}: ${info.messageId}`);
+    } catch (error: any) {
+      this.logger.error(`❌ Failed to send email to ${to}:`, error.message || error);
+      if (error.code) {
+        this.logger.error(`Error code: ${error.code}`);
+      }
+      if (error.response) {
+        this.logger.error(`Error response: ${JSON.stringify(error.response)}`);
+      }
+      throw new Error(`Failed to send email: ${error.message || 'Unknown error'}`);
     }
   }
 
@@ -250,6 +263,23 @@ export class EmailService {
    * Send OTP code via email
    */
   async sendOTPEmail(email: string, otpCode: string, firstName?: string): Promise<void> {
+    this.logger.log(`[Send OTP Email] Preparing to send OTP to ${email}`);
+    
+    // Check if email service is configured
+    if (this.useMailjet) {
+      if (!this.mailjetApiKey || !this.mailjetApiSecret || !this.mailjetFromEmail) {
+        this.logger.error('[Send OTP Email] Mailjet credentials not configured');
+        throw new Error('Email service not configured. Please set MAILJET_API_KEY, MAILJET_API_SECRET, and MAILJET_FROM_EMAIL.');
+      }
+    } else {
+      if (!this.transporter) {
+        this.logger.error('[Send OTP Email] SMTP transporter not configured');
+        this.logger.error(`EMAIL_USER: ${process.env.EMAIL_USER ? 'set' : 'missing'}`);
+        this.logger.error(`EMAIL_PASSWORD: ${process.env.EMAIL_PASSWORD ? 'set' : 'missing'}`);
+        throw new Error('Email service not configured. Please set EMAIL_USER and EMAIL_PASSWORD environment variables.');
+      }
+    }
+    
     const fromEmail = process.env.EMAIL_FROM || `WayFinder <${process.env.EMAIL_USER}>`;
 
     const mailOptions = {
@@ -300,10 +330,19 @@ export class EmailService {
       `,
     };
 
-    if (this.useMailjet) {
-      await this.sendViaMailjet(email, 'Votre code de vérification WayFinder', mailOptions.html, mailOptions.text);
-    } else {
-      await this.sendViaSMTP(email, 'Votre code de vérification WayFinder', mailOptions.html, mailOptions.text, fromEmail);
+    try {
+      if (this.useMailjet) {
+        this.logger.log(`[Send OTP Email] Sending via Mailjet to ${email}`);
+        await this.sendViaMailjet(email, 'Votre code de vérification WayFinder', mailOptions.html, mailOptions.text);
+        this.logger.log(`[Send OTP Email] ✅ OTP email sent successfully via Mailjet to ${email}`);
+      } else {
+        this.logger.log(`[Send OTP Email] Sending via SMTP to ${email}`);
+        await this.sendViaSMTP(email, 'Votre code de vérification WayFinder', mailOptions.html, mailOptions.text, fromEmail);
+        this.logger.log(`[Send OTP Email] ✅ OTP email sent successfully via SMTP to ${email}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`[Send OTP Email] ❌ Failed to send OTP email to ${email}:`, error.message || error);
+      throw error; // Re-throw to let caller handle
     }
   }
 

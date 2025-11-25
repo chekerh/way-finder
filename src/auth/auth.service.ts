@@ -374,11 +374,17 @@ export class AuthService {
 
     // Send OTP email - use normalized code to ensure consistency
     try {
+      console.log(`[Send OTP] Attempting to send OTP email to ${email} with code ${normalizedCode}`);
       await this.emailService.sendOTPEmail(email, normalizedCode, user.first_name);
-    } catch (error) {
-      // If email fails, mark OTP as used so it can't be used
-      await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
-      throw new BadRequestException('Impossible d\'envoyer l\'email. Veuillez réessayer plus tard.');
+      console.log(`[Send OTP] ✅ OTP email sent successfully to ${email}`);
+    } catch (error: any) {
+      // Log detailed error information
+      console.error(`[Send OTP] ❌ Failed to send email to ${email}:`, error.message || error);
+      console.error(`[Send OTP] Error details:`, JSON.stringify(error, null, 2));
+      
+      // Don't mark OTP as used if email fails - allow user to retry
+      console.error(`[Send OTP] Email service error - OTP code ${normalizedCode} was generated but email failed to send`);
+      throw new BadRequestException(`Impossible d'envoyer l'email. Erreur: ${error.message || 'Service email non configuré'}. Veuillez vérifier la configuration email sur Render ou réessayer plus tard.`);
     }
 
     return {
@@ -536,13 +542,18 @@ export class AuthService {
 
     // Send OTP email - use normalized code to ensure consistency
     try {
+      console.log(`[Register OTP] Attempting to send OTP email to ${email} with code ${normalizedCode}`);
       await this.emailService.sendOTPEmail(email, normalizedCode);
-      console.log(`[Register OTP] OTP sent successfully to ${email}`);
-    } catch (error) {
-      // If email fails, mark OTP as used so it can't be used
-      await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
-      console.error(`[Register OTP] Failed to send email to ${email}:`, error);
-      throw new BadRequestException('Impossible d\'envoyer l\'email. Veuillez réessayer plus tard.');
+      console.log(`[Register OTP] ✅ OTP email sent successfully to ${email}`);
+    } catch (error: any) {
+      // Log detailed error information
+      console.error(`[Register OTP] ❌ Failed to send email to ${email}:`, error.message || error);
+      console.error(`[Register OTP] Error details:`, JSON.stringify(error, null, 2));
+      
+      // Don't mark OTP as used if email fails - allow user to retry
+      // The OTP is still valid, they just need to request a new one
+      console.error(`[Register OTP] Email service error - OTP code ${normalizedCode} was generated but email failed to send`);
+      throw new BadRequestException(`Impossible d'envoyer l'email. Erreur: ${error.message || 'Service email non configuré'}. Veuillez vérifier la configuration email sur Render ou réessayer plus tard.`);
     }
 
     return {
