@@ -135,11 +135,28 @@ export class AuthService {
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
 
-    let user = await this.userService.findByUsername(identifier);
-    if (!user) {
+    // If identifier contains @, it's an email - search by email first
+    // Otherwise, try username first, then email as fallback
+    let user: any = null;
+    if (identifier.includes('@')) {
+      // It's an email - search directly by email
       user = await this.userService.findByEmail(identifier.toLowerCase());
+      console.log(`[Login] Searching by email: ${identifier.toLowerCase()}, found: ${user ? 'YES' : 'NO'}`);
+    } else {
+      // It's a username - try username first, then email as fallback
+      user = await this.userService.findByUsername(identifier);
+      if (!user) {
+        user = await this.userService.findByEmail(identifier.toLowerCase());
+        console.log(`[Login] Username not found, trying as email: ${identifier.toLowerCase()}, found: ${user ? 'YES' : 'NO'}`);
+      } else {
+        console.log(`[Login] Found by username: ${identifier}`);
+      }
     }
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    
+    if (!user) {
+      console.log(`[Login] User not found for identifier: ${identifier}`);
+      throw new UnauthorizedException('Email ou mot de passe incorrect.');
+    }
 
     // Check if user has a password (Google OAuth users might not have one)
     if (!user.password) {
@@ -375,7 +392,10 @@ export class AuthService {
    */
   async verifyOTP(dto: VerifyOTPDto) {
     const email = dto.email.trim().toLowerCase();
+    // Normalize code: remove all non-digit characters and ensure it's exactly 4 digits
     const code = dto.code.trim().replace(/\D/g, '').padStart(4, '0').slice(0, 4);
+
+    console.log(`[Verify OTP] Verifying OTP for ${email}, normalized code: ${code}`);
 
     if (code.length !== 4 || !/^\d{4}$/.test(code)) {
       throw new BadRequestException('Le code doit être composé de 4 chiffres');
@@ -384,36 +404,51 @@ export class AuthService {
     // Check if any OTP was sent for this email
     const anyOTP = await this.otpModel.findOne({ email }).sort({ last_sent_at: -1 }).exec();
     if (!anyOTP) {
+      console.log(`[Verify OTP] No OTP found for email: ${email}`);
       throw new BadRequestException('Aucun code n\'a été envoyé. Veuillez d\'abord demander un code.');
     }
 
-    // Find valid OTP
+    // Debug: List all OTPs for this email
+    const allOtps = await this.otpModel.find({ email }).exec();
+    console.log(`[Verify OTP] Found ${allOtps.length} OTP records for ${email}`);
+    allOtps.forEach((otp, index) => {
+      console.log(`[Verify OTP] OTP ${index + 1}: code="${otp.code}", used=${otp.used}, expires_at=${otp.expires_at}, now=${new Date()}`);
+    });
+
+    // Find valid OTP - use exact code match
     const otp = await this.otpModel.findOne({
       email,
-      code,
+      code: code, // Exact match with normalized code
       used: false,
       expires_at: { $gt: new Date() }, // Not expired
     }).exec();
 
     if (!otp) {
+      console.log(`[Verify OTP] No valid OTP found for ${email} with code ${code}`);
+      
       // Check if code exists but is used
-      const usedOtp = await this.otpModel.findOne({ email, code, used: true }).exec();
+      const usedOtp = await this.otpModel.findOne({ email, code: code, used: true }).exec();
       if (usedOtp) {
+        console.log(`[Verify OTP] OTP found but already used for ${email}`);
         throw new UnauthorizedException('Ce code a déjà été utilisé. Veuillez demander un nouveau code.');
       }
       
       // Check if code exists but is expired
       const expiredOtp = await this.otpModel.findOne({ 
         email, 
-        code,
+        code: code,
         expires_at: { $lte: new Date() }
       }).exec();
       if (expiredOtp) {
+        console.log(`[Verify OTP] OTP found but expired for ${email}`);
         throw new UnauthorizedException('Le code a expiré. Veuillez demander un nouveau code.');
       }
       
+      console.log(`[Verify OTP] Invalid code for ${email}. Provided: ${code}`);
       throw new UnauthorizedException('Code invalide. Veuillez vérifier le code et réessayer.');
     }
+    
+    console.log(`[Verify OTP] Valid OTP found for ${email}`);
 
     // Mark OTP as used
     await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
@@ -548,10 +583,10 @@ export class AuthService {
       console.log(`[Register OTP] OTP ${index + 1}: code="${otp.code}", used=${otp.used}, expires_at=${otp.expires_at}, now=${new Date()}`);
     });
     
-    // Verify OTP
+    // Verify OTP - use exact code match with normalized code
     const otp = await this.otpModel.findOne({
       email,
-      code,
+      code: code, // Exact match with normalized code
       used: false,
       expires_at: { $gt: new Date() }, // Not expired
     }).exec();
