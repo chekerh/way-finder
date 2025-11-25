@@ -309,11 +309,14 @@ export class AuthService {
   async sendOTP(dto: SendOTPDto) {
     const email = dto.email.trim().toLowerCase();
     
-    // Check if user exists with this email
+    // Check if user exists with this email - STRICT CHECK
     const user = await this.userService.findByEmail(email);
     if (!user) {
-      throw new NotFoundException('Aucun compte trouvé avec cet email');
+      console.log(`[Send OTP] User not found for email: ${email}`);
+      throw new NotFoundException('Aucun compte trouvé avec cet email. Veuillez d\'abord créer un compte.');
     }
+    
+    console.log(`[Send OTP] User found for email: ${email}, user ID: ${(user as any)._id}`);
 
     // Check cooldown period (30 seconds)
     const recentOTP = await this.otpModel.findOne({
@@ -415,11 +418,14 @@ export class AuthService {
     // Mark OTP as used
     await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
 
-    // Find user by email
+    // Find user by email - MUST exist for OTP login
     const user = await this.userService.findByEmail(email);
     if (!user) {
-      throw new NotFoundException('Utilisateur introuvable');
+      console.log(`[Verify OTP] User not found for email: ${email} after OTP verification`);
+      throw new NotFoundException('Utilisateur introuvable. Le code OTP a été vérifié mais aucun compte n\'existe avec cet email. Veuillez d\'abord créer un compte.');
     }
+    
+    console.log(`[Verify OTP] User found for email: ${email}, user ID: ${(user as any)._id}`);
 
     // Generate JWT token
     const payload = { sub: (user as any)._id.toString(), username: user.username };
