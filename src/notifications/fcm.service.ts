@@ -63,16 +63,22 @@ export class FcmService {
     },
   ): Promise<boolean> {
     if (!this.firebaseApp) {
-      this.logger.debug('FCM not initialized - skipping push notification (notification saved to database)');
+      this.logger.warn('❌ FCM not initialized - skipping push notification (notification saved to database)');
+      this.logger.warn('   Configure FIREBASE_SERVICE_ACCOUNT_KEY environment variable on Render');
       return false;
     }
     
     if (!fcmToken) {
-      this.logger.debug('FCM token not provided - skipping push notification (notification saved to database)');
+      this.logger.warn('❌ FCM token not provided - skipping push notification (notification saved to database)');
       return false;
     }
 
     try {
+      this.logger.log(`📤 [FCM] Sending notification to token: ${fcmToken.substring(0, 20)}...`);
+      this.logger.log(`📤 [FCM] Title: ${title}`);
+      this.logger.log(`📤 [FCM] Message: ${message}`);
+      this.logger.log(`📤 [FCM] Data: ${JSON.stringify(data)}`);
+      
       const messagePayload: admin.messaging.Message = {
         token: fcmToken,
         notification: {
@@ -105,18 +111,36 @@ export class FcmService {
             aps: {
               sound: 'default',
               badge: 1,
+              alert: {
+                title,
+                body: message,
+              },
+              contentAvailable: true,
             },
           },
         },
       };
 
       const response = await admin.messaging().send(messagePayload);
-      this.logger.log(`Successfully sent FCM notification: ${response}`);
+      this.logger.log(`✅ [FCM] Successfully sent FCM notification: ${response}`);
       return true;
-    } catch (error) {
-      // Log as warning instead of error to avoid breaking the notification creation flow
-      this.logger.warn(`Failed to send FCM notification: ${error.message}`);
-      this.logger.debug('Notification was saved to database but push notification failed');
+    } catch (error: any) {
+      // Log detailed error information
+      this.logger.error(`❌ [FCM] Failed to send FCM notification: ${error.message}`);
+      if (error.code) {
+        this.logger.error(`❌ [FCM] Error code: ${error.code}`);
+      }
+      if (error.stack) {
+        this.logger.error(`❌ [FCM] Error stack: ${error.stack}`);
+      }
+      this.logger.warn('⚠️ [FCM] Notification was saved to database but push notification failed');
+      
+      // Check for common FCM errors
+      if (error.code === 'messaging/invalid-registration-token' || 
+          error.code === 'messaging/registration-token-not-registered') {
+        this.logger.error('❌ [FCM] Invalid or unregistered FCM token - user needs to re-register token');
+      }
+      
       return false;
     }
   }

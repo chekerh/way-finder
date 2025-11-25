@@ -77,10 +77,15 @@ export class NotificationsService {
     }
     
     // Send FCM push notification ONLY if this is a new notification (not a duplicate)
+    console.log(`[NotificationsService] Attempting to send FCM - shouldSendFCM: ${shouldSendFCM}, isInitialized: ${this.fcmService.isInitialized()}`);
+    
     if (shouldSendFCM && this.fcmService.isInitialized()) {
       try {
         const fcmToken = await this.userService.getFcmToken(userId);
+        console.log(`[NotificationsService] FCM token for user ${userId}: ${fcmToken ? 'FOUND' : 'NOT FOUND'}`);
+        
         if (fcmToken) {
+          console.log(`[NotificationsService] Sending FCM notification to token: ${fcmToken.substring(0, 20)}...`);
           const sent = await this.fcmService.sendNotification(
             fcmToken,
             notificationToReturn.title,
@@ -93,22 +98,29 @@ export class NotificationsService {
             },
           );
           if (sent) {
-            console.log(`[NotificationsService] ✅ FCM push notification sent for user ${userId}, type ${createNotificationDto.type}`);
+            console.log(`[NotificationsService] ✅ FCM push notification sent successfully for user ${userId}, type ${createNotificationDto.type}`);
           } else {
             console.log(`[NotificationsService] ⚠️ FCM push notification failed (notification saved to database)`);
+            console.log(`[NotificationsService] Check FCM service logs above for error details`);
           }
         } else {
-          console.log(`[NotificationsService] ⚠️ No FCM token found for user ${userId} (notification saved to database)`);
+          console.log(`[NotificationsService] ⚠️ No FCM token found for user ${userId}`);
+          console.log(`[NotificationsService] User needs to register FCM token via POST /api/user/fcm-token`);
+          console.log(`[NotificationsService] Notification saved to database but push notification not sent`);
         }
-      } catch (error) {
+      } catch (error: any) {
         // Log error but don't fail notification creation
         // Notification is still saved to database even if push fails
-        console.error('[NotificationsService] ❌ Error attempting to send FCM notification (notification saved to database):', error.message);
+        console.error('[NotificationsService] ❌ Error attempting to send FCM notification:', error.message);
+        console.error('[NotificationsService] Error stack:', error.stack);
+        console.error('[NotificationsService] Notification saved to database but push notification failed');
       }
     } else if (!shouldSendFCM) {
       console.log(`[NotificationsService] ⏭️ Skipping FCM send - duplicate notification prevented`);
     } else if (!this.fcmService.isInitialized()) {
-      console.log(`[NotificationsService] ⚠️ FCM service not initialized - notification saved to database (configure FIREBASE_SERVICE_ACCOUNT_KEY to enable push notifications)`);
+      console.log(`[NotificationsService] ⚠️ FCM service not initialized`);
+      console.log(`[NotificationsService] Configure FIREBASE_SERVICE_ACCOUNT_KEY environment variable on Render`);
+      console.log(`[NotificationsService] Notification saved to database but push notifications are disabled`);
     }
     
     return notificationToReturn;
