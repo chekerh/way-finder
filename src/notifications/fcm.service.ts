@@ -183,7 +183,16 @@ export class FcmService {
             aps: {
               sound: 'default',
               badge: 1,
+              alert: {
+                title,
+                body: message,
+              },
+              // Ensure notification is displayed even when app is in foreground
+              'content-available': 1,
             },
+          },
+          headers: {
+            'apns-priority': '10', // High priority for immediate delivery
           },
         },
       }));
