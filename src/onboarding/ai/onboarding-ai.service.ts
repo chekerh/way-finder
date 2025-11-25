@@ -7,7 +7,7 @@ import { Question } from '../questions/question-templates';
 export class OnboardingAIService {
   private readonly logger = new Logger(OnboardingAIService.name);
   private openai: OpenAI | null = null;
-  private readonly maxQuestions = Number(process.env.ONBOARDING_MAX_QUESTIONS ?? 7);
+  private readonly maxQuestions = Number(process.env.ONBOARDING_MAX_QUESTIONS ?? 5);
 
   constructor() {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -62,39 +62,56 @@ export class OnboardingAIService {
     const answers = session.answers;
     const conversationHistory = this.buildConversationHistory(answers);
     
-    const systemPrompt = `You are a helpful travel assistant helping a new user set up their WayFinder travel app preferences. 
-Your goal is to ask ONE relevant, engaging question that naturally follows from their previous answers.
+    const systemPrompt = `You are an expert travel consultant helping a new user set up their WayFinder travel app preferences. 
+You have ONLY 5 questions total to understand the user's complete travel profile. Each question must be strategic and extract maximum value.
 
-Guidelines:
-- Ask questions that build on what they've already told you
-- Make questions conversational and friendly
-- Focus on travel preferences: destinations, activities, budget, accommodation, travel style, etc.
-- Each question should help you understand their travel personality better
-- Don't repeat information you already have
-- Keep questions concise (max 15 words)
-- Provide 3-6 answer options that are specific and useful
+CRITICAL STRATEGY - Question Priority Order:
+1. First question: Travel style/personality (solo, couple, family, group) OR primary travel motivation (adventure, relaxation, culture, business)
+2. Second question: Budget range OR preferred destinations/regions
+3. Third question: Activities/interests (multiple choice to capture many preferences at once)
+4. Fourth question: Travel frequency/timing OR accommodation preferences
+5. Fifth question: Climate preference OR trip duration OR group size
+
+GUIDELINES FOR MAXIMUM VALUE:
+- Each question should reveal MULTIPLE insights about the user
+- Use multiple_choice when possible to gather more data per question
+- Make questions comprehensive but not overwhelming (4-6 options max for multiple choice)
+- Ask questions that help predict: destinations they'll love, activities they'll enjoy, budget they'll need, when they'll travel
+- Build on previous answers to create a cohesive profile
+- Make questions conversational, engaging, and easy to answer
+- Each answer should help us understand: WHERE they want to go, WHAT they want to do, WHEN they travel, HOW MUCH they spend, WHO they travel with
+
+QUESTION QUALITY REQUIREMENTS:
+- Questions must be specific enough to generate actionable recommendations
+- Options should cover the full spectrum of possibilities
+- Use clear, concise language (max 20 words for question text)
+- Make sure each question adds unique value not covered by previous questions
 
 Question types you can use:
-- single_choice: User picks one option
-- multiple_choice: User can select multiple options (specify min/max)
-- text: For open-ended responses (use sparingly)
+- single_choice: For mutually exclusive options (e.g., travel style, budget tier)
+- multiple_choice: For gathering multiple preferences at once (e.g., activities, interests, regions) - PREFERRED when possible
+- text: Only for truly open-ended questions (use sparingly, max 1 text question)
 
 Return a JSON object with this structure:
 {
   "id": "unique_question_id",
   "type": "single_choice" | "multiple_choice" | "text",
-  "text": "Your question here",
+  "text": "Your strategic question here",
   "options": [{"value": "option1", "label": "Display Label 1"}, ...],
-  "required": true/false,
+  "required": true,
   "min_selections": 1 (if multiple_choice),
-  "max_selections": 3 (if multiple_choice)
+  "max_selections": 5 (if multiple_choice - allow more selections to gather more data)
 }`;
 
-    const userPrompt = `Here's what the user has told us so far:
+    const userPrompt = `Here's what the user has told us so far (Question ${session.questions_answered.length + 1} of 5):
 ${conversationHistory}
 
-Based on this conversation, what's the most relevant next question to ask? 
-Remember: make it flow naturally from what they've already shared.`;
+Based on this conversation and the strategic question order, what's the MOST VALUABLE next question to ask?
+Remember: We only have ${5 - session.questions_answered.length} questions left. Make this question count!
+- Extract maximum information from this single question
+- Use multiple_choice if possible to gather multiple preferences
+- Build naturally on what they've already shared
+- Ensure this question fills a critical gap in understanding their travel profile`;
 
     const completion = await this.openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -186,51 +203,55 @@ Remember: make it flow naturally from what they've already shared.`;
 
   /**
    * Fallback question generator when AI is unavailable
+   * Optimized for 5 questions with maximum information extraction
    */
   private generateFallbackQuestion(answeredIds: string[]): Question | null {
     if (answeredIds.length >= this.maxQuestions) {
       return null;
     }
-    // Basic required questions
+    
+    // Question 1: Travel style/personality (comprehensive)
     if (!answeredIds.includes('travel_type')) {
       return {
         id: 'travel_type',
         type: 'single_choice',
-        text: 'What type of trip are you planning?',
+        text: 'What best describes your travel style?',
         options: [
-          { value: 'business', label: 'Business' },
-          { value: 'leisure', label: 'Leisure' },
-          { value: 'adventure', label: 'Adventure' },
-          { value: 'family', label: 'Family' },
-          { value: 'solo', label: 'Solo Travel' },
+          { value: 'solo', label: 'Solo Traveler' },
           { value: 'couple', label: 'Romantic Getaway' },
+          { value: 'family', label: 'Family Trip' },
+          { value: 'friends', label: 'Friends Group' },
+          { value: 'business', label: 'Business Travel' },
+          { value: 'adventure', label: 'Adventure Seeker' },
         ],
         required: true,
         priority: 1,
       };
     }
 
+    // Question 2: Budget range
     if (!answeredIds.includes('budget')) {
       return {
         id: 'budget',
         type: 'single_choice',
-        text: 'What is your budget range?',
+        text: 'What is your typical travel budget per person?',
         options: [
-          { value: 'low', label: 'Budget-friendly ($)' },
-          { value: 'mid_range', label: 'Mid-range ($$)' },
-          { value: 'high', label: 'High-end ($$$)' },
-          { value: 'luxury', label: 'Luxury ($$$$)' },
+          { value: 'low', label: 'Budget ($500-$1,500)' },
+          { value: 'mid_range', label: 'Mid-range ($1,500-$3,500)' },
+          { value: 'high', label: 'High-end ($3,500-$7,000)' },
+          { value: 'luxury', label: 'Luxury ($7,000+)' },
         ],
         required: true,
         priority: 2,
       };
     }
 
+    // Question 3: Activities & Interests (multiple choice to gather maximum data)
     if (!answeredIds.includes('interests')) {
       return {
         id: 'interests',
         type: 'multiple_choice',
-        text: 'What activities interest you? (Select all that apply)',
+        text: 'What activities and experiences interest you most? (Select all that apply)',
         options: [
           { value: 'sightseeing', label: 'Sightseeing & Landmarks' },
           { value: 'adventure_sports', label: 'Adventure Sports' },
@@ -240,11 +261,55 @@ Remember: make it flow naturally from what they've already shared.`;
           { value: 'nature', label: 'Nature & Wildlife' },
           { value: 'food', label: 'Food & Dining' },
           { value: 'shopping', label: 'Shopping' },
+          { value: 'beaches', label: 'Beaches & Water Activities' },
+          { value: 'mountains', label: 'Mountains & Hiking' },
         ],
         required: true,
         priority: 3,
+        min_selections: 2,
+        max_selections: 6, // Allow more selections to gather comprehensive data
+      };
+    }
+
+    // Question 4: Destination preferences (multiple choice for regions)
+    if (!answeredIds.includes('destination_preferences')) {
+      return {
+        id: 'destination_preferences',
+        type: 'multiple_choice',
+        text: 'Which regions or types of destinations interest you? (Select all that apply)',
+        options: [
+          { value: 'europe', label: 'Europe' },
+          { value: 'asia', label: 'Asia' },
+          { value: 'americas', label: 'Americas (North & South)' },
+          { value: 'africa', label: 'Africa' },
+          { value: 'oceania', label: 'Oceania (Australia, Pacific)' },
+          { value: 'middle_east', label: 'Middle East' },
+          { value: 'tropical', label: 'Tropical Islands' },
+          { value: 'urban', label: 'Major Cities' },
+          { value: 'rural', label: 'Countryside & Nature' },
+        ],
+        required: true,
+        priority: 4,
         min_selections: 1,
         max_selections: 5,
+      };
+    }
+
+    // Question 5: Travel frequency or accommodation preference
+    if (!answeredIds.includes('travel_frequency') && !answeredIds.includes('accommodation_preference')) {
+      // Prefer travel frequency as it helps with timing recommendations
+      return {
+        id: 'travel_frequency',
+        type: 'single_choice',
+        text: 'How often do you typically travel?',
+        options: [
+          { value: 'rarely', label: 'Rarely (once a year or less)' },
+          { value: 'occasionally', label: 'Occasionally (2-3 times a year)' },
+          { value: 'frequently', label: 'Frequently (4-6 times a year)' },
+          { value: 'very_frequently', label: 'Very Frequently (7+ times a year)' },
+        ],
+        required: true,
+        priority: 5,
       };
     }
 
@@ -252,12 +317,21 @@ Remember: make it flow naturally from what they've already shared.`;
   }
 
   hasEnoughData(answers: Record<string, any>): boolean {
-    // Require at least 5 meaningful answers for a good profile
+    // With only 5 questions, we need to ensure we have comprehensive data
+    // Count meaningful answers (arrays count as 1, but we check if they have items)
     const meaningfulAnswers = Object.values(answers).filter(
       (v) => v !== null && v !== undefined && (Array.isArray(v) ? v.length > 0 : true)
     );
     
-    return meaningfulAnswers.length >= 5;
+    // If we have 5 questions answered, we have enough data
+    // Also check if we have key preferences: travel style, budget, interests, or destinations
+    const hasKeyPreferences = 
+      answers.travel_type || 
+      answers.budget || 
+      (Array.isArray(answers.interests) && answers.interests.length > 0) ||
+      (Array.isArray(answers.destination_preferences) && answers.destination_preferences.length > 0);
+    
+    return meaningfulAnswers.length >= 4 && hasKeyPreferences; // At least 4 answers with key preferences
   }
 
   extractPreferences(answers: Record<string, any>): any {

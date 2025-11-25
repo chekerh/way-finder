@@ -82,6 +82,9 @@ export class OnboardingService {
     if (!session.questions_answered.includes(dto.question_id)) {
       session.questions_answered.push(dto.question_id);
     }
+    
+    // Save session before forwarding to ensure answers are persisted
+    await session.save();
 
     return this.forwardToEngine(session);
   }
@@ -249,24 +252,60 @@ export class OnboardingService {
    * Otherwise we fall back to the built‑in OnboardingAIService so the flow always works.
    */
   private async forwardToEngine(session: OnboardingSessionDocument) {
+    // Reload session to ensure we have the latest data
+    const freshSession = await this.onboardingModel.findOne({
+      _id: session._id,
+    }).exec();
+    
+    if (!freshSession) {
+      throw new NotFoundException('Onboarding session not found');
+    }
+    
+    // Check if already completed (safety check)
+    if (freshSession.completed) {
+      return {
+        session_id: freshSession.session_id,
+        completed: true,
+        message: 'Onboarding already completed!',
+      };
+    }
+    
+    // Check if max questions reached (safety check)
+    const maxQuestions = Number(process.env.ONBOARDING_MAX_QUESTIONS ?? 5);
+    if (freshSession.questions_answered.length >= maxQuestions) {
+      this.logger.log(`Max questions reached (${freshSession.questions_answered.length}/${maxQuestions}), completing onboarding`);
+      const preferences = this.aiService.extractPreferences(freshSession.answers);
+      await this.completeOnboarding(
+        freshSession.user_id.toString(),
+        freshSession.session_id,
+        preferences,
+      );
+      return {
+        session_id: freshSession.session_id,
+        completed: true,
+        preferences,
+        message: 'Onboarding completed! Your personalized recommendations are ready.',
+      };
+    }
+    
     if (this.useN8N) {
-      return this.forwardToN8N(session);
+      return this.forwardToN8N(freshSession);
     }
 
     // Fallback: use local AI service
-    const nextQuestion = await this.aiService.generateNextQuestion(session);
+    const nextQuestion = await this.aiService.generateNextQuestion(freshSession);
 
     // No more questions → complete onboarding locally
     if (!nextQuestion) {
-      const preferences = this.aiService.extractPreferences(session.answers);
+      const preferences = this.aiService.extractPreferences(freshSession.answers);
       await this.completeOnboarding(
-        session.user_id.toString(),
-        session.session_id,
+        freshSession.user_id.toString(),
+        freshSession.session_id,
         preferences,
       );
 
       return {
-        session_id: session.session_id,
+        session_id: freshSession.session_id,
         completed: true,
         preferences,
         message:
@@ -275,22 +314,22 @@ export class OnboardingService {
     }
 
     // There is a next question → update session & return payload
-    session.current_question_id = nextQuestion.id;
-    if (!session.questions_answered.includes(nextQuestion.id)) {
+    freshSession.current_question_id = nextQuestion.id;
+    if (!freshSession.questions_answered.includes(nextQuestion.id)) {
       // Do not mark as answered yet; it will be marked when the user submits.
       // We only track "current_question_id" here.
     }
-    await session.save();
+    await freshSession.save();
 
-    const totalQuestionsEstimate = 8; // rough count used for progress bar
+    const totalQuestionsEstimate = maxQuestions; // Use actual max questions for progress
 
     return {
       // Keep snake_case to match existing mobile models
-      session_id: session.session_id,
+      session_id: freshSession.session_id,
       completed: false,
       question: nextQuestion,
       progress: {
-        current: session.questions_answered.length,
+        current: freshSession.questions_answered.length,
         total: totalQuestionsEstimate,
       } as any,
     };
