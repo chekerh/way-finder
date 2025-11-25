@@ -183,6 +183,12 @@ export class NotificationsService {
     await this.notificationModel.deleteOne({ _id: notificationId, userId }).exec();
   }
 
+  async deleteAllNotifications(userId: string): Promise<number> {
+    const result = await this.notificationModel.deleteMany({ userId }).exec();
+    console.log(`[NotificationsService] Deleted ${result.deletedCount} notifications for user ${userId}`);
+    return result.deletedCount || 0;
+  }
+
   // Helper methods for creating specific notification types
   async createBookingNotification(
     userId: string,
