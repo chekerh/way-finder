@@ -18,69 +18,66 @@ export class NotificationsService {
     userId: string,
     createNotificationDto: CreateNotificationDto,
   ): Promise<NotificationDocument> {
-    // For booking operations (cancelled, confirmed, updated), always create a new notification
-    // to ensure user sees popup when action is performed
-    // For likes/comments, prevent spam by checking recent notifications
-    const shouldPreventDuplicates = 
-      createNotificationDto.type === 'post_liked' || 
-      createNotificationDto.type === 'post_commented' ||
-      createNotificationDto.type === 'journey_liked' || 
-      createNotificationDto.type === 'journey_commented';
-
-    let existingNotification: NotificationDocument | null = null;
+    // Prevent duplicate notifications for ALL types within a short time window (5 minutes)
+    // This ensures each action (like, comment, booking cancelled) only sends ONE notification
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     
-    if (shouldPreventDuplicates) {
-      // Only prevent duplicates for likes/comments within the last hour
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      const existingNotificationQuery: any = {
-        userId,
-        type: createNotificationDto.type,
-        isRead: false,
-        createdAt: { $gte: oneHourAgo },
-      };
+    const existingNotificationQuery: any = {
+      userId,
+      type: createNotificationDto.type,
+      createdAt: { $gte: fiveMinutesAgo }, // Check within last 5 minutes
+    };
 
-      if (createNotificationDto.data) {
-        if (createNotificationDto.data.postId) {
-          existingNotificationQuery['data.postId'] = createNotificationDto.data.postId;
-        }
-        if (createNotificationDto.data.journeyId) {
-          existingNotificationQuery['data.journeyId'] = createNotificationDto.data.journeyId;
-        }
+    // For booking notifications, check by bookingId to prevent duplicates for same booking
+    if (createNotificationDto.type === 'booking_cancelled' || 
+        createNotificationDto.type === 'booking_confirmed' || 
+        createNotificationDto.type === 'booking_updated') {
+      if (createNotificationDto.data?.bookingId) {
+        existingNotificationQuery['data.bookingId'] = createNotificationDto.data.bookingId;
       }
-
-      existingNotification = await this.notificationModel.findOne(existingNotificationQuery).exec();
     }
     
+    // For likes/comments, check by postId or journeyId
+    if (createNotificationDto.type === 'post_liked' || 
+        createNotificationDto.type === 'post_commented' ||
+        createNotificationDto.type === 'journey_liked' || 
+        createNotificationDto.type === 'journey_commented') {
+      if (createNotificationDto.data?.postId) {
+        existingNotificationQuery['data.postId'] = createNotificationDto.data.postId;
+      }
+      if (createNotificationDto.data?.journeyId) {
+        existingNotificationQuery['data.journeyId'] = createNotificationDto.data.journeyId;
+      }
+    }
+
+    const existingNotification = await this.notificationModel.findOne(existingNotificationQuery).exec();
+    
     let notificationToReturn: NotificationDocument;
+    let shouldSendFCM = false;
     
     if (existingNotification) {
-      // For likes/comments: update existing notification if it's recent (within 1 hour)
-      console.log(`[NotificationsService] Recent notification exists for user ${userId}, type ${createNotificationDto.type} - updating and sending push`);
+      // A notification for this action already exists within the last 5 minutes
+      // DO NOT create a new one or send another FCM notification
+      console.log(`[NotificationsService] ⚠️ Duplicate notification prevented for user ${userId}, type ${createNotificationDto.type}, bookingId: ${createNotificationDto.data?.bookingId || 'N/A'}`);
+      console.log(`[NotificationsService] Existing notification ID: ${existingNotification._id}, created at: ${existingNotification.createdAt}`);
+      console.log(`[NotificationsService] Skipping notification creation and FCM send to prevent duplicates`);
       
-      existingNotification.title = createNotificationDto.title;
-      existingNotification.message = createNotificationDto.message;
-      existingNotification.data = createNotificationDto.data || existingNotification.data;
-      existingNotification.actionUrl = createNotificationDto.actionUrl || existingNotification.actionUrl;
-      existingNotification.createdAt = new Date();
-      existingNotification.isRead = false;
-      existingNotification.readAt = null;
-      
-      notificationToReturn = await existingNotification.save();
+      // Return existing notification without sending FCM
+      notificationToReturn = existingNotification;
+      shouldSendFCM = false; // DO NOT send FCM for duplicate
     } else {
-      // Always create new notification for booking operations
-      // This ensures user sees popup every time an action is performed
+      // No recent notification exists - create new one and send FCM
       const notification = new this.notificationModel({
         userId,
         ...createNotificationDto,
       });
       notificationToReturn = await notification.save();
-      console.log(`[NotificationsService] Created new notification for user ${userId}, type ${createNotificationDto.type}`);
+      console.log(`[NotificationsService] ✅ Created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${notificationToReturn._id}`);
+      shouldSendFCM = true; // Send FCM only for new notifications
     }
     
-    // Always try to send FCM push notification if FCM is initialized
-    // This ensures the user sees the popup when an action is performed
-    // If FCM is not configured, notification is still saved to database
-    if (this.fcmService.isInitialized()) {
+    // Send FCM push notification ONLY if this is a new notification (not a duplicate)
+    if (shouldSendFCM && this.fcmService.isInitialized()) {
       try {
         const fcmToken = await this.userService.getFcmToken(userId);
         if (fcmToken) {
@@ -96,20 +93,22 @@ export class NotificationsService {
             },
           );
           if (sent) {
-            console.log(`[NotificationsService] FCM push notification sent for user ${userId}, type ${createNotificationDto.type}`);
+            console.log(`[NotificationsService] ✅ FCM push notification sent for user ${userId}, type ${createNotificationDto.type}`);
           } else {
-            console.log(`[NotificationsService] FCM push notification failed (notification saved to database)`);
+            console.log(`[NotificationsService] ⚠️ FCM push notification failed (notification saved to database)`);
           }
         } else {
-          console.log(`[NotificationsService] No FCM token found for user ${userId} (notification saved to database)`);
+          console.log(`[NotificationsService] ⚠️ No FCM token found for user ${userId} (notification saved to database)`);
         }
       } catch (error) {
         // Log error but don't fail notification creation
         // Notification is still saved to database even if push fails
-        console.error('[NotificationsService] Error attempting to send FCM notification (notification saved to database):', error.message);
+        console.error('[NotificationsService] ❌ Error attempting to send FCM notification (notification saved to database):', error.message);
       }
-    } else {
-      console.log(`[NotificationsService] FCM service not initialized - notification saved to database (configure FIREBASE_SERVICE_ACCOUNT_KEY to enable push notifications)`);
+    } else if (!shouldSendFCM) {
+      console.log(`[NotificationsService] ⏭️ Skipping FCM send - duplicate notification prevented`);
+    } else if (!this.fcmService.isInitialized()) {
+      console.log(`[NotificationsService] ⚠️ FCM service not initialized - notification saved to database (configure FIREBASE_SERVICE_ACCOUNT_KEY to enable push notifications)`);
     }
     
     return notificationToReturn;
