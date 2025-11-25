@@ -488,16 +488,19 @@ export class AuthService {
   async sendOTPForRegistration(dto: SendOTPForRegistrationDto) {
     const email = dto.email.trim().toLowerCase();
     
-    // Check if user already exists with this email
+    // Check if user already exists with this email - DO THIS FIRST, BEFORE ANY OTP CREATION
     const existingUser = await this.userService.findByEmail(email);
     if (existingUser) {
-      console.log(`[Register OTP] Email already exists: ${email}`);
+      console.log(`[Register OTP] ❌ Email already exists: ${email} - NOT sending OTP, redirecting to login`);
       // Check if user has a password or was created via OAuth
       if (!existingUser.password) {
         throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utiliser un autre email.');
       }
-      throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utiliser la connexion par code OTP.');
+      // User exists with password - tell them to login instead
+      throw new ConflictException('Un utilisateur avec cet email existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
     }
+    
+    console.log(`[Register OTP] ✅ Email ${email} does not exist - proceeding with OTP generation`);
 
     // Check cooldown period (30 seconds)
     const recentOTP = await this.otpModel.findOne({
@@ -636,11 +639,11 @@ export class AuthService {
     console.log(`[Register OTP] Email check result: ${existingEmail ? 'EXISTS' : 'NOT FOUND'}`);
     
     if (existingEmail) {
-      console.log(`[Register OTP] Email already exists: ${email}. Auto-logging in user with valid OTP.`);
+      console.log(`[Register OTP] ⚠️ Email already exists: ${email} (race condition - user created between OTP send and verify)`);
       console.log(`[Register OTP] User ID: ${(existingEmail as any)._id}, Username: ${existingEmail.username}`);
       
       // If user exists and OTP is valid, automatically log them in instead of rejecting
-      // This provides a better user experience
+      // This handles race conditions where user was created between OTP send and verify
       const payload = { sub: (existingEmail as any)._id.toString(), username: existingEmail.username };
       const token = await this.jwtService.signAsync(payload);
       console.log(`[Register OTP] Token generated successfully for auto-login`);
