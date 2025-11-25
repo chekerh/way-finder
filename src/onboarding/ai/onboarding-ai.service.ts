@@ -7,6 +7,7 @@ import { Question } from '../questions/question-templates';
 export class OnboardingAIService {
   private readonly logger = new Logger(OnboardingAIService.name);
   private openai: OpenAI | null = null;
+  private readonly maxQuestions = Number(process.env.ONBOARDING_MAX_QUESTIONS ?? 7);
 
   constructor() {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -25,6 +26,11 @@ export class OnboardingAIService {
   async generateNextQuestion(session: OnboardingSession): Promise<Question | null> {
     const answers = session.answers;
     const answeredIds = session.questions_answered;
+
+    if (answeredIds.length >= this.maxQuestions) {
+      this.logger.log(`Reached max question limit (${this.maxQuestions}), completing session.`);
+      return null;
+    }
 
     // If no AI available, fall back to basic required questions
     if (!this.openai) {
@@ -182,6 +188,9 @@ Remember: make it flow naturally from what they've already shared.`;
    * Fallback question generator when AI is unavailable
    */
   private generateFallbackQuestion(answeredIds: string[]): Question | null {
+    if (answeredIds.length >= this.maxQuestions) {
+      return null;
+    }
     // Basic required questions
     if (!answeredIds.includes('travel_type')) {
       return {
