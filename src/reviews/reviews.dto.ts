@@ -1,4 +1,13 @@
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, MaxLength } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MaxLength,
+} from 'class-validator';
 import type { ReviewItemType } from './reviews.schema';
 
 export class CreateReviewDto {
@@ -60,4 +69,3 @@ export class UpdateReviewDto {
     guide?: number;
   };
 }
-

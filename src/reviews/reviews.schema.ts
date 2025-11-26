@@ -8,7 +8,11 @@ export class Review {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
-  @Prop({ required: true, enum: ['flight', 'hotel', 'activity', 'destination'], index: true })
+  @Prop({
+    required: true,
+    enum: ['flight', 'hotel', 'activity', 'destination'],
+    index: true,
+  })
   itemType: ReviewItemType;
 
   @Prop({ required: true, index: true })
@@ -45,4 +49,3 @@ export const ReviewSchema = SchemaFactory.createForClass(Review);
 
 // Compound index to prevent duplicate reviews
 ReviewSchema.index({ userId: 1, itemType: 1, itemId: 1 }, { unique: true });
-

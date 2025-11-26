@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsOptional, IsString, IsArray, IsString as IsStringArray } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsArray,
+  IsString as IsStringArray,
+} from 'class-validator';
 
 export class CreatePostDto {
   @IsNotEmpty()
@@ -47,4 +53,3 @@ export class UpdatePostDto {
   @IsString({ each: true })
   tags?: string[];
 }
-

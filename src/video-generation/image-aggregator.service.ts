@@ -164,4 +164,3 @@ export class ImageAggregatorService {
     return Array.from(new Set(destinations));
   }
 }
-

@@ -1,4 +1,11 @@
-import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RewardsService } from './rewards.service';
 import { AwardPointsDto, UserPointsResponse } from './rewards.dto';
@@ -30,7 +37,12 @@ export class RewardsController {
   @Post('redeem')
   async redeemPoints(
     @Request() req,
-    @Body() body: { points: number; description: string; metadata?: Record<string, any> },
+    @Body()
+    body: {
+      points: number;
+      description: string;
+      metadata?: Record<string, any>;
+    },
   ) {
     return this.rewardsService.redeemPoints(
       req.user.userId,
@@ -40,4 +52,3 @@ export class RewardsController {
     );
   }
 }
-

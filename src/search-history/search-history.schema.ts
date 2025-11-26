@@ -52,4 +52,3 @@ export const SearchHistorySchema = SchemaFactory.createForClass(SearchHistory);
 SearchHistorySchema.index({ userId: 1, lastSearchedAt: -1 });
 SearchHistorySchema.index({ userId: 1, isSaved: 1, lastSearchedAt: -1 });
 SearchHistorySchema.index({ userId: 1, searchType: 1, lastSearchedAt: -1 });
-

@@ -20,9 +20,17 @@ export class PriceAlertsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async createPriceAlert(@Req() req: any, @Body() createPriceAlertDto: CreatePriceAlertDto) {
-    const alert = await this.priceAlertsService.createPriceAlert(req.user.sub, createPriceAlertDto);
-    const alertObj = (alert as any).toObject ? (alert as any).toObject() : alert;
+  async createPriceAlert(
+    @Req() req: any,
+    @Body() createPriceAlertDto: CreatePriceAlertDto,
+  ) {
+    const alert = await this.priceAlertsService.createPriceAlert(
+      req.user.sub,
+      createPriceAlertDto,
+    );
+    const alertObj = (alert as any).toObject
+      ? (alert as any).toObject()
+      : alert;
     return alertObj;
   }
 
@@ -37,7 +45,9 @@ export class PriceAlertsController {
       activeOnly === 'true',
     );
     return alerts.map((alert) => {
-      const alertObj = (alert as any).toObject ? (alert as any).toObject() : alert;
+      const alertObj = (alert as any).toObject
+        ? (alert as any).toObject()
+        : alert;
       return alertObj;
     });
   }
@@ -45,8 +55,13 @@ export class PriceAlertsController {
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   async getPriceAlert(@Req() req: any, @Param('id') alertId: string) {
-    const alert = await this.priceAlertsService.getPriceAlert(req.user.sub, alertId);
-    const alertObj = (alert as any).toObject ? (alert as any).toObject() : alert;
+    const alert = await this.priceAlertsService.getPriceAlert(
+      req.user.sub,
+      alertId,
+    );
+    const alertObj = (alert as any).toObject
+      ? (alert as any).toObject()
+      : alert;
     return alertObj;
   }
 
@@ -57,8 +72,14 @@ export class PriceAlertsController {
     @Param('id') alertId: string,
     @Body() updateDto: UpdatePriceAlertDto,
   ) {
-    const alert = await this.priceAlertsService.updatePriceAlert(req.user.sub, alertId, updateDto);
-    const alertObj = (alert as any).toObject ? (alert as any).toObject() : alert;
+    const alert = await this.priceAlertsService.updatePriceAlert(
+      req.user.sub,
+      alertId,
+      updateDto,
+    );
+    const alertObj = (alert as any).toObject
+      ? (alert as any).toObject()
+      : alert;
     return alertObj;
   }
 
@@ -72,9 +93,13 @@ export class PriceAlertsController {
   @UseGuards(JwtAuthGuard)
   @Post(':id/deactivate')
   async deactivatePriceAlert(@Req() req: any, @Param('id') alertId: string) {
-    const alert = await this.priceAlertsService.deactivatePriceAlert(req.user.sub, alertId);
-    const alertObj = (alert as any).toObject ? (alert as any).toObject() : alert;
+    const alert = await this.priceAlertsService.deactivatePriceAlert(
+      req.user.sub,
+      alertId,
+    );
+    const alertObj = (alert as any).toObject
+      ? (alert as any).toObject()
+      : alert;
     return alertObj;
   }
 }
-

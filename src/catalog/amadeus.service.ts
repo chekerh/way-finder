@@ -1,5 +1,9 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { AxiosRequestConfig, AxiosError } from 'axios';
 import { lastValueFrom } from 'rxjs';
 import { FlightSearchDto } from './dto/flight-search.dto';
@@ -25,7 +29,8 @@ export class AmadeusService {
 
   private readonly clientId = process.env.AMADEUS_CLIENT_ID;
   private readonly clientSecret = process.env.AMADEUS_CLIENT_SECRET;
-  private readonly host = process.env.AMADEUS_HOST ?? 'https://test.api.amadeus.com';
+  private readonly host =
+    process.env.AMADEUS_HOST ?? 'https://test.api.amadeus.com';
 
   constructor(private readonly http: HttpService) {}
 
@@ -39,7 +44,9 @@ export class AmadeusService {
     }
 
     if (!this.isConfigured()) {
-      throw new InternalServerErrorException('Amadeus credentials are not configured');
+      throw new InternalServerErrorException(
+        'Amadeus credentials are not configured',
+      );
     }
 
     const body = new URLSearchParams();
@@ -64,8 +71,13 @@ export class AmadeusService {
       this.tokenExpiry = Date.now() + response.data.expires_in * 1000;
       return this.cachedToken;
     } catch (error) {
-      this.logger.error('Failed to fetch Amadeus token', error instanceof Error ? error.stack : '');
-      throw new InternalServerErrorException('Failed to authenticate with Amadeus');
+      this.logger.error(
+        'Failed to fetch Amadeus token',
+        error instanceof Error ? error.stack : '',
+      );
+      throw new InternalServerErrorException(
+        'Failed to authenticate with Amadeus',
+      );
     }
   }
 
@@ -120,7 +132,9 @@ export class AmadeusService {
           {
             cabin: params.travelClass,
             coverage: 'MOST_SEGMENTS',
-            originDestinationIds: payload.originDestinations.map((od: any) => od.id),
+            originDestinationIds: payload.originDestinations.map(
+              (od: any) => od.id,
+            ),
           },
         ],
       };
@@ -148,18 +162,24 @@ export class AmadeusService {
           this.logger.warn(
             `Amadeus rate limit exceeded (429). Please wait before making more requests.`,
           );
-          throw new AmadeusRateLimitError('Amadeus API rate limit exceeded. Please try again later.');
+          throw new AmadeusRateLimitError(
+            'Amadeus API rate limit exceeded. Please try again later.',
+          );
         }
         if (axiosError.response?.status === 401) {
           // Token might be expired, clear cache
           this.cachedToken = null;
           this.tokenExpiry = 0;
-          this.logger.warn('Amadeus authentication failed, token cache cleared');
+          this.logger.warn(
+            'Amadeus authentication failed, token cache cleared',
+          );
         }
       }
-      this.logger.error('Failed to fetch Amadeus flight offers', error instanceof Error ? error.stack : '');
+      this.logger.error(
+        'Failed to fetch Amadeus flight offers',
+        error instanceof Error ? error.stack : '',
+      );
       throw new InternalServerErrorException('Unable to fetch flight offers');
     }
   }
 }
-

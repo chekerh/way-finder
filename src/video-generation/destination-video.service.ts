@@ -1,7 +1,15 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { DestinationVideo, DestinationVideoDocument } from './destination-video.schema';
+import {
+  DestinationVideo,
+  DestinationVideoDocument,
+} from './destination-video.schema';
 import { ImageAggregatorService } from './image-aggregator.service';
 import { MusicSelectorService } from './music-selector.service';
 import { ImgBBService } from '../journey/imgbb.service';
@@ -31,29 +39,45 @@ export class DestinationVideoService {
   /**
    * Generate video for a user and destination
    */
-  async generateVideo(userId: string, destination: string): Promise<DestinationVideoDocument> {
-    this.logger.log(`Generating video for user ${userId} and destination ${destination}`);
+  async generateVideo(
+    userId: string,
+    destination: string,
+  ): Promise<DestinationVideoDocument> {
+    this.logger.log(
+      `Generating video for user ${userId} and destination ${destination}`,
+    );
 
     // Check if video already exists
-    let destinationVideo = await this.destinationVideoModel.findOne({
-      user_id: userId,
-      destination: destination.trim(),
-    }).exec();
+    let destinationVideo = await this.destinationVideoModel
+      .findOne({
+        user_id: userId,
+        destination: destination.trim(),
+      })
+      .exec();
 
     if (destinationVideo && destinationVideo.status === 'processing') {
-      throw new BadRequestException('Video generation is already in progress for this destination');
+      throw new BadRequestException(
+        'Video generation is already in progress for this destination',
+      );
     }
 
-    if (destinationVideo && destinationVideo.status === 'ready' && destinationVideo.video_url) {
-      this.logger.log(`Video already exists for user ${userId} and destination ${destination}`);
+    if (
+      destinationVideo &&
+      destinationVideo.status === 'ready' &&
+      destinationVideo.video_url
+    ) {
+      this.logger.log(
+        `Video already exists for user ${userId} and destination ${destination}`,
+      );
       return destinationVideo;
     }
 
     // Aggregate images
-    const aggregatedImages = await this.imageAggregator.aggregateImagesByDestination(
-      userId,
-      destination,
-    );
+    const aggregatedImages =
+      await this.imageAggregator.aggregateImagesByDestination(
+        userId,
+        destination,
+      );
 
     if (aggregatedImages.imageUrls.length === 0) {
       throw new BadRequestException(
@@ -94,28 +118,37 @@ export class DestinationVideoService {
     await destinationVideo.save();
 
     // Start video generation asynchronously
-    this.generateVideoAsync(destinationVideo, aggregatedImages).catch(async (error) => {
-      const errorMessage = error.message || 'Unknown error occurred during video generation';
-      const errorStack = error.stack || 'No stack trace available';
-      
-      this.logger.error(
-        `Video generation failed for user ${userId}, destination ${destination}: ${errorMessage}`,
-        errorStack,
-      );
-      
-      try {
-        // Reload the document to ensure we have the latest version
-        const updatedVideo = await this.destinationVideoModel.findById(destinationVideo._id).exec();
-        if (updatedVideo) {
-          updatedVideo.status = 'failed';
-          updatedVideo.error_message = `Video generation failed: ${errorMessage}. ${errorStack.substring(0, 200)}`;
-          await updatedVideo.save();
-          this.logger.log(`Updated destination video status to failed with error message`);
+    this.generateVideoAsync(destinationVideo, aggregatedImages).catch(
+      async (error) => {
+        const errorMessage =
+          error.message || 'Unknown error occurred during video generation';
+        const errorStack = error.stack || 'No stack trace available';
+
+        this.logger.error(
+          `Video generation failed for user ${userId}, destination ${destination}: ${errorMessage}`,
+          errorStack,
+        );
+
+        try {
+          // Reload the document to ensure we have the latest version
+          const updatedVideo = await this.destinationVideoModel
+            .findById(destinationVideo._id)
+            .exec();
+          if (updatedVideo) {
+            updatedVideo.status = 'failed';
+            updatedVideo.error_message = `Video generation failed: ${errorMessage}. ${errorStack.substring(0, 200)}`;
+            await updatedVideo.save();
+            this.logger.log(
+              `Updated destination video status to failed with error message`,
+            );
+          }
+        } catch (saveError) {
+          this.logger.error(
+            `Failed to save error message to database: ${saveError.message}`,
+          );
         }
-      } catch (saveError) {
-        this.logger.error(`Failed to save error message to database: ${saveError.message}`);
-      }
-    });
+      },
+    );
 
     return destinationVideo;
   }
@@ -150,7 +183,7 @@ export class DestinationVideoService {
 
       step = 'ai_video_generation';
       this.logger.log('Generating video using AI service...');
-      
+
       // Generate video using AI service
       const videoResult = await this.aiVideoService.generateVideo(videoPayload);
 
@@ -165,21 +198,23 @@ export class DestinationVideoService {
       destinationVideo.generated_at = new Date();
       await destinationVideo.save();
 
-      this.logger.log(`Video generation completed successfully: ${videoResult.videoUrl}`);
-
+      this.logger.log(
+        `Video generation completed successfully: ${videoResult.videoUrl}`,
+      );
     } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error occurred during video generation';
+      const errorMessage =
+        error.message || 'Unknown error occurred during video generation';
       const errorStack = error.stack || 'No stack trace available';
       const stepInfo = step ? ` (failed at step: ${step})` : '';
-      
+
       this.logger.error(
         `Video generation error${stepInfo}: ${errorMessage}`,
         errorStack,
       );
-      
+
       // Add more context to the error message
       const detailedError = `Step: ${step}. Error: ${errorMessage}`;
-      
+
       throw new Error(detailedError);
     }
   }
@@ -204,7 +239,9 @@ export class DestinationVideoService {
   /**
    * Get all destination videos for a user
    */
-  async getUserDestinationVideos(userId: string): Promise<DestinationVideoDocument[]> {
+  async getUserDestinationVideos(
+    userId: string,
+  ): Promise<DestinationVideoDocument[]> {
     return this.destinationVideoModel
       .find({
         user_id: this.toObjectId(userId, 'user id'),
@@ -232,13 +269,12 @@ export class DestinationVideoService {
       })
       .exec();
 
-    const videoMap = new Map(
-      videos.map((v) => [v.destination, v]),
-    );
+    const videoMap = new Map(videos.map((v) => [v.destination, v]));
 
     const imageCountMap = new Map<string, number>();
     for (const dest of destinations) {
-      const aggregated = await this.imageAggregator.aggregateImagesByDestination(userId, dest);
+      const aggregated =
+        await this.imageAggregator.aggregateImagesByDestination(userId, dest);
       imageCountMap.set(dest, aggregated.totalCount);
     }
 
@@ -255,4 +291,3 @@ export class DestinationVideoService {
     });
   }
 }
-

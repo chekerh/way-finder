@@ -42,10 +42,10 @@ export class DestinationVideo {
 }
 
 export type DestinationVideoDocument = HydratedDocument<DestinationVideo>;
-export const DestinationVideoSchema = SchemaFactory.createForClass(DestinationVideo);
+export const DestinationVideoSchema =
+  SchemaFactory.createForClass(DestinationVideo);
 
 // Compound index for efficient queries: user + destination
 DestinationVideoSchema.index({ user_id: 1, destination: 1 }, { unique: true });
 // Index for status queries
 DestinationVideoSchema.index({ user_id: 1, status: 1 });
-

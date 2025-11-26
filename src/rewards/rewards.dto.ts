@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsOptional,
+  IsEnum,
+} from 'class-validator';
 
 export enum PointsSource {
   ONBOARDING = 'onboarding',
@@ -56,4 +62,3 @@ export class UserPointsResponse {
   lifetime_points: number;
   recent_transactions: PointsTransactionResponse[];
 }
-

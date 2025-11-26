@@ -1,4 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsIn } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsIn,
+} from 'class-validator';
 
 export class LoginDto {
   @IsString()
@@ -78,4 +85,3 @@ export class SendOTPForRegistrationDto {
   @IsNotEmpty()
   email: string;
 }
-

@@ -20,4 +20,3 @@ import { NotificationsModule } from '../notifications/notifications.module';
   providers: [PaymentService, PaypalService],
 })
 export class PaymentModule {}
-

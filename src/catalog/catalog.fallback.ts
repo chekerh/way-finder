@@ -7,13 +7,13 @@ export interface FallbackFlightOffer {
 export const DESTINATION_DESCRIPTIONS: Record<string, string> = {
   CDG: 'Paris, la capitale de la France, est réputée pour sa culture, son art, sa gastronomie et ses monuments emblématiques comme la Tour Eiffel, le Louvre et Notre-Dame. Ville romantique par excellence, elle attire des millions de visiteurs chaque année.',
   ORY: 'Paris, la capitale de la France, est réputée pour sa culture, son art, sa gastronomie et ses monuments emblématiques comme la Tour Eiffel, le Louvre et Notre-Dame. Ville romantique par excellence, elle attire des millions de visiteurs chaque année.',
-  FCO: 'Rome, la capitale de l\'Italie, est une ville riche en histoire avec ses monuments antiques, ses églises baroques et sa cuisine délicieuse. Découvrez le Colisée, le Forum romain et la Cité du Vatican.',
+  FCO: "Rome, la capitale de l'Italie, est une ville riche en histoire avec ses monuments antiques, ses églises baroques et sa cuisine délicieuse. Découvrez le Colisée, le Forum romain et la Cité du Vatican.",
   BCN: 'Barcelone, capitale de la Catalogne, est une ville dynamique connue pour son architecture moderniste de Gaudí, ses plages méditerranéennes, sa vie nocturne animée et sa cuisine catalane exceptionnelle.',
-  MAD: 'Madrid, la capitale de l\'Espagne, est une ville vibrante avec ses musées de renommée mondiale, ses parcs magnifiques, sa scène gastronomique et sa vie culturelle riche.',
+  MAD: "Madrid, la capitale de l'Espagne, est une ville vibrante avec ses musées de renommée mondiale, ses parcs magnifiques, sa scène gastronomique et sa vie culturelle riche.",
   LHR: 'Londres, capitale du Royaume-Uni, est une métropole cosmopolite célèbre pour son histoire, ses musées, ses théâtres, ses parcs royaux et sa diversité culturelle.',
-  AMS: 'Amsterdam, capitale des Pays-Bas, est réputée pour ses canaux pittoresques, ses musées d\'art, son architecture historique et son ambiance décontractée unique.',
-  ATH: 'Athènes, berceau de la civilisation occidentale, offre une combinaison unique d\'histoire ancienne avec l\'Acropole, de culture moderne et de cuisine méditerranéenne authentique.',
-  IST: 'Istanbul, ville à cheval entre l\'Europe et l\'Asie, est un carrefour culturel fascinant avec ses mosquées historiques, ses bazars animés et sa cuisine turque exceptionnelle.',
+  AMS: "Amsterdam, capitale des Pays-Bas, est réputée pour ses canaux pittoresques, ses musées d'art, son architecture historique et son ambiance décontractée unique.",
+  ATH: "Athènes, berceau de la civilisation occidentale, offre une combinaison unique d'histoire ancienne avec l'Acropole, de culture moderne et de cuisine méditerranéenne authentique.",
+  IST: "Istanbul, ville à cheval entre l'Europe et l'Asie, est un carrefour culturel fascinant avec ses mosquées historiques, ses bazars animés et sa cuisine turque exceptionnelle.",
   DXB: 'Dubaï, ville ultramoderne des Émirats arabes unis, est connue pour ses gratte-ciel impressionnants, ses centres commerciaux de luxe, ses plages et son hospitalité légendaire.',
   JFK: 'New York, la ville qui ne dort jamais, est un centre culturel et financier mondial avec ses musées, ses théâtres de Broadway, ses parcs et son énergie incomparable.',
   NRT: 'Tokyo, capitale du Japon, allie tradition et modernité avec ses temples anciens, sa technologie de pointe, sa cuisine raffinée et sa culture unique.',
@@ -577,8 +577,10 @@ export const FALLBACK_ACTIVITIES: FallbackActivity[] = [
     country: 'France',
     name: 'Musée du Louvre',
     category: 'Musées',
-    description: 'Découvrez la Joconde et plus de 35 000 œuvres dans le musée le plus visité au monde.',
-    imageUrl: 'https://images.unsplash.com/photo-1511739001486-6bfe10ce785f?w=800&h=600&fit=crop&q=80',
+    description:
+      'Découvrez la Joconde et plus de 35 000 œuvres dans le musée le plus visité au monde.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1511739001486-6bfe10ce785f?w=800&h=600&fit=crop&q=80',
     address: 'Rue de Rivoli, 75001 Paris',
     price: 17,
     rating: 4.8,
@@ -591,8 +593,10 @@ export const FALLBACK_ACTIVITIES: FallbackActivity[] = [
     country: 'France',
     name: 'Tour Eiffel & Croisière',
     category: 'Activités',
-    description: 'Accès au deuxième étage de la Tour Eiffel suivi d’une croisière sur la Seine.',
-    imageUrl: 'https://images.unsplash.com/photo-1502602898669-a6655f84aff2?w=800&h=600&fit=crop&q=80',
+    description:
+      'Accès au deuxième étage de la Tour Eiffel suivi d’une croisière sur la Seine.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1502602898669-a6655f84aff2?w=800&h=600&fit=crop&q=80',
     address: 'Champ de Mars, 5 Av. Anatole France, 75007 Paris',
     price: 49,
     rating: 4.7,
@@ -605,8 +609,10 @@ export const FALLBACK_ACTIVITIES: FallbackActivity[] = [
     country: 'Italie',
     name: 'Visite du Colisée & Forum',
     category: 'Activités',
-    description: 'Coupe-file pour le Colisée, le Forum Romain et le Mont Palatin avec guide francophone.',
-    imageUrl: 'https://images.unsplash.com/photo-1526481280695-3c46973e3323?w=800&h=600&fit=crop&q=80',
+    description:
+      'Coupe-file pour le Colisée, le Forum Romain et le Mont Palatin avec guide francophone.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1526481280695-3c46973e3323?w=800&h=600&fit=crop&q=80',
     address: 'Piazza del Colosseo, 1, 00184 Roma',
     price: 42,
     rating: 4.9,
@@ -619,8 +625,10 @@ export const FALLBACK_ACTIVITIES: FallbackActivity[] = [
     country: 'Italie',
     name: 'Food tour à Trastevere',
     category: 'Restaurants',
-    description: 'Dégustez les meilleures spécialités romaines dans le quartier animé de Trastevere.',
-    imageUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop&q=80',
+    description:
+      'Dégustez les meilleures spécialités romaines dans le quartier animé de Trastevere.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop&q=80',
     address: 'Piazza Trilussa, 00153 Roma',
     price: 65,
     rating: 4.6,
@@ -633,8 +641,10 @@ export const FALLBACK_ACTIVITIES: FallbackActivity[] = [
     country: 'EAU',
     name: 'Safari désert & BBQ',
     category: 'Activités',
-    description: 'Balade en 4x4 dans le désert avec sandboarding, spectacle et dîner BBQ.',
-    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&h=600&fit=crop&q=80',
+    description:
+      'Balade en 4x4 dans le désert avec sandboarding, spectacle et dîner BBQ.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&h=600&fit=crop&q=80',
     address: 'Prise en charge depuis votre hôtel à Dubai',
     price: 55,
     rating: 4.7,
@@ -647,8 +657,10 @@ export const FALLBACK_ACTIVITIES: FallbackActivity[] = [
     country: 'Tunisie',
     name: 'Medina Walking Tour',
     category: 'Musées',
-    description: 'Visite guidée de la médina de Tunis et découverte des artisans locaux.',
-    imageUrl: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=800&h=600&fit=crop&q=80',
+    description:
+      'Visite guidée de la médina de Tunis et découverte des artisans locaux.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=800&h=600&fit=crop&q=80',
     address: 'Place de la Kasbah, Tunis',
     price: 15,
     rating: 4.5,
@@ -656,4 +668,3 @@ export const FALLBACK_ACTIVITIES: FallbackActivity[] = [
     coordinates: { lat: 36.7997, lon: 10.162 },
   },
 ];
-

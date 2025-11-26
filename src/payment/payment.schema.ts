@@ -30,4 +30,3 @@ export class Payment {
 
 export type PaymentDocument = HydratedDocument<Payment>;
 export const PaymentSchema = SchemaFactory.createForClass(Payment);
-

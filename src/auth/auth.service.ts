@@ -1,10 +1,25 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
-import { RegisterDto, LoginDto, GoogleSignInDto, VerifyEmailDto, SendOTPDto, VerifyOTPDto, RegisterWithOTPDto, SendOTPForRegistrationDto } from './auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  GoogleSignInDto,
+  VerifyEmailDto,
+  SendOTPDto,
+  VerifyOTPDto,
+  RegisterWithOTPDto,
+  SendOTPForRegistrationDto,
+} from './auth.dto';
 import { GoogleAuthService } from './google-auth.service';
 import { EmailService } from './email.service';
 import { OTP, OTPDocument } from './otp.schema';
@@ -33,26 +48,32 @@ export class AuthService {
     const existing = await this.userService.findByUsername(username);
     if (existing) {
       const userId = (existing as any)._id || (existing as any).id || 'unknown';
-      console.log(`[Register] Username conflict: ${username} already exists (user ID: ${userId})`);
+      console.log(
+        `[Register] Username conflict: ${username} already exists (user ID: ${userId})`,
+      );
       throw new ConflictException('Username already exists');
     }
-    
+
     // Check if email already exists
     const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) {
-      const userId = (existingEmail as any)._id || (existingEmail as any).id || 'unknown';
-      console.log(`[Register] Email conflict: ${email} already exists (user ID: ${userId})`);
+      const userId =
+        (existingEmail as any)._id || (existingEmail as any).id || 'unknown';
+      console.log(
+        `[Register] Email conflict: ${email} already exists (user ID: ${userId})`,
+      );
       throw new ConflictException('Email already exists');
     }
-    
+
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
 
     const hash = await bcrypt.hash(rawPassword, 10);
-    
+
     // Generate email verification token
-    const emailVerificationToken = this.emailService.generateVerificationToken();
-    
+    const emailVerificationToken =
+      this.emailService.generateVerificationToken();
+
     try {
       const user = await this.userService.create({
         username,
@@ -63,54 +84,62 @@ export class AuthService {
         email_verified: false, // Email not verified yet
         email_verification_token: emailVerificationToken,
       });
-      
+
       // Send verification email
       try {
-        await this.emailService.sendVerificationEmail(email, emailVerificationToken, firstName);
+        await this.emailService.sendVerificationEmail(
+          email,
+          emailVerificationToken,
+          firstName,
+        );
       } catch (error) {
         // Log error but don't fail registration if email fails
         console.error('Failed to send verification email:', error);
       }
-      
+
       const userObj = (user as any).toObject ? (user as any).toObject() : user;
       const { password: _password, ...result } = userObj;
-      return { 
-        message: 'User registered successfully. Please check your email to verify your account.', 
-        user: result 
+      return {
+        message:
+          'User registered successfully. Please check your email to verify your account.',
+        user: result,
       };
     } catch (error: any) {
       // Handle MongoDB duplicate key errors
       if (error.code === 11000) {
         // MongoDB duplicate key error
         let duplicateField: string | null = null;
-        
+
         // Try to get the field from keyPattern
         if (error.keyPattern) {
           duplicateField = Object.keys(error.keyPattern)[0];
         }
-        
+
         // If not found, try to extract from error message
         if (!duplicateField && error.message) {
           const message = error.message.toLowerCase();
           if (message.includes('email') || message.includes('email_1')) {
             duplicateField = 'email';
-          } else if (message.includes('username') || message.includes('username_1')) {
+          } else if (
+            message.includes('username') ||
+            message.includes('username_1')
+          ) {
             duplicateField = 'username';
           }
         }
-        
+
         // If still not found, do a final check by querying the database
         if (!duplicateField) {
           const checkEmail = await this.userService.findByEmail(email);
           const checkUsername = await this.userService.findByUsername(username);
-          
+
           if (checkEmail) {
             duplicateField = 'email';
           } else if (checkUsername) {
             duplicateField = 'username';
           }
         }
-        
+
         // Determine the error message based on the duplicate field
         if (duplicateField === 'email') {
           throw new ConflictException('Email already exists');
@@ -118,7 +147,7 @@ export class AuthService {
         if (duplicateField === 'username') {
           throw new ConflictException('Username already exists');
         }
-        
+
         // Fallback: check if we can determine from the values we tried to insert
         // This handles cases where the error structure is unexpected
         throw new ConflictException('Email or username already exists');
@@ -130,7 +159,8 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const identifier = dto.username.trim();
-    if (!identifier) throw new BadRequestException('Username or email is required');
+    if (!identifier)
+      throw new BadRequestException('Username or email is required');
 
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
@@ -141,18 +171,22 @@ export class AuthService {
     if (identifier.includes('@')) {
       // It's an email - search directly by email
       user = await this.userService.findByEmail(identifier.toLowerCase());
-      console.log(`[Login] Searching by email: ${identifier.toLowerCase()}, found: ${user ? 'YES' : 'NO'}`);
+      console.log(
+        `[Login] Searching by email: ${identifier.toLowerCase()}, found: ${user ? 'YES' : 'NO'}`,
+      );
     } else {
       // It's a username - try username first, then email as fallback
       user = await this.userService.findByUsername(identifier);
       if (!user) {
         user = await this.userService.findByEmail(identifier.toLowerCase());
-        console.log(`[Login] Username not found, trying as email: ${identifier.toLowerCase()}, found: ${user ? 'YES' : 'NO'}`);
+        console.log(
+          `[Login] Username not found, trying as email: ${identifier.toLowerCase()}, found: ${user ? 'YES' : 'NO'}`,
+        );
       } else {
         console.log(`[Login] Found by username: ${identifier}`);
       }
     }
-    
+
     if (!user) {
       console.log(`[Login] User not found for identifier: ${identifier}`);
       throw new UnauthorizedException('Email ou mot de passe incorrect.');
@@ -160,22 +194,29 @@ export class AuthService {
 
     // Check if user has a password (Google OAuth users might not have one)
     if (!user.password) {
-      throw new UnauthorizedException('Cet compte a été créé via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.');
+      throw new UnauthorizedException(
+        'Cet compte a été créé via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.',
+      );
     }
 
     const passwordMatch = await bcrypt.compare(rawPassword, user.password);
     if (!passwordMatch) {
-      throw new UnauthorizedException('Email ou mot de passe incorrect. Si vous avez oublié votre mot de passe, utilisez la connexion par code OTP.');
+      throw new UnauthorizedException(
+        'Email ou mot de passe incorrect. Si vous avez oublié votre mot de passe, utilisez la connexion par code OTP.',
+      );
     }
 
-    const payload = { sub: (user as any)._id.toString(), username: user.username };
+    const payload = {
+      sub: user._id.toString(),
+      username: user.username,
+    };
     const token = await this.jwtService.signAsync(payload);
-    const userObj = (user as any).toObject ? (user as any).toObject() : user;
+    const userObj = user.toObject ? user.toObject() : user;
     const { password: _password, ...userData } = userObj;
-    return { 
+    return {
       access_token: token,
       user: userData,
-      onboarding_completed: user.onboarding_completed || false
+      onboarding_completed: user.onboarding_completed || false,
     };
   }
 
@@ -185,18 +226,28 @@ export class AuthService {
    */
   async googleSignIn(dto: GoogleSignInDto) {
     const clientType = dto.client_type || 'android';
-    
+
     // Check configuration based on client type
-    if (clientType === 'android' && !this.googleAuthService.isAndroidConfigured()) {
-      throw new BadRequestException('Google OAuth Android is not configured. Please set GOOGLE_CLIENT_ID_ANDROID');
+    if (
+      clientType === 'android' &&
+      !this.googleAuthService.isAndroidConfigured()
+    ) {
+      throw new BadRequestException(
+        'Google OAuth Android is not configured. Please set GOOGLE_CLIENT_ID_ANDROID',
+      );
     }
-    
+
     if (clientType === 'web' && !this.googleAuthService.isConfigured()) {
-      throw new BadRequestException('Google OAuth Web is not configured. Please set GOOGLE_CLIENT_ID_WEB and GOOGLE_CLIENT_SECRET_WEB');
+      throw new BadRequestException(
+        'Google OAuth Web is not configured. Please set GOOGLE_CLIENT_ID_WEB and GOOGLE_CLIENT_SECRET_WEB',
+      );
     }
 
     // Verify Google ID token
-    const googleUser = await this.googleAuthService.verifyIdToken(dto.id_token, clientType);
+    const googleUser = await this.googleAuthService.verifyIdToken(
+      dto.id_token,
+      clientType,
+    );
 
     // Check if user exists with this Google ID
     let user = await this.userService.findByGoogleId(googleUser.googleId);
@@ -207,14 +258,17 @@ export class AuthService {
 
       if (user) {
         // User exists with email but not Google ID - link Google account
-        user = await this.userService.updateGoogleId((user as any)._id.toString(), googleUser.googleId);
+        user = await this.userService.updateGoogleId(
+          (user as any)._id.toString(),
+          googleUser.googleId,
+        );
       } else {
         // Create new user with Google account
         // Generate username from email (remove @domain.com)
         const usernameBase = googleUser.email.split('@')[0];
         let username = usernameBase;
         let counter = 1;
-        
+
         // Ensure username is unique
         while (await this.userService.findByUsername(username)) {
           username = `${usernameBase}${counter}`;
@@ -222,7 +276,8 @@ export class AuthService {
         }
 
         // Generate email verification token (even though Google verified it)
-        const emailVerificationToken = this.emailService.generateVerificationToken();
+        const emailVerificationToken =
+          this.emailService.generateVerificationToken();
 
         user = await this.userService.create({
           username,
@@ -241,9 +296,9 @@ export class AuthService {
         if (!googleUser.emailVerified) {
           try {
             await this.emailService.sendVerificationEmail(
-              googleUser.email, 
-              emailVerificationToken, 
-              googleUser.firstName
+              googleUser.email,
+              emailVerificationToken,
+              googleUser.firstName,
             );
           } catch (error) {
             console.error('Failed to send verification email:', error);
@@ -253,7 +308,10 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const payload = { sub: (user as any)._id.toString(), username: user.username };
+    const payload = {
+      sub: (user as any)._id.toString(),
+      username: user.username,
+    };
     const token = await this.jwtService.signAsync(payload);
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
     const { password: _password, ...userData } = userObj;
@@ -304,14 +362,18 @@ export class AuthService {
     }
 
     // Generate new verification token
-    const emailVerificationToken = this.emailService.generateVerificationToken();
-    await this.userService.updateVerificationToken((user as any)._id.toString(), emailVerificationToken);
+    const emailVerificationToken =
+      this.emailService.generateVerificationToken();
+    await this.userService.updateVerificationToken(
+      (user as any)._id.toString(),
+      emailVerificationToken,
+    );
 
     // Send verification email
     await this.emailService.sendVerificationEmail(
-      user.email, 
-      emailVerificationToken, 
-      user.first_name
+      user.email,
+      emailVerificationToken,
+      user.first_name,
     );
 
     return {
@@ -325,42 +387,55 @@ export class AuthService {
    */
   async sendOTP(dto: SendOTPDto) {
     const email = dto.email.trim().toLowerCase();
-    
+
     // Check if user exists with this email - STRICT CHECK
     const user = await this.userService.findByEmail(email);
     if (!user) {
       console.log(`[Send OTP] User not found for email: ${email}`);
-      throw new NotFoundException('Aucun compte trouvé avec cet email. Veuillez d\'abord créer un compte.');
+      throw new NotFoundException(
+        "Aucun compte trouvé avec cet email. Veuillez d'abord créer un compte.",
+      );
     }
-    
-    console.log(`[Send OTP] User found for email: ${email}, user ID: ${(user as any)._id}`);
+
+    console.log(
+      `[Send OTP] User found for email: ${email}, user ID: ${(user as any)._id}`,
+    );
 
     // Check cooldown period (30 seconds)
-    const recentOTP = await this.otpModel.findOne({
-      email,
-      last_sent_at: { $gte: new Date(Date.now() - 30 * 1000) }, // Within last 30 seconds
-    }).sort({ last_sent_at: -1 }).exec();
+    const recentOTP = await this.otpModel
+      .findOne({
+        email,
+        last_sent_at: { $gte: new Date(Date.now() - 30 * 1000) }, // Within last 30 seconds
+      })
+      .sort({ last_sent_at: -1 })
+      .exec();
 
     if (recentOTP) {
-      const secondsRemaining = Math.ceil((30 * 1000 - (Date.now() - recentOTP.last_sent_at.getTime())) / 1000);
-      throw new BadRequestException(`Veuillez attendre ${secondsRemaining} seconde(s) avant de renvoyer le code.`);
+      const secondsRemaining = Math.ceil(
+        (30 * 1000 - (Date.now() - recentOTP.last_sent_at.getTime())) / 1000,
+      );
+      throw new BadRequestException(
+        `Veuillez attendre ${secondsRemaining} seconde(s) avant de renvoyer le code.`,
+      );
     }
 
     // Generate 4-digit OTP code
     const otpCode = this.emailService.generateOTPCode();
     // Normalize code to ensure it's exactly 4 digits
-    const normalizedCode = otpCode.replace(/\D/g, '').padStart(4, '0').slice(0, 4);
-    
+    const normalizedCode = otpCode
+      .replace(/\D/g, '')
+      .padStart(4, '0')
+      .slice(0, 4);
+
     // Calculate expiration time (5 minutes from now)
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5);
     const now = new Date();
 
     // Invalidate any existing OTPs for this email
-    await this.otpModel.updateMany(
-      { email, used: false },
-      { $set: { used: true } }
-    ).exec();
+    await this.otpModel
+      .updateMany({ email, used: false }, { $set: { used: true } })
+      .exec();
 
     // Create new OTP record - use normalized code
     const otp = new this.otpModel({
@@ -374,17 +449,33 @@ export class AuthService {
 
     // Send OTP email - use normalized code to ensure consistency
     try {
-      console.log(`[Send OTP] Attempting to send OTP email to ${email} with code ${normalizedCode}`);
-      await this.emailService.sendOTPEmail(email, normalizedCode, user.first_name);
+      console.log(
+        `[Send OTP] Attempting to send OTP email to ${email} with code ${normalizedCode}`,
+      );
+      await this.emailService.sendOTPEmail(
+        email,
+        normalizedCode,
+        user.first_name,
+      );
       console.log(`[Send OTP] ✅ OTP email sent successfully to ${email}`);
     } catch (error: any) {
       // Log detailed error information
-      console.error(`[Send OTP] ❌ Failed to send email to ${email}:`, error.message || error);
-      console.error(`[Send OTP] Error details:`, JSON.stringify(error, null, 2));
-      
+      console.error(
+        `[Send OTP] ❌ Failed to send email to ${email}:`,
+        error.message || error,
+      );
+      console.error(
+        `[Send OTP] Error details:`,
+        JSON.stringify(error, null, 2),
+      );
+
       // Don't mark OTP as used if email fails - allow user to retry
-      console.error(`[Send OTP] Email service error - OTP code ${normalizedCode} was generated but email failed to send`);
-      throw new BadRequestException(`Impossible d'envoyer l'email. Erreur: ${error.message || 'Service email non configuré'}. Veuillez vérifier la configuration email sur Render ou réessayer plus tard.`);
+      console.error(
+        `[Send OTP] Email service error - OTP code ${normalizedCode} was generated but email failed to send`,
+      );
+      throw new BadRequestException(
+        `Impossible d'envoyer l'email. Erreur: ${error.message || 'Service email non configuré'}. Veuillez vérifier la configuration email sur Render ou réessayer plus tard.`,
+      );
     }
 
     return {
@@ -399,61 +490,90 @@ export class AuthService {
   async verifyOTP(dto: VerifyOTPDto) {
     const email = dto.email.trim().toLowerCase();
     // Normalize code: remove all non-digit characters and ensure it's exactly 4 digits
-    const code = dto.code.trim().replace(/\D/g, '').padStart(4, '0').slice(0, 4);
+    const code = dto.code
+      .trim()
+      .replace(/\D/g, '')
+      .padStart(4, '0')
+      .slice(0, 4);
 
-    console.log(`[Verify OTP] Verifying OTP for ${email}, normalized code: ${code}`);
+    console.log(
+      `[Verify OTP] Verifying OTP for ${email}, normalized code: ${code}`,
+    );
 
     if (code.length !== 4 || !/^\d{4}$/.test(code)) {
       throw new BadRequestException('Le code doit être composé de 4 chiffres');
     }
 
     // Check if any OTP was sent for this email
-    const anyOTP = await this.otpModel.findOne({ email }).sort({ last_sent_at: -1 }).exec();
+    const anyOTP = await this.otpModel
+      .findOne({ email })
+      .sort({ last_sent_at: -1 })
+      .exec();
     if (!anyOTP) {
       console.log(`[Verify OTP] No OTP found for email: ${email}`);
-      throw new BadRequestException('Aucun code n\'a été envoyé. Veuillez d\'abord demander un code.');
+      throw new BadRequestException(
+        "Aucun code n'a été envoyé. Veuillez d'abord demander un code.",
+      );
     }
 
     // Debug: List all OTPs for this email
     const allOtps = await this.otpModel.find({ email }).exec();
-    console.log(`[Verify OTP] Found ${allOtps.length} OTP records for ${email}`);
+    console.log(
+      `[Verify OTP] Found ${allOtps.length} OTP records for ${email}`,
+    );
     allOtps.forEach((otp, index) => {
-      console.log(`[Verify OTP] OTP ${index + 1}: code="${otp.code}", used=${otp.used}, expires_at=${otp.expires_at}, now=${new Date()}`);
+      console.log(
+        `[Verify OTP] OTP ${index + 1}: code="${otp.code}", used=${otp.used}, expires_at=${otp.expires_at}, now=${new Date()}`,
+      );
     });
 
     // Find valid OTP - use exact code match
-    const otp = await this.otpModel.findOne({
-      email,
-      code: code, // Exact match with normalized code
-      used: false,
-      expires_at: { $gt: new Date() }, // Not expired
-    }).exec();
+    const otp = await this.otpModel
+      .findOne({
+        email,
+        code: code, // Exact match with normalized code
+        used: false,
+        expires_at: { $gt: new Date() }, // Not expired
+      })
+      .exec();
 
     if (!otp) {
-      console.log(`[Verify OTP] No valid OTP found for ${email} with code ${code}`);
-      
+      console.log(
+        `[Verify OTP] No valid OTP found for ${email} with code ${code}`,
+      );
+
       // Check if code exists but is used
-      const usedOtp = await this.otpModel.findOne({ email, code: code, used: true }).exec();
+      const usedOtp = await this.otpModel
+        .findOne({ email, code: code, used: true })
+        .exec();
       if (usedOtp) {
         console.log(`[Verify OTP] OTP found but already used for ${email}`);
-        throw new UnauthorizedException('Ce code a déjà été utilisé. Veuillez demander un nouveau code.');
+        throw new UnauthorizedException(
+          'Ce code a déjà été utilisé. Veuillez demander un nouveau code.',
+        );
       }
-      
+
       // Check if code exists but is expired
-      const expiredOtp = await this.otpModel.findOne({ 
-        email, 
-        code: code,
-        expires_at: { $lte: new Date() }
-      }).exec();
+      const expiredOtp = await this.otpModel
+        .findOne({
+          email,
+          code: code,
+          expires_at: { $lte: new Date() },
+        })
+        .exec();
       if (expiredOtp) {
         console.log(`[Verify OTP] OTP found but expired for ${email}`);
-        throw new UnauthorizedException('Le code a expiré. Veuillez demander un nouveau code.');
+        throw new UnauthorizedException(
+          'Le code a expiré. Veuillez demander un nouveau code.',
+        );
       }
-      
+
       console.log(`[Verify OTP] Invalid code for ${email}. Provided: ${code}`);
-      throw new UnauthorizedException('Code invalide. Veuillez vérifier le code et réessayer.');
+      throw new UnauthorizedException(
+        'Code invalide. Veuillez vérifier le code et réessayer.',
+      );
     }
-    
+
     console.log(`[Verify OTP] Valid OTP found for ${email}`);
 
     // Mark OTP as used
@@ -462,16 +582,25 @@ export class AuthService {
     // Find user by email - MUST exist for OTP login
     const user = await this.userService.findByEmail(email);
     if (!user) {
-      console.log(`[Verify OTP] User not found for email: ${email} after OTP verification`);
-      throw new NotFoundException('Utilisateur introuvable. Le code OTP a été vérifié mais aucun compte n\'existe avec cet email. Veuillez d\'abord créer un compte.');
+      console.log(
+        `[Verify OTP] User not found for email: ${email} after OTP verification`,
+      );
+      throw new NotFoundException(
+        "Utilisateur introuvable. Le code OTP a été vérifié mais aucun compte n'existe avec cet email. Veuillez d'abord créer un compte.",
+      );
     }
-    
-    console.log(`[Verify OTP] User found for email: ${email}, user ID: ${(user as any)._id}`);
+
+    console.log(
+      `[Verify OTP] User found for email: ${email}, user ID: ${(user as any)._id}`,
+    );
 
     // Generate JWT token
-    const payload = { sub: (user as any)._id.toString(), username: user.username };
+    const payload = {
+      sub: (user as any)._id.toString(),
+      username: user.username,
+    };
     const token = await this.jwtService.signAsync(payload);
-    
+
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
     const { password: _password, ...userData } = userObj;
 
@@ -487,52 +616,73 @@ export class AuthService {
    */
   async sendOTPForRegistration(dto: SendOTPForRegistrationDto) {
     const email = dto.email.trim().toLowerCase();
-    
+
     // Check if user already exists with this email - DO THIS FIRST, BEFORE ANY OTP CREATION
     const existingUser = await this.userService.findByEmail(email);
     if (existingUser) {
-      console.log(`[Register OTP] ❌ Email already exists: ${email} - NOT sending OTP, redirecting to login`);
+      console.log(
+        `[Register OTP] ❌ Email already exists: ${email} - NOT sending OTP, redirecting to login`,
+      );
       // Check if user has a password or was created via OAuth
       if (!existingUser.password) {
-        throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utiliser un autre email.');
+        throw new ConflictException(
+          'Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utiliser un autre email.',
+        );
       }
       // User exists with password - tell them to login instead
-      throw new ConflictException('Un utilisateur avec cet email existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
+      throw new ConflictException(
+        'Un utilisateur avec cet email existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
+      );
     }
-    
-    console.log(`[Register OTP] ✅ Email ${email} does not exist - proceeding with OTP generation`);
+
+    console.log(
+      `[Register OTP] ✅ Email ${email} does not exist - proceeding with OTP generation`,
+    );
 
     // Check cooldown period (30 seconds)
-    const recentOTP = await this.otpModel.findOne({
-      email,
-      last_sent_at: { $gte: new Date(Date.now() - 30 * 1000) }, // Within last 30 seconds
-    }).sort({ last_sent_at: -1 }).exec();
+    const recentOTP = await this.otpModel
+      .findOne({
+        email,
+        last_sent_at: { $gte: new Date(Date.now() - 30 * 1000) }, // Within last 30 seconds
+      })
+      .sort({ last_sent_at: -1 })
+      .exec();
 
     if (recentOTP) {
-      const secondsRemaining = Math.ceil((30 * 1000 - (Date.now() - recentOTP.last_sent_at.getTime())) / 1000);
-      throw new BadRequestException(`Veuillez attendre ${secondsRemaining} seconde(s) avant de renvoyer le code.`);
+      const secondsRemaining = Math.ceil(
+        (30 * 1000 - (Date.now() - recentOTP.last_sent_at.getTime())) / 1000,
+      );
+      throw new BadRequestException(
+        `Veuillez attendre ${secondsRemaining} seconde(s) avant de renvoyer le code.`,
+      );
     }
 
     // Generate 4-digit OTP code
     const otpCode = this.emailService.generateOTPCode();
     console.log(`[Register OTP] Generated OTP code: ${otpCode} for ${email}`);
-    
+
     // Calculate expiration time (5 minutes from now)
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5);
     const now = new Date();
-    console.log(`[Register OTP] OTP will expire at: ${expiresAt.toISOString()}`);
+    console.log(
+      `[Register OTP] OTP will expire at: ${expiresAt.toISOString()}`,
+    );
 
     // Invalidate any existing OTPs for this email
-    await this.otpModel.updateMany(
-      { email, used: false },
-      { $set: { used: true } }
-    ).exec();
+    await this.otpModel
+      .updateMany({ email, used: false }, { $set: { used: true } })
+      .exec();
 
     // Create new OTP record - ensure code is normalized (4 digits, no spaces)
-    const normalizedCode = otpCode.replace(/\D/g, '').padStart(4, '0').slice(0, 4);
-    console.log(`[Register OTP] Saving OTP for ${email}, code: ${normalizedCode} (original: ${otpCode})`);
-    
+    const normalizedCode = otpCode
+      .replace(/\D/g, '')
+      .padStart(4, '0')
+      .slice(0, 4);
+    console.log(
+      `[Register OTP] Saving OTP for ${email}, code: ${normalizedCode} (original: ${otpCode})`,
+    );
+
     const otp = new this.otpModel({
       email,
       code: normalizedCode,
@@ -545,18 +695,30 @@ export class AuthService {
 
     // Send OTP email - use normalized code to ensure consistency
     try {
-      console.log(`[Register OTP] Attempting to send OTP email to ${email} with code ${normalizedCode}`);
+      console.log(
+        `[Register OTP] Attempting to send OTP email to ${email} with code ${normalizedCode}`,
+      );
       await this.emailService.sendOTPEmail(email, normalizedCode);
       console.log(`[Register OTP] ✅ OTP email sent successfully to ${email}`);
     } catch (error: any) {
       // Log detailed error information
-      console.error(`[Register OTP] ❌ Failed to send email to ${email}:`, error.message || error);
-      console.error(`[Register OTP] Error details:`, JSON.stringify(error, null, 2));
-      
+      console.error(
+        `[Register OTP] ❌ Failed to send email to ${email}:`,
+        error.message || error,
+      );
+      console.error(
+        `[Register OTP] Error details:`,
+        JSON.stringify(error, null, 2),
+      );
+
       // Don't mark OTP as used if email fails - allow user to retry
       // The OTP is still valid, they just need to request a new one
-      console.error(`[Register OTP] Email service error - OTP code ${normalizedCode} was generated but email failed to send`);
-      throw new BadRequestException(`Impossible d'envoyer l'email. Erreur: ${error.message || 'Service email non configuré'}. Veuillez vérifier la configuration email sur Render ou réessayer plus tard.`);
+      console.error(
+        `[Register OTP] Email service error - OTP code ${normalizedCode} was generated but email failed to send`,
+      );
+      throw new BadRequestException(
+        `Impossible d'envoyer l'email. Erreur: ${error.message || 'Service email non configuré'}. Veuillez vérifier la configuration email sur Render ou réessayer plus tard.`,
+      );
     }
 
     return {
@@ -583,51 +745,74 @@ export class AuthService {
 
     // Verify OTP - add detailed logging
     console.log(`[Register OTP] Verifying OTP for ${email}, code: ${code}`);
-    
+
     // Check if any OTP was sent for this email
-    const anyOTP = await this.otpModel.findOne({ email }).sort({ last_sent_at: -1 }).exec();
+    const anyOTP = await this.otpModel
+      .findOne({ email })
+      .sort({ last_sent_at: -1 })
+      .exec();
     if (!anyOTP) {
-      throw new BadRequestException('Aucun code n\'a été envoyé. Veuillez d\'abord demander un code.');
+      throw new BadRequestException(
+        "Aucun code n'a été envoyé. Veuillez d'abord demander un code.",
+      );
     }
-    
+
     // First, find all OTPs for this email to debug
     const allOtps = await this.otpModel.find({ email }).exec();
-    console.log(`[Register OTP] Found ${allOtps.length} OTP records for ${email}`);
+    console.log(
+      `[Register OTP] Found ${allOtps.length} OTP records for ${email}`,
+    );
     allOtps.forEach((otp, index) => {
-      console.log(`[Register OTP] OTP ${index + 1}: code="${otp.code}", used=${otp.used}, expires_at=${otp.expires_at}, now=${new Date()}`);
+      console.log(
+        `[Register OTP] OTP ${index + 1}: code="${otp.code}", used=${otp.used}, expires_at=${otp.expires_at}, now=${new Date()}`,
+      );
     });
-    
+
     // Verify OTP - use exact code match with normalized code
-    const otp = await this.otpModel.findOne({
-      email,
-      code: code, // Exact match with normalized code
-      used: false,
-      expires_at: { $gt: new Date() }, // Not expired
-    }).exec();
+    const otp = await this.otpModel
+      .findOne({
+        email,
+        code: code, // Exact match with normalized code
+        used: false,
+        expires_at: { $gt: new Date() }, // Not expired
+      })
+      .exec();
 
     if (!otp) {
       // Check if code exists but is used
-      const usedOtp = await this.otpModel.findOne({ email, code, used: true }).exec();
+      const usedOtp = await this.otpModel
+        .findOne({ email, code, used: true })
+        .exec();
       if (usedOtp) {
         console.log(`[Register OTP] OTP found but already used for ${email}`);
-        throw new UnauthorizedException('Ce code a déjà été utilisé. Veuillez demander un nouveau code.');
+        throw new UnauthorizedException(
+          'Ce code a déjà été utilisé. Veuillez demander un nouveau code.',
+        );
       }
-      
+
       // Check if code exists but is expired
-      const expiredOtp = await this.otpModel.findOne({ 
-        email, 
-        code,
-        expires_at: { $lte: new Date() }
-      }).exec();
+      const expiredOtp = await this.otpModel
+        .findOne({
+          email,
+          code,
+          expires_at: { $lte: new Date() },
+        })
+        .exec();
       if (expiredOtp) {
         console.log(`[Register OTP] OTP found but expired for ${email}`);
-        throw new UnauthorizedException('Le code a expiré. Veuillez demander un nouveau code.');
+        throw new UnauthorizedException(
+          'Le code a expiré. Veuillez demander un nouveau code.',
+        );
       }
-      
-      console.log(`[Register OTP] No valid OTP found for ${email} with code ${code}`);
-      throw new UnauthorizedException('Code invalide. Veuillez vérifier le code et réessayer.');
+
+      console.log(
+        `[Register OTP] No valid OTP found for ${email} with code ${code}`,
+      );
+      throw new UnauthorizedException(
+        'Code invalide. Veuillez vérifier le code et réessayer.',
+      );
     }
-    
+
     console.log(`[Register OTP] Valid OTP found for ${email}`);
 
     // Mark OTP as used
@@ -636,21 +821,32 @@ export class AuthService {
     // Double-check that email doesn't exist (race condition protection)
     console.log(`[Register OTP] Checking if email exists: ${email}`);
     const existingEmail = await this.userService.findByEmail(email);
-    console.log(`[Register OTP] Email check result: ${existingEmail ? 'EXISTS' : 'NOT FOUND'}`);
-    
+    console.log(
+      `[Register OTP] Email check result: ${existingEmail ? 'EXISTS' : 'NOT FOUND'}`,
+    );
+
     if (existingEmail) {
-      console.log(`[Register OTP] ⚠️ Email already exists: ${email} (race condition - user created between OTP send and verify)`);
-      console.log(`[Register OTP] User ID: ${(existingEmail as any)._id}, Username: ${existingEmail.username}`);
-      
+      console.log(
+        `[Register OTP] ⚠️ Email already exists: ${email} (race condition - user created between OTP send and verify)`,
+      );
+      console.log(
+        `[Register OTP] User ID: ${(existingEmail as any)._id}, Username: ${existingEmail.username}`,
+      );
+
       // If user exists and OTP is valid, automatically log them in instead of rejecting
       // This handles race conditions where user was created between OTP send and verify
-      const payload = { sub: (existingEmail as any)._id.toString(), username: existingEmail.username };
+      const payload = {
+        sub: (existingEmail as any)._id.toString(),
+        username: existingEmail.username,
+      };
       const token = await this.jwtService.signAsync(payload);
       console.log(`[Register OTP] Token generated successfully for auto-login`);
-      
-      const userObj = (existingEmail as any).toObject ? (existingEmail as any).toObject() : existingEmail;
+
+      const userObj = (existingEmail as any).toObject
+        ? (existingEmail as any).toObject()
+        : existingEmail;
       const { password: _password, ...userData } = userObj;
-      
+
       console.log(`[Register OTP] Returning auto-login response for ${email}`);
       return {
         message: 'Connexion réussie avec le code OTP',
@@ -660,14 +856,20 @@ export class AuthService {
         auto_login: true, // Flag to indicate this was an auto-login
       };
     }
-    
-    console.log(`[Register OTP] Email does not exist, proceeding with registration for ${email}`);
+
+    console.log(
+      `[Register OTP] Email does not exist, proceeding with registration for ${email}`,
+    );
 
     // Check if username already exists
     const existing = await this.userService.findByUsername(username);
     if (existing) {
-      console.log(`[Register OTP] Username conflict: ${username} already exists`);
-      throw new ConflictException('Ce nom d\'utilisateur est déjà utilisé. Veuillez en choisir un autre.');
+      console.log(
+        `[Register OTP] Username conflict: ${username} already exists`,
+      );
+      throw new ConflictException(
+        "Ce nom d'utilisateur est déjà utilisé. Veuillez en choisir un autre.",
+      );
     }
 
     if (!username || !email || !firstName || !lastName) {
@@ -675,13 +877,15 @@ export class AuthService {
     }
 
     const rawPassword = dto.password.trim();
-    if (!rawPassword) throw new BadRequestException('Le mot de passe est requis');
+    if (!rawPassword)
+      throw new BadRequestException('Le mot de passe est requis');
 
     const hash = await bcrypt.hash(rawPassword, 10);
-    
+
     // Generate email verification token (OTP already verified email)
-    const emailVerificationToken = this.emailService.generateVerificationToken();
-    
+    const emailVerificationToken =
+      this.emailService.generateVerificationToken();
+
     try {
       const user = await this.userService.create({
         username,
@@ -693,33 +897,36 @@ export class AuthService {
         email_verification_token: emailVerificationToken,
         email_verified_at: new Date(),
       });
-      
+
       console.log(`[Register OTP] User registered successfully: ${email}`);
 
       const userObj = (user as any).toObject ? (user as any).toObject() : user;
       const { password: _password, ...result } = userObj;
-      return { 
-        message: 'Compte créé avec succès', 
-        user: result 
+      return {
+        message: 'Compte créé avec succès',
+        user: result,
       };
     } catch (error: any) {
       // Handle MongoDB duplicate key errors
       if (error.code === 11000) {
         let duplicateField: string | null = null;
-        
+
         if (error.keyPattern) {
           duplicateField = Object.keys(error.keyPattern)[0];
         }
-        
+
         if (!duplicateField && error.message) {
           const message = error.message.toLowerCase();
           if (message.includes('email') || message.includes('email_1')) {
             duplicateField = 'email';
-          } else if (message.includes('username') || message.includes('username_1')) {
+          } else if (
+            message.includes('username') ||
+            message.includes('username_1')
+          ) {
             duplicateField = 'username';
           }
         }
-        
+
         // If duplicateField is not determined, try to find it by checking the database
         if (!duplicateField) {
           const checkEmail = await this.userService.findByEmail(email);
@@ -730,27 +937,39 @@ export class AuthService {
             duplicateField = 'username';
           }
         }
-        
+
         if (duplicateField === 'email') {
           // Check if user has a password
           const existingUser = await this.userService.findByEmail(email);
           if (existingUser && !existingUser.password) {
-            throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.');
+            throw new ConflictException(
+              'Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.',
+            );
           }
-          throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
+          throw new ConflictException(
+            'Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
+          );
         }
         if (duplicateField === 'username') {
-          throw new ConflictException('Ce nom d\'utilisateur est déjà utilisé. Veuillez en choisir un autre.');
+          throw new ConflictException(
+            "Ce nom d'utilisateur est déjà utilisé. Veuillez en choisir un autre.",
+          );
         }
         // Fallback: check email as it's the most common case
         const existingUser = await this.userService.findByEmail(email);
         if (existingUser) {
           if (!existingUser.password) {
-            throw new ConflictException('Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.');
+            throw new ConflictException(
+              'Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.',
+            );
           }
-          throw new ConflictException('Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
+          throw new ConflictException(
+            'Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
+          );
         }
-        throw new ConflictException('Un utilisateur avec ces informations existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.');
+        throw new ConflictException(
+          'Un utilisateur avec ces informations existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
+        );
       }
       throw error;
     }

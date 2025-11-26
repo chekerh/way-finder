@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HttpModule } from '@nestjs/axios';
-import { DestinationVideo, DestinationVideoSchema } from './destination-video.schema';
+import {
+  DestinationVideo,
+  DestinationVideoSchema,
+} from './destination-video.schema';
 import { DestinationVideoService } from './destination-video.service';
 import { DestinationVideoController } from './destination-video.controller';
 import { ImageAggregatorService } from './image-aggregator.service';
@@ -29,4 +32,3 @@ import { VideoProcessingModule } from '../video-processing/video-processing.modu
   exports: [DestinationVideoService],
 })
 export class DestinationVideoModule {}
-

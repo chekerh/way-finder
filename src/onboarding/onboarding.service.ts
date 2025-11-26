@@ -8,7 +8,10 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { OnboardingSession, OnboardingSessionDocument } from './onboarding.schema';
+import {
+  OnboardingSession,
+  OnboardingSessionDocument,
+} from './onboarding.schema';
 import { AnswerDto } from './onboarding.dto';
 import { OnboardingAIService } from './ai/onboarding-ai.service';
 import { UserService } from '../user/user.service';
@@ -35,7 +38,9 @@ export class OnboardingService {
 
   async startSession(userId: string): Promise<any> {
     // Check if user already has a session
-    let session = await this.onboardingModel.findOne({ user_id: new Types.ObjectId(userId) }).exec();
+    let session = await this.onboardingModel
+      .findOne({ user_id: new Types.ObjectId(userId) })
+      .exec();
 
     if (!session) {
       // Create new session
@@ -59,10 +64,12 @@ export class OnboardingService {
   }
 
   async submitAnswer(userId: string, dto: AnswerDto): Promise<any> {
-    const session = await this.onboardingModel.findOne({
-      user_id: new Types.ObjectId(userId),
-      session_id: dto.session_id,
-    }).exec();
+    const session = await this.onboardingModel
+      .findOne({
+        user_id: new Types.ObjectId(userId),
+        session_id: dto.session_id,
+      })
+      .exec();
 
     if (!session) {
       throw new NotFoundException('Onboarding session not found');
@@ -82,24 +89,31 @@ export class OnboardingService {
     if (!session.questions_answered.includes(dto.question_id)) {
       session.questions_answered.push(dto.question_id);
     }
-    
+
     // Save session before forwarding to ensure answers are persisted
     await session.save();
 
     return this.forwardToEngine(session);
   }
 
-  async completeOnboarding(userId: string, sessionId: string, providedPreferences?: any): Promise<any> {
-    const session = await this.onboardingModel.findOne({
-      user_id: new Types.ObjectId(userId),
-      session_id: sessionId,
-    }).exec();
+  async completeOnboarding(
+    userId: string,
+    sessionId: string,
+    providedPreferences?: any,
+  ): Promise<any> {
+    const session = await this.onboardingModel
+      .findOne({
+        user_id: new Types.ObjectId(userId),
+        session_id: sessionId,
+      })
+      .exec();
 
     if (!session) {
       throw new NotFoundException('Onboarding session not found');
     }
 
-    const preferences = providedPreferences ?? this.aiService.extractPreferences(session.answers);
+    const preferences =
+      providedPreferences ?? this.aiService.extractPreferences(session.answers);
 
     // Update session
     session.completed = true;
@@ -125,16 +139,22 @@ export class OnboardingService {
 
     // Award points for completing onboarding
     try {
-      const points = this.rewardsService.getPointsForAction(PointsSource.ONBOARDING);
+      const points = this.rewardsService.getPointsForAction(
+        PointsSource.ONBOARDING,
+      );
       await this.rewardsService.awardPoints({
         userId,
         points,
         source: PointsSource.ONBOARDING,
         description: 'Completed onboarding questionnaire',
       });
-      this.logger.log(`Awarded ${points} points to user ${userId} for completing onboarding`);
+      this.logger.log(
+        `Awarded ${points} points to user ${userId} for completing onboarding`,
+      );
     } catch (error) {
-      this.logger.warn(`Failed to award points for onboarding: ${error.message}`);
+      this.logger.warn(
+        `Failed to award points for onboarding: ${error.message}`,
+      );
       // Don't fail onboarding if points fail
     }
 
@@ -143,14 +163,17 @@ export class OnboardingService {
       completed: true,
       recommendations_generated: true,
       redirect_to: 'home',
-      message: 'Onboarding completed! Your personalized recommendations are ready.',
+      message:
+        'Onboarding completed! Your personalized recommendations are ready.',
     };
   }
 
   async getStatus(userId: string): Promise<any> {
-    const session = await this.onboardingModel.findOne({
-      user_id: new Types.ObjectId(userId),
-    }).exec();
+    const session = await this.onboardingModel
+      .findOne({
+        user_id: new Types.ObjectId(userId),
+      })
+      .exec();
 
     const user = await this.userService.findById(userId);
 
@@ -167,16 +190,21 @@ export class OnboardingService {
 
   async resumeSession(userId: string, sessionId?: string): Promise<any> {
     let session;
-    
+
     if (sessionId) {
-      session = await this.onboardingModel.findOne({
-        user_id: new Types.ObjectId(userId),
-        session_id: sessionId,
-      }).exec();
+      session = await this.onboardingModel
+        .findOne({
+          user_id: new Types.ObjectId(userId),
+          session_id: sessionId,
+        })
+        .exec();
     } else {
-      session = await this.onboardingModel.findOne({
-        user_id: new Types.ObjectId(userId),
-      }).sort({ createdAt: -1 }).exec();
+      session = await this.onboardingModel
+        .findOne({
+          user_id: new Types.ObjectId(userId),
+        })
+        .sort({ createdAt: -1 })
+        .exec();
     }
 
     if (!session) {
@@ -192,7 +220,9 @@ export class OnboardingService {
 
   async skipOnboarding(userId: string): Promise<any> {
     // Find or create session
-    let session = await this.onboardingModel.findOne({ user_id: new Types.ObjectId(userId) }).exec();
+    let session = await this.onboardingModel
+      .findOne({ user_id: new Types.ObjectId(userId) })
+      .exec();
 
     if (!session) {
       const sessionId = this.generateSessionId();
@@ -224,13 +254,16 @@ export class OnboardingService {
       session_id: session.session_id,
       completed: true,
       skipped: true,
-      message: 'Onboarding skipped. You can update your preferences later in your profile.',
+      message:
+        'Onboarding skipped. You can update your preferences later in your profile.',
     };
   }
 
   async resetOnboarding(userId: string): Promise<any> {
     // Delete existing session
-    await this.onboardingModel.deleteMany({ user_id: new Types.ObjectId(userId) }).exec();
+    await this.onboardingModel
+      .deleteMany({ user_id: new Types.ObjectId(userId) })
+      .exec();
 
     // Reset user onboarding status
     await this.userService.updateProfile(userId, {
@@ -253,14 +286,16 @@ export class OnboardingService {
    */
   private async forwardToEngine(session: OnboardingSessionDocument) {
     // Reload session to ensure we have the latest data
-    const freshSession = await this.onboardingModel.findOne({
-      _id: session._id,
-    }).exec();
-    
+    const freshSession = await this.onboardingModel
+      .findOne({
+        _id: session._id,
+      })
+      .exec();
+
     if (!freshSession) {
       throw new NotFoundException('Onboarding session not found');
     }
-    
+
     // Check if already completed (safety check)
     if (freshSession.completed) {
       return {
@@ -269,12 +304,16 @@ export class OnboardingService {
         message: 'Onboarding already completed!',
       };
     }
-    
+
     // Check if max questions reached (safety check)
     const maxQuestions = Number(process.env.ONBOARDING_MAX_QUESTIONS ?? 5);
     if (freshSession.questions_answered.length >= maxQuestions) {
-      this.logger.log(`Max questions reached (${freshSession.questions_answered.length}/${maxQuestions}), completing onboarding`);
-      const preferences = this.aiService.extractPreferences(freshSession.answers);
+      this.logger.log(
+        `Max questions reached (${freshSession.questions_answered.length}/${maxQuestions}), completing onboarding`,
+      );
+      const preferences = this.aiService.extractPreferences(
+        freshSession.answers,
+      );
       await this.completeOnboarding(
         freshSession.user_id.toString(),
         freshSession.session_id,
@@ -284,20 +323,24 @@ export class OnboardingService {
         session_id: freshSession.session_id,
         completed: true,
         preferences,
-        message: 'Onboarding completed! Your personalized recommendations are ready.',
+        message:
+          'Onboarding completed! Your personalized recommendations are ready.',
       };
     }
-    
+
     if (this.useN8N) {
       return this.forwardToN8N(freshSession);
     }
 
     // Fallback: use local AI service
-    const nextQuestion = await this.aiService.generateNextQuestion(freshSession);
+    const nextQuestion =
+      await this.aiService.generateNextQuestion(freshSession);
 
     // No more questions → complete onboarding locally
     if (!nextQuestion) {
-      const preferences = this.aiService.extractPreferences(freshSession.answers);
+      const preferences = this.aiService.extractPreferences(
+        freshSession.answers,
+      );
       await this.completeOnboarding(
         freshSession.user_id.toString(),
         freshSession.session_id,
@@ -357,7 +400,12 @@ export class OnboardingService {
       const respData = (error?.response && error.response.data) || undefined;
       this.logger.error(
         `n8n request failed`,
-        JSON.stringify({ url, status, response: respData, message: error?.message }),
+        JSON.stringify({
+          url,
+          status,
+          response: respData,
+          message: error?.message,
+        }),
       );
       throw new InternalServerErrorException({
         message: 'Failed to contact onboarding brain',
@@ -366,7 +414,11 @@ export class OnboardingService {
     }
 
     if (response.completed) {
-      await this.completeOnboarding(session.user_id.toString(), session.session_id, response.preferences);
+      await this.completeOnboarding(
+        session.user_id.toString(),
+        session.session_id,
+        response.preferences,
+      );
       return response;
     }
 
@@ -378,4 +430,3 @@ export class OnboardingService {
     return response;
   }
 }
-

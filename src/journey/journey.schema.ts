@@ -35,7 +35,11 @@ export class Journey {
   @Prop({ type: String, default: null })
   video_url?: string; // AI-generated video URL
 
-  @Prop({ type: String, enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending' })
+  @Prop({
+    type: String,
+    enum: ['pending', 'processing', 'completed', 'failed'],
+    default: 'pending',
+  })
   video_status: 'pending' | 'processing' | 'completed' | 'failed';
 
   @Prop({ trim: true, default: '' })
@@ -102,9 +106,9 @@ export class JourneyComment {
 }
 
 export type JourneyCommentDocument = HydratedDocument<JourneyComment>;
-export const JourneyCommentSchema = SchemaFactory.createForClass(JourneyComment);
+export const JourneyCommentSchema =
+  SchemaFactory.createForClass(JourneyComment);
 
 // Indexes for efficient queries
 JourneyCommentSchema.index({ journey_id: 1, createdAt: -1 });
 JourneyCommentSchema.index({ user_id: 1 });
-

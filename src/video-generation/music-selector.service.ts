@@ -36,7 +36,7 @@ export class MusicSelectorService {
   constructor(private readonly httpService: HttpService) {
     this.pixabayApiKey = process.env.PIXABAY_API_KEY || '';
     this.musicCacheDir = path.join(process.cwd(), 'uploads', 'music');
-    
+
     // Create music cache directory if it doesn't exist
     if (!fs.existsSync(this.musicCacheDir)) {
       fs.mkdirSync(this.musicCacheDir, { recursive: true });
@@ -58,14 +58,20 @@ export class MusicSelectorService {
     try {
       // Try Pixabay first
       if (this.pixabayApiKey) {
-        const pixabayResult = await this.fetchFromPixabay(destination, tags, duration);
+        const pixabayResult = await this.fetchFromPixabay(
+          destination,
+          tags,
+          duration,
+        );
         if (pixabayResult) {
           return pixabayResult;
         }
       }
 
       // Fallback: Use generic travel music from Pixabay (public domain)
-      this.logger.warn(`Pixabay API key not configured or no results. Using fallback music.`);
+      this.logger.warn(
+        `Pixabay API key not configured or no results. Using fallback music.`,
+      );
       return await this.fetchFallbackMusic(destination, duration);
     } catch (error) {
       this.logger.error(`Error selecting music: ${error.message}`, error.stack);
@@ -85,11 +91,11 @@ export class MusicSelectorService {
     try {
       // Build search query based on destination and tags
       const searchTerms = this.buildSearchQuery(destination, tags);
-      
+
       const url = `https://pixabay.com/api/videos/?key=${this.pixabayApiKey}&q=${encodeURIComponent(searchTerms)}&video_type=music&category=music&per_page=10&safesearch=true`;
-      
+
       this.logger.log(`Fetching music from Pixabay with query: ${searchTerms}`);
-      
+
       const response = await firstValueFrom(
         this.httpService.get<PixabayMusicResponse>(url, {
           timeout: 10000,
@@ -103,7 +109,8 @@ export class MusicSelectorService {
 
       // Select the best match (first result with medium quality)
       const selectedMusic = response.data.hits[0];
-      const videoUrl = selectedMusic.videos.medium?.url || selectedMusic.videos.small?.url;
+      const videoUrl =
+        selectedMusic.videos.medium?.url || selectedMusic.videos.small?.url;
 
       if (!videoUrl) {
         this.logger.warn('Selected music has no video URL');
@@ -111,8 +118,12 @@ export class MusicSelectorService {
       }
 
       // Download the music file
-      const filePath = await this.downloadMusicFile(videoUrl, destination, 'pixabay');
-      
+      const filePath = await this.downloadMusicFile(
+        videoUrl,
+        destination,
+        'pixabay',
+      );
+
       return {
         filePath,
         source: 'pixabay',
@@ -177,9 +188,15 @@ export class MusicSelectorService {
       );
 
       if (response.data.hits && response.data.hits.length > 0) {
-        const videoUrl = response.data.hits[0].videos.medium?.url || response.data.hits[0].videos.small?.url;
+        const videoUrl =
+          response.data.hits[0].videos.medium?.url ||
+          response.data.hits[0].videos.small?.url;
         if (videoUrl) {
-          const filePath = await this.downloadMusicFile(videoUrl, destination, 'pixabay_fallback');
+          const filePath = await this.downloadMusicFile(
+            videoUrl,
+            destination,
+            'pixabay_fallback',
+          );
           return {
             filePath,
             source: 'pixabay_fallback',
@@ -208,24 +225,28 @@ export class MusicSelectorService {
 
     return new Promise((resolve, reject) => {
       const file = fs.createWriteStream(filePath);
-      
-      https.get(url, (response) => {
-        if (response.statusCode !== 200) {
-          reject(new Error(`Failed to download music: ${response.statusCode}`));
-          return;
-        }
 
-        response.pipe(file);
+      https
+        .get(url, (response) => {
+          if (response.statusCode !== 200) {
+            reject(
+              new Error(`Failed to download music: ${response.statusCode}`),
+            );
+            return;
+          }
 
-        file.on('finish', () => {
-          file.close();
-          this.logger.log(`Music downloaded to: ${filePath}`);
-          resolve(filePath);
+          response.pipe(file);
+
+          file.on('finish', () => {
+            file.close();
+            this.logger.log(`Music downloaded to: ${filePath}`);
+            resolve(filePath);
+          });
+        })
+        .on('error', (error) => {
+          fs.unlinkSync(filePath); // Delete the file on error
+          reject(error);
         });
-      }).on('error', (error) => {
-        fs.unlinkSync(filePath); // Delete the file on error
-        reject(error);
-      });
     });
   }
 
@@ -241,7 +262,7 @@ export class MusicSelectorService {
       for (const file of files) {
         const filePath = path.join(this.musicCacheDir, file);
         const stats = fs.statSync(filePath);
-        
+
         if (now - stats.mtimeMs > maxAge) {
           fs.unlinkSync(filePath);
           this.logger.log(`Deleted old music file: ${file}`);
@@ -252,4 +273,3 @@ export class MusicSelectorService {
     }
   }
 }
-

@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Put, Req, UseGuards, Post, UploadedFile, UseInterceptors, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Put,
+  Req,
+  UseGuards,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './user.dto';
@@ -45,7 +57,8 @@ export class UserController {
         destination: './uploads/profiles',
         filename: (req, file, cb) => {
           const userId = (req as any).user?.sub;
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
           const ext = extname(file.originalname);
           cb(null, `profile-${userId}-${uniqueSuffix}${ext}`);
         },
@@ -55,26 +68,37 @@ export class UserController {
       },
       fileFilter: (req, file, cb) => {
         if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
-          return cb(new BadRequestException('Only image files are allowed!'), false);
+          return cb(
+            new BadRequestException('Only image files are allowed!'),
+            false,
+          );
         }
         cb(null, true);
       },
     }),
   )
-  async uploadProfileImage(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+  async uploadProfileImage(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    
-    this.logger.log(`Uploading profile image to ImgBB for user ${req.user.sub}`);
-    
+
+    this.logger.log(
+      `Uploading profile image to ImgBB for user ${req.user.sub}`,
+    );
+
     let imageUrl: string;
     const filePath = path.join(file.destination, file.filename);
-    
+
     try {
       // Upload to ImgBB
-      const imgbbUrl = await this.imgbbService.uploadImage(filePath, `profile-${req.user.sub}.jpg`);
-      
+      const imgbbUrl = await this.imgbbService.uploadImage(
+        filePath,
+        `profile-${req.user.sub}.jpg`,
+      );
+
       // Clean up local file after successful upload
       try {
         if (fs.existsSync(filePath)) {
@@ -82,13 +106,20 @@ export class UserController {
           this.logger.debug(`Deleted local profile file: ${filePath}`);
         }
       } catch (cleanupError) {
-        this.logger.warn(`Failed to delete local profile file ${filePath}: ${cleanupError.message}`);
+        this.logger.warn(
+          `Failed to delete local profile file ${filePath}: ${cleanupError.message}`,
+        );
       }
-      
+
       imageUrl = imgbbUrl;
-      this.logger.log(`Profile image uploaded successfully to ImgBB: ${imageUrl}`);
+      this.logger.log(
+        `Profile image uploaded successfully to ImgBB: ${imageUrl}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to upload profile image to ImgBB: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to upload profile image to ImgBB: ${error.message}`,
+        error.stack,
+      );
       // Fallback to local storage if ImgBB fails
       const publicBaseUrl = (
         process.env.PUBLIC_BASE_URL ||
@@ -96,17 +127,19 @@ export class UserController {
         'http://localhost:3000'
       ).replace(/\/$/, '');
       imageUrl = `${publicBaseUrl}/uploads/profiles/${file.filename}`;
-      this.logger.warn(`Using local storage fallback for profile image: ${imageUrl}`);
+      this.logger.warn(
+        `Using local storage fallback for profile image: ${imageUrl}`,
+      );
     }
-    
+
     // Update user profile with image URL
     const user = await this.userService.updateProfile(req.user.sub, {
       profile_image_url: imageUrl,
     });
-    
+
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
     const { password, ...result } = userObj;
-    
+
     return {
       message: 'Profile image uploaded successfully',
       profile_image_url: imageUrl,

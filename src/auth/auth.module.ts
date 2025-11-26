@@ -25,4 +25,3 @@ import { OTP, OTPSchema } from './otp.schema';
   exports: [EmailService], // Export for use in other modules if needed
 })
 export class AuthModule {}
-

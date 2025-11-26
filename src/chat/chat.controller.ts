@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { SendMessageDto, SwitchModelDto, ChatModel } from './chat.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -40,23 +48,24 @@ export class ChatController {
   async getAvailableModels(@Req() req: any) {
     return {
       models: [
-        { 
-          id: ChatModel.HUGGINGFACE, 
-          name: 'Hugging Face (Free)', 
-          available: this.aiService.isModelAvailable(ChatModel.HUGGINGFACE) 
+        {
+          id: ChatModel.HUGGINGFACE,
+          name: 'Hugging Face (Free)',
+          available: this.aiService.isModelAvailable(ChatModel.HUGGINGFACE),
         },
-        { 
-          id: ChatModel.OPENAI_GPT4O_MINI, 
-          name: 'OpenAI GPT-4o Mini', 
-          available: this.aiService.isModelAvailable(ChatModel.OPENAI_GPT4O_MINI) 
+        {
+          id: ChatModel.OPENAI_GPT4O_MINI,
+          name: 'OpenAI GPT-4o Mini',
+          available: this.aiService.isModelAvailable(
+            ChatModel.OPENAI_GPT4O_MINI,
+          ),
         },
-        { 
-          id: ChatModel.OPENAI_GPT4O, 
-          name: 'OpenAI GPT-4o', 
-          available: this.aiService.isModelAvailable(ChatModel.OPENAI_GPT4O) 
+        {
+          id: ChatModel.OPENAI_GPT4O,
+          name: 'OpenAI GPT-4o',
+          available: this.aiService.isModelAvailable(ChatModel.OPENAI_GPT4O),
         },
       ],
     };
   }
 }
-

@@ -25,7 +25,7 @@ export class RewardsService {
     points_awarded: number;
   }> {
     const userId = new Types.ObjectId(dto.userId);
-    
+
     // Create transaction
     const transaction = new this.pointsTransactionModel({
       user_id: userId,
@@ -165,7 +165,10 @@ export class RewardsService {
   /**
    * Calculate points for different actions
    */
-  getPointsForAction(source: PointsSource, metadata?: Record<string, any>): number {
+  getPointsForAction(
+    source: PointsSource,
+    metadata?: Record<string, any>,
+  ): number {
     const pointsMap: Record<PointsSource, number> = {
       [PointsSource.ONBOARDING]: 100, // Complete onboarding
       [PointsSource.BOOKING]: 50, // Per booking
@@ -193,4 +196,3 @@ export class RewardsService {
     return pointsMap[source] || 0;
   }
 }
-

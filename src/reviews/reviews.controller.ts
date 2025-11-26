@@ -21,9 +21,17 @@ export class ReviewsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async createReview(@Req() req: any, @Body() createReviewDto: CreateReviewDto) {
-    const review = await this.reviewsService.createReview(req.user.sub, createReviewDto);
-    const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+  async createReview(
+    @Req() req: any,
+    @Body() createReviewDto: CreateReviewDto,
+  ) {
+    const review = await this.reviewsService.createReview(
+      req.user.sub,
+      createReviewDto,
+    );
+    const reviewObj = (review as any).toObject
+      ? (review as any).toObject()
+      : review;
     return reviewObj;
   }
 
@@ -34,8 +42,14 @@ export class ReviewsController {
     @Param('id') reviewId: string,
     @Body() updateReviewDto: UpdateReviewDto,
   ) {
-    const review = await this.reviewsService.updateReview(req.user.sub, reviewId, updateReviewDto);
-    const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+    const review = await this.reviewsService.updateReview(
+      req.user.sub,
+      reviewId,
+      updateReviewDto,
+    );
+    const reviewObj = (review as any).toObject
+      ? (review as any).toObject()
+      : review;
     return reviewObj;
   }
 
@@ -53,7 +67,9 @@ export class ReviewsController {
   ) {
     const reviews = await this.reviewsService.getReviews(itemType, itemId);
     return reviews.map((review) => {
-      const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+      const reviewObj = (review as any).toObject
+        ? (review as any).toObject()
+        : review;
       return reviewObj;
     });
   }
@@ -72,9 +88,14 @@ export class ReviewsController {
     @Req() req: any,
     @Query('type') itemType?: ReviewItemType,
   ) {
-    const reviews = await this.reviewsService.getUserReviews(req.user.sub, itemType);
+    const reviews = await this.reviewsService.getUserReviews(
+      req.user.sub,
+      itemType,
+    );
     return reviews.map((review) => {
-      const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+      const reviewObj = (review as any).toObject
+        ? (review as any).toObject()
+        : review;
       return reviewObj;
     });
   }
@@ -86,12 +107,17 @@ export class ReviewsController {
     @Param('itemType') itemType: ReviewItemType,
     @Param('itemId') itemId: string,
   ) {
-    const review = await this.reviewsService.checkUserReview(req.user.sub, itemType, itemId);
+    const review = await this.reviewsService.checkUserReview(
+      req.user.sub,
+      itemType,
+      itemId,
+    );
     if (!review) {
       return null;
     }
-    const reviewObj = (review as any).toObject ? (review as any).toObject() : review;
+    const reviewObj = (review as any).toObject
+      ? (review as any).toObject()
+      : review;
     return reviewObj;
   }
 }
-

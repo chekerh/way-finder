@@ -32,5 +32,7 @@ export type FavoriteDocument = HydratedDocument<Favorite>;
 export const FavoriteSchema = SchemaFactory.createForClass(Favorite);
 
 // Compound index to ensure unique user-item pairs
-FavoriteSchema.index({ user_id: 1, item_type: 1, item_id: 1 }, { unique: true });
-
+FavoriteSchema.index(
+  { user_id: 1, item_type: 1, item_id: 1 },
+  { unique: true },
+);

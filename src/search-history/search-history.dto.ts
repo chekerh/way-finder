@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsObject, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+  IsObject,
+  IsNumber,
+} from 'class-validator';
 
 export class CreateSearchHistoryDto {
   @IsString()
@@ -37,4 +44,3 @@ export class SaveSearchDto {
   @IsNotEmpty()
   savedName: string;
 }
-

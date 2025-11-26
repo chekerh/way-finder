@@ -1,4 +1,9 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 import { Server } from 'socket.io';
 
 @WebSocketGateway()
@@ -15,4 +20,3 @@ export class RealTimeGateway {
     this.server.emit('chat_message', message);
   }
 }
-

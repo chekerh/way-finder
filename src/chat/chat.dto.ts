@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsOptional, IsString, IsEnum, IsArray } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsArray,
+} from 'class-validator';
 
 export enum ChatModel {
   HUGGINGFACE = 'huggingface',
@@ -35,4 +41,3 @@ export class ChatResponseDto {
   }>;
   session_id: string;
 }
-

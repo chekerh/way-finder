@@ -6,7 +6,11 @@ import { FlightSearchDto, RecommendedQueryDto } from './dto/flight-search.dto';
 import { ExploreSearchDto } from './dto/explore-search.dto';
 import { ActivitySearchDto } from './dto/activity-search.dto';
 import { UserService } from '../user/user.service';
-import { FALLBACK_EXPLORE_OFFERS, FALLBACK_FLIGHT_OFFERS, DESTINATION_DESCRIPTIONS } from './catalog.fallback';
+import {
+  FALLBACK_EXPLORE_OFFERS,
+  FALLBACK_FLIGHT_OFFERS,
+  DESTINATION_DESCRIPTIONS,
+} from './catalog.fallback';
 
 @Injectable()
 export class CatalogService {
@@ -25,7 +29,11 @@ export class CatalogService {
     }
 
     const preferences = (user as any)?.onboarding_preferences ?? {};
-    const origin = overrides.originLocationCode ?? preferences.home_airport ?? preferences.origin ?? 'TUN';
+    const origin =
+      overrides.originLocationCode ??
+      preferences.home_airport ??
+      preferences.origin ??
+      'TUN';
 
     // If a specific destination is requested, use it
     if (overrides.destinationLocationCode) {
@@ -34,7 +42,8 @@ export class CatalogService {
         destinationLocationCode: overrides.destinationLocationCode,
         departureDate: overrides.departureDate ?? this.generateDateString(14),
         returnDate: overrides.returnDate ?? this.generateDateString(21),
-        travelClass: overrides.travelClass ?? this.mapTravelClass(preferences.travel_type),
+        travelClass:
+          overrides.travelClass ?? this.mapTravelClass(preferences.travel_type),
         adults: overrides.adults ?? 1,
         currencyCode: overrides.currencyCode ?? preferences.currency ?? 'EUR',
         max: overrides.maxResults ?? 5,
@@ -46,7 +55,8 @@ export class CatalogService {
         // Ajouter les descriptions aux offres de vol
         if (result?.data?.length) {
           const enrichedData = result.data.map((offer: any) => {
-            const destinationCode = offer.itineraries?.[0]?.segments?.[0]?.arrival?.iataCode;
+            const destinationCode =
+              offer.itineraries?.[0]?.segments?.[0]?.arrival?.iataCode;
             if (destinationCode && DESTINATION_DESCRIPTIONS[destinationCode]) {
               return {
                 ...offer,
@@ -64,71 +74,108 @@ export class CatalogService {
         } else {
           this.registerAmadeusFailure();
         }
-        return this.buildFallbackFlightResponse([overrides.destinationLocationCode!], overrides.maxResults ?? 5);
+        return this.buildFallbackFlightResponse(
+          [overrides.destinationLocationCode],
+          overrides.maxResults ?? 5,
+        );
       }
     }
 
     // Otherwise, search for multiple popular destinations to provide variety
     // Always include diverse destinations to avoid showing only one city
     // Include destinations from different regions: Europe, Asia, Americas
-    const defaultDestinations = ['CDG', 'FCO', 'BCN', 'DXB', 'JFK', 'LHR', 'MAD', 'AMS', 'ATH', 'IST', 'NRT', 'BKK', 'SIN', 'ICN'];
+    const defaultDestinations = [
+      'CDG',
+      'FCO',
+      'BCN',
+      'DXB',
+      'JFK',
+      'LHR',
+      'MAD',
+      'AMS',
+      'ATH',
+      'IST',
+      'NRT',
+      'BKK',
+      'SIN',
+      'ICN',
+    ];
     const popularDestinations =
       preferences.destination_preferences?.length > 0
-        ? [...preferences.destination_preferences, ...defaultDestinations].slice(0, 10) // Mix preferences with defaults
+        ? [
+            ...preferences.destination_preferences,
+            ...defaultDestinations,
+          ].slice(0, 10) // Mix preferences with defaults
         : defaultDestinations;
 
     const allFlights: any[] = [];
     const totalRequested = overrides.maxResults ?? 15;
     // Increase number of destinations to search for more variety
     const numDestinations = Math.min(5, popularDestinations.length); // Search up to 5 different destinations
-    const maxPerDestination = Math.max(2, Math.floor(totalRequested / numDestinations));
+    const maxPerDestination = Math.max(
+      2,
+      Math.floor(totalRequested / numDestinations),
+    );
 
     if (this.shouldUseFallbackFlights()) {
-      return this.buildFallbackFlightResponse(popularDestinations, totalRequested);
+      return this.buildFallbackFlightResponse(
+        popularDestinations,
+        totalRequested,
+      );
     }
 
     let hadSuccessfulExternalCall = false;
 
-    const searchPromises = popularDestinations.slice(0, numDestinations).map(async (dest) => {
-      try {
-        const search: FlightSearchDto = {
-          originLocationCode: origin,
-          destinationLocationCode: dest,
-          departureDate: overrides.departureDate ?? this.generateDateString(14),
-          returnDate: overrides.returnDate ?? this.generateDateString(21),
-          travelClass: overrides.travelClass ?? this.mapTravelClass(preferences.travel_type),
-          adults: overrides.adults ?? 1,
-          currencyCode: overrides.currencyCode ?? preferences.currency ?? 'EUR',
-          max: maxPerDestination,
-          maxPrice: overrides.maxPrice ?? preferences.budget_cap,
-        };
+    const searchPromises = popularDestinations
+      .slice(0, numDestinations)
+      .map(async (dest) => {
+        try {
+          const search: FlightSearchDto = {
+            originLocationCode: origin,
+            destinationLocationCode: dest,
+            departureDate:
+              overrides.departureDate ?? this.generateDateString(14),
+            returnDate: overrides.returnDate ?? this.generateDateString(21),
+            travelClass:
+              overrides.travelClass ??
+              this.mapTravelClass(preferences.travel_type),
+            adults: overrides.adults ?? 1,
+            currencyCode:
+              overrides.currencyCode ?? preferences.currency ?? 'EUR',
+            max: maxPerDestination,
+            maxPrice: overrides.maxPrice ?? preferences.budget_cap,
+          };
 
-        const result = await this.amadeus.searchFlights(search);
-        if (result?.data?.length) {
-          hadSuccessfulExternalCall = true;
-          // Ajouter les descriptions aux offres de vol
-          return result.data.map((offer: any) => {
-            // Extraire le code d'aéroport de destination depuis les segments
-            const destinationCode = offer.itineraries?.[0]?.segments?.[0]?.arrival?.iataCode;
-            if (destinationCode && DESTINATION_DESCRIPTIONS[destinationCode]) {
-              return {
-                ...offer,
-                description: DESTINATION_DESCRIPTIONS[destinationCode],
-              };
-            }
-            return offer;
-          });
+          const result = await this.amadeus.searchFlights(search);
+          if (result?.data?.length) {
+            hadSuccessfulExternalCall = true;
+            // Ajouter les descriptions aux offres de vol
+            return result.data.map((offer: any) => {
+              // Extraire le code d'aéroport de destination depuis les segments
+              const destinationCode =
+                offer.itineraries?.[0]?.segments?.[0]?.arrival?.iataCode;
+              if (
+                destinationCode &&
+                DESTINATION_DESCRIPTIONS[destinationCode]
+              ) {
+                return {
+                  ...offer,
+                  description: DESTINATION_DESCRIPTIONS[destinationCode],
+                };
+              }
+              return offer;
+            });
+          }
+          return [];
+        } catch (error) {
+          if (error instanceof AmadeusRateLimitError) {
+            this.registerAmadeusRateLimit();
+          } else {
+            this.registerAmadeusFailure();
+          }
+          return [];
         }
-        return [];
-      } catch (error) {
-        if (error instanceof AmadeusRateLimitError) {
-          this.registerAmadeusRateLimit();
-        } else {
-          this.registerAmadeusFailure();
-        }
-        return [];
-      }
-    });
+      });
 
     const results = await Promise.all(searchPromises);
     results.forEach((flights) => {
@@ -138,7 +185,10 @@ export class CatalogService {
     });
 
     if (!allFlights.length) {
-      return this.buildFallbackFlightResponse(popularDestinations, totalRequested);
+      return this.buildFallbackFlightResponse(
+        popularDestinations,
+        totalRequested,
+      );
     }
 
     if (hadSuccessfulExternalCall) {
@@ -154,7 +204,9 @@ export class CatalogService {
     const budget = params.budget;
     const destination = params.destination?.toUpperCase();
 
-    let offers = FALLBACK_EXPLORE_OFFERS.filter((offer) => offer.flyFrom === origin);
+    let offers = FALLBACK_EXPLORE_OFFERS.filter(
+      (offer) => offer.flyFrom === origin,
+    );
 
     if (destination) {
       offers = offers.filter((offer) => offer.flyTo === destination);
@@ -175,7 +227,9 @@ export class CatalogService {
     };
   }
 
-  async getActivitiesFeed(params: ActivitySearchDto): Promise<ActivityFeedResponse> {
+  async getActivitiesFeed(
+    params: ActivitySearchDto,
+  ): Promise<ActivityFeedResponse> {
     return this.activities.findActivities(params);
   }
 
@@ -198,7 +252,9 @@ export class CatalogService {
   }
 
   private shouldUseFallbackFlights(): boolean {
-    return !this.amadeus.isConfigured() || Date.now() < this.amadeusCooldownUntil;
+    return (
+      !this.amadeus.isConfigured() || Date.now() < this.amadeusCooldownUntil
+    );
   }
 
   private registerAmadeusFailure() {
@@ -215,8 +271,13 @@ export class CatalogService {
     this.amadeusCooldownUntil = 0;
   }
 
-  private buildFallbackFlightResponse(preferredDestinations: string[], maxResults?: number) {
-    const normalizedPrefs = preferredDestinations.map((code) => code.toUpperCase());
+  private buildFallbackFlightResponse(
+    preferredDestinations: string[],
+    maxResults?: number,
+  ) {
+    const normalizedPrefs = preferredDestinations.map((code) =>
+      code.toUpperCase(),
+    );
 
     // First, try to get flights matching preferences
     let flights = FALLBACK_FLIGHT_OFFERS.filter((flight) =>
@@ -225,15 +286,20 @@ export class CatalogService {
 
     // If we don't have enough variety, add more destinations from fallback
     // Ensure we always have at least 3-5 different destinations
-    const uniqueDestinations = flights.map(f => f.destinationCode).filter((v, i, a) => a.indexOf(v) === i);
+    const uniqueDestinations = flights
+      .map((f) => f.destinationCode)
+      .filter((v, i, a) => a.indexOf(v) === i);
     const minDestinations = Math.min(5, FALLBACK_FLIGHT_OFFERS.length);
-    
+
     if (uniqueDestinations.length < minDestinations) {
       // Add more destinations from fallback to ensure variety
       const additionalFlights = FALLBACK_FLIGHT_OFFERS.filter(
-        (flight) => !uniqueDestinations.includes(flight.destinationCode)
+        (flight) => !uniqueDestinations.includes(flight.destinationCode),
       );
-      flights = [...flights, ...additionalFlights].slice(0, minDestinations * 2); // Take up to 2 per destination
+      flights = [...flights, ...additionalFlights].slice(
+        0,
+        minDestinations * 2,
+      ); // Take up to 2 per destination
     }
 
     if (!flights.length) {
@@ -243,7 +309,7 @@ export class CatalogService {
     // Ensure we return diverse destinations (at least one per unique destination code)
     const diverseFlights: typeof FALLBACK_FLIGHT_OFFERS = [];
     const seenDestinations = new Set<string>();
-    
+
     // First pass: one flight per destination
     for (const flight of flights) {
       if (!seenDestinations.has(flight.destinationCode)) {
@@ -251,12 +317,16 @@ export class CatalogService {
         seenDestinations.add(flight.destinationCode);
       }
     }
-    
+
     // Second pass: add more flights from same destinations if we have space
     for (const flight of flights) {
       if (diverseFlights.length >= (maxResults ?? 15)) break;
-      if (seenDestinations.has(flight.destinationCode) && 
-          diverseFlights.filter(f => f.destinationCode === flight.destinationCode).length < 2) {
+      if (
+        seenDestinations.has(flight.destinationCode) &&
+        diverseFlights.filter(
+          (f) => f.destinationCode === flight.destinationCode,
+        ).length < 2
+      ) {
         diverseFlights.push(flight);
       }
     }
@@ -277,4 +347,3 @@ export class CatalogService {
     };
   }
 }
-

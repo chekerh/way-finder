@@ -17,4 +17,3 @@ import { UserModule } from '../user/user.module';
   exports: [RewardsService],
 })
 export class RewardsModule {}
-

@@ -7,7 +7,9 @@ import { Question } from '../questions/question-templates';
 export class OnboardingAIService {
   private readonly logger = new Logger(OnboardingAIService.name);
   private openai: OpenAI | null = null;
-  private readonly maxQuestions = Number(process.env.ONBOARDING_MAX_QUESTIONS ?? 5);
+  private readonly maxQuestions = Number(
+    process.env.ONBOARDING_MAX_QUESTIONS ?? 5,
+  );
 
   constructor() {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -15,7 +17,9 @@ export class OnboardingAIService {
       this.openai = new OpenAI({ apiKey });
       this.logger.log('OpenAI client initialized');
     } else {
-      this.logger.warn('OPENAI_API_KEY not set, AI question generation will be disabled');
+      this.logger.warn(
+        'OPENAI_API_KEY not set, AI question generation will be disabled',
+      );
     }
   }
 
@@ -23,12 +27,16 @@ export class OnboardingAIService {
    * Generates the next contextual question based on previous answers
    * Uses AI to create questions that flow naturally and relate to previous responses
    */
-  async generateNextQuestion(session: OnboardingSession): Promise<Question | null> {
+  async generateNextQuestion(
+    session: OnboardingSession,
+  ): Promise<Question | null> {
     const answers = session.answers;
     const answeredIds = session.questions_answered;
 
     if (answeredIds.length >= this.maxQuestions) {
-      this.logger.log(`Reached max question limit (${this.maxQuestions}), completing session.`);
+      this.logger.log(
+        `Reached max question limit (${this.maxQuestions}), completing session.`,
+      );
       return null;
     }
 
@@ -44,7 +52,11 @@ export class OnboardingAIService {
 
     try {
       const question = await this.generateAIContextualQuestion(session);
-      return question;
+      const normalizedQuestion = this.normalizeQuestion(question, answeredIds);
+      if (!normalizedQuestion) {
+        return this.generateFallbackQuestion(answeredIds);
+      }
+      return normalizedQuestion;
     } catch (error) {
       this.logger.error('Failed to generate AI question, falling back', error);
       return this.generateFallbackQuestion(answeredIds);
@@ -54,14 +66,16 @@ export class OnboardingAIService {
   /**
    * Uses OpenAI to generate a contextual question based on conversation history
    */
-  private async generateAIContextualQuestion(session: OnboardingSession): Promise<Question | null> {
+  private async generateAIContextualQuestion(
+    session: OnboardingSession,
+  ): Promise<Question | null> {
     if (!this.openai) {
       return null;
     }
 
     const answers = session.answers;
     const conversationHistory = this.buildConversationHistory(answers);
-    
+
     const systemPrompt = `You are an expert travel consultant helping a new user set up their WayFinder travel app preferences. 
 You have ONLY 5 questions total to understand the user's complete travel profile. Each question must be strategic and extract maximum value.
 
@@ -130,7 +144,7 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     }
 
     const parsedResponse = JSON.parse(responseContent);
-    
+
     // Validate and format the question
     const question: Question = {
       id: parsedResponse.id || `question_${Date.now()}`,
@@ -144,8 +158,11 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     };
 
     // Ensure we have valid options for choice questions
-    if ((question.type === 'single_choice' || question.type === 'multiple_choice') && 
-        (!question.options || question.options.length === 0)) {
+    if (
+      (question.type === 'single_choice' ||
+        question.type === 'multiple_choice') &&
+      (!question.options || question.options.length === 0)
+    ) {
       throw new Error('Choice questions must have options');
     }
 
@@ -161,13 +178,13 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     }
 
     const history: string[] = [];
-    
+
     for (const [key, value] of Object.entries(answers)) {
       if (value === null || value === undefined) continue;
-      
+
       const questionText = this.getQuestionText(key);
       let answerText = '';
-      
+
       if (Array.isArray(value)) {
         answerText = value.join(', ');
       } else if (typeof value === 'object') {
@@ -175,12 +192,12 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
       } else {
         answerText = String(value);
       }
-      
+
       history.push(`Q: ${questionText}\nA: ${answerText}`);
     }
 
     return history.join('\n\n');
-    }
+  }
 
   /**
    * Gets human-readable question text for history
@@ -197,9 +214,9 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
       climate_preference: 'What climate do you prefer?',
       duration_preference: 'How long do you typically travel?',
     };
-    
+
     return questionMap[questionId] || `Question about ${questionId}`;
-    }
+  }
 
   /**
    * Fallback question generator when AI is unavailable
@@ -209,7 +226,7 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     if (answeredIds.length >= this.maxQuestions) {
       return null;
     }
-    
+
     // Question 1: Travel style/personality (comprehensive)
     if (!answeredIds.includes('travel_type')) {
       return {
@@ -296,7 +313,10 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     }
 
     // Question 5: Travel frequency or accommodation preference
-    if (!answeredIds.includes('travel_frequency') && !answeredIds.includes('accommodation_preference')) {
+    if (
+      !answeredIds.includes('travel_frequency') &&
+      !answeredIds.includes('accommodation_preference')
+    ) {
       // Prefer travel frequency as it helps with timing recommendations
       return {
         id: 'travel_frequency',
@@ -306,7 +326,10 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
           { value: 'rarely', label: 'Rarely (once a year or less)' },
           { value: 'occasionally', label: 'Occasionally (2-3 times a year)' },
           { value: 'frequently', label: 'Frequently (4-6 times a year)' },
-          { value: 'very_frequently', label: 'Very Frequently (7+ times a year)' },
+          {
+            value: 'very_frequently',
+            label: 'Very Frequently (7+ times a year)',
+          },
         ],
         required: true,
         priority: 5,
@@ -316,21 +339,132 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     return null;
   }
 
+  private normalizeQuestion(
+    question: Question,
+    answeredIds: string[],
+  ): Question | null {
+    const normalizedQuestion: Question = {
+      ...question,
+      id: question.id || `question_${Date.now()}`,
+      required: question.required ?? true,
+    };
+
+    const canonicalId = this.detectCanonicalId(question);
+    if (canonicalId) {
+      normalizedQuestion.id = canonicalId;
+    }
+
+    // Avoid repeating identical questions
+    if (answeredIds.includes(normalizedQuestion.id)) {
+      this.logger.warn(
+        `AI returned duplicate question "${normalizedQuestion.id}", switching to fallback`,
+      );
+      return null;
+    }
+
+    if (normalizedQuestion.type === 'multiple_choice') {
+      const options =
+        normalizedQuestion.options?.filter((opt) => !!opt?.label) ?? [];
+      normalizedQuestion.options = options.slice(0, 6);
+      if (!normalizedQuestion.min_selections) {
+        normalizedQuestion.min_selections = 1;
+      }
+      if (!normalizedQuestion.max_selections) {
+        normalizedQuestion.max_selections = Math.min(
+          5,
+          normalizedQuestion.options.length || 5,
+        );
+      }
+    }
+
+    return normalizedQuestion;
+  }
+
+  private detectCanonicalId(question: Question): string | null {
+    const questionText = question.text?.toLowerCase() ?? '';
+    const optionsText = (question.options ?? [])
+      .map((option) => `${option.label} ${option.value}`.toLowerCase())
+      .join(' ');
+    const haystack = `${questionText} ${optionsText}`;
+
+    const categoryKeywords: Record<string, string[]> = {
+      travel_type: [
+        'travel style',
+        'travel personality',
+        'type of trip',
+        'who do you travel',
+        'companions',
+        'solo',
+        'family',
+        'couple',
+        'friends',
+        'group',
+      ],
+      budget: ['budget', 'spend', 'price', 'cost', '$', '€'],
+      interests: [
+        'interest',
+        'activities',
+        'experiences',
+        'what do you enjoy',
+        'favorite activities',
+        'hobbies',
+      ],
+      destination_preferences: [
+        'destination',
+        'region',
+        'place to go',
+        'where do you want to go',
+        'cities',
+        'regions',
+        'environment',
+      ],
+      accommodation_preference: [
+        'accommodation',
+        'stay',
+        'hotel',
+        'airbnb',
+        'lodging',
+        'where do you stay',
+      ],
+      travel_frequency: [
+        'how often',
+        'frequency',
+        'times per year',
+        'travel frequency',
+      ],
+      climate_preference: ['climate', 'weather', 'temperature', 'season'],
+      duration_preference: ['how long', 'trip length', 'duration', 'stay for'],
+      group_size: ['how many people', 'group size', 'with whom'],
+    };
+
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some((keyword) => haystack.includes(keyword))) {
+        return category;
+      }
+    }
+
+    return null;
+  }
+
   hasEnoughData(answers: Record<string, any>): boolean {
     // With only 5 questions, we need to ensure we have comprehensive data
     // Count meaningful answers (arrays count as 1, but we check if they have items)
     const meaningfulAnswers = Object.values(answers).filter(
-      (v) => v !== null && v !== undefined && (Array.isArray(v) ? v.length > 0 : true)
+      (v) =>
+        v !== null &&
+        v !== undefined &&
+        (Array.isArray(v) ? v.length > 0 : true),
     );
-    
+
     // If we have 5 questions answered, we have enough data
     // Also check if we have key preferences: travel style, budget, interests, or destinations
-    const hasKeyPreferences = 
-      answers.travel_type || 
-      answers.budget || 
+    const hasKeyPreferences =
+      answers.travel_type ||
+      answers.budget ||
       (Array.isArray(answers.interests) && answers.interests.length > 0) ||
-      (Array.isArray(answers.destination_preferences) && answers.destination_preferences.length > 0);
-    
+      (Array.isArray(answers.destination_preferences) &&
+        answers.destination_preferences.length > 0);
+
     return meaningfulAnswers.length >= 4 && hasKeyPreferences; // At least 4 answers with key preferences
   }
 
@@ -357,8 +491,8 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
       preferences.budget = answers.budget;
     }
     if (answers.interests) {
-      preferences.interests = Array.isArray(answers.interests) 
-        ? answers.interests 
+      preferences.interests = Array.isArray(answers.interests)
+        ? answers.interests
         : [answers.interests];
     }
 

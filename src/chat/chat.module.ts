@@ -1,7 +1,12 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ChatMessage, ChatSession, ChatMessageSchema, ChatSessionSchema } from './chat.schema';
+import {
+  ChatMessage,
+  ChatSession,
+  ChatMessageSchema,
+  ChatSessionSchema,
+} from './chat.schema';
 import { ChatService } from './chat.service';
 import { ChatController } from './chat.controller';
 import { MultiModelAIService } from './ai/multi-model-ai.service';
@@ -26,4 +31,3 @@ import { CatalogModule } from '../catalog/catalog.module';
   exports: [ChatService],
 })
 export class ChatModule {}
-

@@ -20,4 +20,3 @@ export interface RecommendedQueryDto extends Partial<FlightSearchDto> {
   airline?: string;
   maxDuration?: number; // in minutes
 }
-

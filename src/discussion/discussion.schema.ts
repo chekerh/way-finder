@@ -32,7 +32,8 @@ export class DiscussionPost {
 }
 
 export type DiscussionPostDocument = HydratedDocument<DiscussionPost>;
-export const DiscussionPostSchema = SchemaFactory.createForClass(DiscussionPost);
+export const DiscussionPostSchema =
+  SchemaFactory.createForClass(DiscussionPost);
 
 @Schema({ timestamps: true })
 export class DiscussionComment {
@@ -56,5 +57,5 @@ export class DiscussionComment {
 }
 
 export type DiscussionCommentDocument = HydratedDocument<DiscussionComment>;
-export const DiscussionCommentSchema = SchemaFactory.createForClass(DiscussionComment);
-
+export const DiscussionCommentSchema =
+  SchemaFactory.createForClass(DiscussionComment);

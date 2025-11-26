@@ -63,4 +63,3 @@ export const PriceAlertSchema = SchemaFactory.createForClass(PriceAlert);
 PriceAlertSchema.index({ userId: 1, isActive: 1 });
 PriceAlertSchema.index({ alertType: 1, itemId: 1, isActive: 1 });
 PriceAlertSchema.index({ isActive: 1, isTriggered: 1, expiresAt: 1 });
-

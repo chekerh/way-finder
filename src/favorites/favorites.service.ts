@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Favorite, FavoriteDocument } from './favorites.schema';
@@ -7,10 +11,14 @@ import { CreateFavoriteDto } from './favorites.dto';
 @Injectable()
 export class FavoritesService {
   constructor(
-    @InjectModel(Favorite.name) private readonly favoriteModel: Model<FavoriteDocument>,
+    @InjectModel(Favorite.name)
+    private readonly favoriteModel: Model<FavoriteDocument>,
   ) {}
 
-  async addFavorite(userId: string, createFavoriteDto: CreateFavoriteDto): Promise<Favorite> {
+  async addFavorite(
+    userId: string,
+    createFavoriteDto: CreateFavoriteDto,
+  ): Promise<Favorite> {
     // Check if already favorited
     const existing = await this.favoriteModel.findOne({
       user_id: userId,
@@ -33,7 +41,11 @@ export class FavoritesService {
     return await favorite.save();
   }
 
-  async removeFavorite(userId: string, itemType: string, itemId: string): Promise<void> {
+  async removeFavorite(
+    userId: string,
+    itemType: string,
+    itemId: string,
+  ): Promise<void> {
     const result = await this.favoriteModel.deleteOne({
       user_id: userId,
       item_type: itemType,
@@ -51,10 +63,17 @@ export class FavoritesService {
       query.item_type = itemType;
     }
 
-    return await this.favoriteModel.find(query).sort({ favorited_at: -1 }).exec();
+    return await this.favoriteModel
+      .find(query)
+      .sort({ favorited_at: -1 })
+      .exec();
   }
 
-  async isFavorite(userId: string, itemType: string, itemId: string): Promise<boolean> {
+  async isFavorite(
+    userId: string,
+    itemType: string,
+    itemId: string,
+  ): Promise<boolean> {
     const favorite = await this.favoriteModel.findOne({
       user_id: userId,
       item_type: itemType,
@@ -73,4 +92,3 @@ export class FavoritesService {
     return await this.favoriteModel.countDocuments(query).exec();
   }
 }
-

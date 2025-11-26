@@ -18,4 +18,3 @@ export class ResumeOnboardingDto {
   @IsString()
   session_id?: string;
 }
-

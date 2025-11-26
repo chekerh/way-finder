@@ -1,4 +1,10 @@
-import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export enum FavoriteItemType {
   FLIGHT = 'flight',
@@ -31,4 +37,3 @@ export class FavoriteResponseDto {
   createdAt: Date;
   updatedAt: Date;
 }
-

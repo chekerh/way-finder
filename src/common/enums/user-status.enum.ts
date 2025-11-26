@@ -5,4 +5,3 @@ export enum UserStatus {
 }
 
 export default UserStatus;
-

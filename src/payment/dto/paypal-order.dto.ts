@@ -61,5 +61,3 @@ export class CreatePaypalOrderDto {
   @Type(() => PaypalItemDto)
   items?: PaypalItemDto[];
 }
-
-

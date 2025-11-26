@@ -5,10 +5,13 @@ import { ItineraryService } from './itinerary.service';
 import { ItineraryController } from './itinerary.controller';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Itinerary.name, schema: ItinerarySchema }])],
+  imports: [
+    MongooseModule.forFeature([
+      { name: Itinerary.name, schema: ItinerarySchema },
+    ]),
+  ],
   controllers: [ItineraryController],
   providers: [ItineraryService],
   exports: [ItineraryService],
 })
 export class ItineraryModule {}
-

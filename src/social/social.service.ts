@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserFollow, UserFollowDocument } from './social.schema';
@@ -8,21 +13,28 @@ import { FollowUserDto, ShareTripDto, UpdateSharedTripDto } from './social.dto';
 @Injectable()
 export class SocialService {
   constructor(
-    @InjectModel(UserFollow.name) private readonly userFollowModel: Model<UserFollowDocument>,
-    @InjectModel(SharedTrip.name) private readonly sharedTripModel: Model<SharedTripDocument>,
+    @InjectModel(UserFollow.name)
+    private readonly userFollowModel: Model<UserFollowDocument>,
+    @InjectModel(SharedTrip.name)
+    private readonly sharedTripModel: Model<SharedTripDocument>,
   ) {}
 
   // ========== FOLLOW/UNFOLLOW ==========
 
-  async followUser(followerId: string, followingId: string): Promise<{ message: string; following: boolean }> {
+  async followUser(
+    followerId: string,
+    followingId: string,
+  ): Promise<{ message: string; following: boolean }> {
     if (followerId === followingId) {
       throw new BadRequestException('Cannot follow yourself');
     }
 
-    const existingFollow = await this.userFollowModel.findOne({
-      followerId,
-      followingId,
-    }).exec();
+    const existingFollow = await this.userFollowModel
+      .findOne({
+        followerId,
+        followingId,
+      })
+      .exec();
 
     if (existingFollow) {
       throw new BadRequestException('Already following this user');
@@ -37,11 +49,16 @@ export class SocialService {
     return { message: 'User followed successfully', following: true };
   }
 
-  async unfollowUser(followerId: string, followingId: string): Promise<{ message: string; following: boolean }> {
-    const result = await this.userFollowModel.deleteOne({
-      followerId,
-      followingId,
-    }).exec();
+  async unfollowUser(
+    followerId: string,
+    followingId: string,
+  ): Promise<{ message: string; following: boolean }> {
+    const result = await this.userFollowModel
+      .deleteOne({
+        followerId,
+        followingId,
+      })
+      .exec();
 
     if (result.deletedCount === 0) {
       throw new NotFoundException('Follow relationship not found');
@@ -50,16 +67,25 @@ export class SocialService {
     return { message: 'User unfollowed successfully', following: false };
   }
 
-  async checkFollowStatus(followerId: string, followingId: string): Promise<boolean> {
-    const follow = await this.userFollowModel.findOne({
-      followerId,
-      followingId,
-    }).exec();
+  async checkFollowStatus(
+    followerId: string,
+    followingId: string,
+  ): Promise<boolean> {
+    const follow = await this.userFollowModel
+      .findOne({
+        followerId,
+        followingId,
+      })
+      .exec();
 
     return !!follow;
   }
 
-  async getFollowers(userId: string, limit: number = 50, skip: number = 0): Promise<any[]> {
+  async getFollowers(
+    userId: string,
+    limit: number = 50,
+    skip: number = 0,
+  ): Promise<any[]> {
     const follows = await this.userFollowModel
       .find({ followingId: userId })
       .populate('followerId', 'username first_name last_name profile_image_url')
@@ -69,7 +95,9 @@ export class SocialService {
       .exec();
 
     return follows.map((follow) => {
-      const follower = (follow.followerId as any).toObject ? (follow.followerId as any).toObject() : follow.followerId;
+      const follower = (follow.followerId as any).toObject
+        ? (follow.followerId as any).toObject()
+        : follow.followerId;
       return {
         ...follower,
         followedAt: follow.followedAt,
@@ -77,17 +105,26 @@ export class SocialService {
     });
   }
 
-  async getFollowing(userId: string, limit: number = 50, skip: number = 0): Promise<any[]> {
+  async getFollowing(
+    userId: string,
+    limit: number = 50,
+    skip: number = 0,
+  ): Promise<any[]> {
     const follows = await this.userFollowModel
       .find({ followerId: userId })
-      .populate('followingId', 'username first_name last_name profile_image_url')
+      .populate(
+        'followingId',
+        'username first_name last_name profile_image_url',
+      )
       .sort({ followedAt: -1 })
       .limit(limit)
       .skip(skip)
       .exec();
 
     return follows.map((follow) => {
-      const following = (follow.followingId as any).toObject ? (follow.followingId as any).toObject() : follow.followingId;
+      const following = (follow.followingId as any).toObject
+        ? (follow.followingId as any).toObject()
+        : follow.followingId;
       return {
         ...following,
         followedAt: follow.followedAt,
@@ -95,7 +132,9 @@ export class SocialService {
     });
   }
 
-  async getFollowCounts(userId: string): Promise<{ followers: number; following: number }> {
+  async getFollowCounts(
+    userId: string,
+  ): Promise<{ followers: number; following: number }> {
     const [followersCount, followingCount] = await Promise.all([
       this.userFollowModel.countDocuments({ followingId: userId }).exec(),
       this.userFollowModel.countDocuments({ followerId: userId }).exec(),
@@ -109,7 +148,10 @@ export class SocialService {
 
   // ========== SHARED TRIPS ==========
 
-  async shareTrip(userId: string, shareTripDto: ShareTripDto): Promise<SharedTrip> {
+  async shareTrip(
+    userId: string,
+    shareTripDto: ShareTripDto,
+  ): Promise<SharedTrip> {
     const sharedTrip = new this.sharedTripModel({
       userId,
       ...shareTripDto,
@@ -118,33 +160,44 @@ export class SocialService {
     });
 
     const savedTrip = await sharedTrip.save();
-    return this.sharedTripModel.findById(savedTrip._id)
+    return this.sharedTripModel
+      .findById(savedTrip._id)
       .populate('userId', 'username first_name last_name profile_image_url')
       .exec() as any;
   }
 
-  async updateSharedTrip(userId: string, tripId: string, updateDto: UpdateSharedTripDto): Promise<SharedTrip> {
-    const trip = await this.sharedTripModel.findOne({ _id: tripId, userId, isVisible: true }).exec();
+  async updateSharedTrip(
+    userId: string,
+    tripId: string,
+    updateDto: UpdateSharedTripDto,
+  ): Promise<SharedTrip> {
+    const trip = await this.sharedTripModel
+      .findOne({ _id: tripId, userId, isVisible: true })
+      .exec();
 
     if (!trip) {
-      throw new NotFoundException('Shared trip not found or you do not have permission to update it');
+      throw new NotFoundException(
+        'Shared trip not found or you do not have permission to update it',
+      );
     }
 
     Object.assign(trip, updateDto);
     const savedTrip = await trip.save();
-    return this.sharedTripModel.findById(savedTrip._id)
+    return this.sharedTripModel
+      .findById(savedTrip._id)
       .populate('userId', 'username first_name last_name profile_image_url')
       .exec() as any;
   }
 
   async deleteSharedTrip(userId: string, tripId: string): Promise<void> {
-    const result = await this.sharedTripModel.updateOne(
-      { _id: tripId, userId },
-      { isVisible: false }
-    ).exec();
+    const result = await this.sharedTripModel
+      .updateOne({ _id: tripId, userId }, { isVisible: false })
+      .exec();
 
     if (result.matchedCount === 0) {
-      throw new NotFoundException('Shared trip not found or you do not have permission to delete it');
+      throw new NotFoundException(
+        'Shared trip not found or you do not have permission to delete it',
+      );
     }
   }
 
@@ -160,7 +213,10 @@ export class SocialService {
 
     // Check if viewer has access (public or following)
     if (!trip.isPublic && viewerId) {
-      const isFollowing = await this.checkFollowStatus(viewerId, trip.userId.toString());
+      const isFollowing = await this.checkFollowStatus(
+        viewerId,
+        trip.userId.toString(),
+      );
       if (!isFollowing && viewerId !== trip.userId.toString()) {
         throw new ForbiddenException('You do not have access to this trip');
       }
@@ -171,7 +227,11 @@ export class SocialService {
     return trip as any;
   }
 
-  async getUserSharedTrips(userId: string, limit: number = 20, skip: number = 0): Promise<SharedTrip[]> {
+  async getUserSharedTrips(
+    userId: string,
+    limit: number = 20,
+    skip: number = 0,
+  ): Promise<SharedTrip[]> {
     return this.sharedTripModel
       .find({ userId, isVisible: true })
       .populate('userId', 'username first_name last_name profile_image_url')
@@ -181,7 +241,11 @@ export class SocialService {
       .exec() as any;
   }
 
-  async getSocialFeed(userId: string, limit: number = 20, skip: number = 0): Promise<SharedTrip[]> {
+  async getSocialFeed(
+    userId: string,
+    limit: number = 20,
+    skip: number = 0,
+  ): Promise<SharedTrip[]> {
     // Get list of users that the current user is following
     const following = await this.userFollowModel
       .find({ followerId: userId })
@@ -208,7 +272,10 @@ export class SocialService {
       .exec() as any;
   }
 
-  async likeSharedTrip(userId: string, tripId: string): Promise<{ message: string; likesCount: number }> {
+  async likeSharedTrip(
+    userId: string,
+    tripId: string,
+  ): Promise<{ message: string; likesCount: number }> {
     // In a full implementation, you'd have a separate likes collection
     // For now, we'll just increment the likes count
     const trip = await this.sharedTripModel.findById(tripId).exec();
@@ -222,4 +289,3 @@ export class SocialService {
     return { message: 'Trip liked successfully', likesCount: trip.likesCount };
   }
 }
-

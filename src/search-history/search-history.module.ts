@@ -15,4 +15,3 @@ import { SearchHistoryController } from './search-history.controller';
   exports: [SearchHistoryService],
 })
 export class SearchHistoryModule {}
-

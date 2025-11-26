@@ -32,7 +32,11 @@ export class SharedTrip {
   @Prop({ trim: true, default: null })
   description?: string;
 
-  @Prop({ type: String, enum: ['itinerary', 'booking', 'destination', 'custom'], required: true })
+  @Prop({
+    type: String,
+    enum: ['itinerary', 'booking', 'destination', 'custom'],
+    required: true,
+  })
   tripType: 'itinerary' | 'booking' | 'destination' | 'custom';
 
   @Prop({ type: Types.ObjectId, refPath: 'tripTypeRef', default: null })
@@ -73,4 +77,3 @@ export const SharedTripSchema = SchemaFactory.createForClass(SharedTrip);
 SharedTripSchema.index({ userId: 1, createdAt: -1 });
 SharedTripSchema.index({ isPublic: 1, isVisible: 1, createdAt: -1 });
 SharedTripSchema.index({ tags: 1 });
-

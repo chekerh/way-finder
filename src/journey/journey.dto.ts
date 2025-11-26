@@ -45,7 +45,10 @@ export class CreateJourneyDto {
         return JSON.parse(value);
       } catch {
         // If not JSON, try splitting by comma
-        return value.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
+        return value
+          .split(',')
+          .map((tag: string) => tag.trim())
+          .filter((tag: string) => tag.length > 0);
       }
     }
     return value;
@@ -129,4 +132,3 @@ export class CreateJourneyCommentDto {
   @IsMongoId()
   parent_comment_id?: string; // For replies
 }
-

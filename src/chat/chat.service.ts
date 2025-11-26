@@ -1,8 +1,18 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { ChatMessage, ChatSession, ChatMessageDocument, ChatSessionDocument } from './chat.schema';
-import { SendMessageDto, SwitchModelDto, ChatResponseDto, ChatModel } from './chat.dto';
+import {
+  ChatMessage,
+  ChatSession,
+  ChatMessageDocument,
+  ChatSessionDocument,
+} from './chat.schema';
+import {
+  SendMessageDto,
+  SwitchModelDto,
+  ChatResponseDto,
+  ChatModel,
+} from './chat.dto';
 import { MultiModelAIService } from './ai/multi-model-ai.service';
 import { UserService } from '../user/user.service';
 import { CatalogService } from '../catalog/catalog.service';
@@ -21,10 +31,15 @@ export class ChatService {
     private readonly catalogService: CatalogService,
   ) {}
 
-  async sendMessage(userId: string, dto: SendMessageDto): Promise<ChatResponseDto> {
+  async sendMessage(
+    userId: string,
+    dto: SendMessageDto,
+  ): Promise<ChatResponseDto> {
     // Get or create chat session
-    let session: ChatSessionDocument | null = await this.chatSessionModel.findOne({ user_id: new Types.ObjectId(userId) }).exec();
-    
+    let session: ChatSessionDocument | null = await this.chatSessionModel
+      .findOne({ user_id: new Types.ObjectId(userId) })
+      .exec();
+
     if (!session) {
       const newSession = await this.createSession(userId);
       if (!newSession) {
@@ -42,11 +57,16 @@ export class ChatService {
     const userPreferences = (user as any).onboarding_preferences || {};
 
     // Use specified model or session's current model
-    const model = dto.model || (session.current_model as ChatModel) || ChatModel.HUGGINGFACE;
+    const model =
+      dto.model ||
+      (session.current_model as ChatModel) ||
+      ChatModel.HUGGINGFACE;
 
     // Verify model is available
     if (!this.aiService.isModelAvailable(model)) {
-      throw new Error(`Model ${model} is not available. Please check API keys.`);
+      throw new Error(
+        `Model ${model} is not available. Please check API keys.`,
+      );
     }
 
     // Get conversation history
@@ -57,7 +77,7 @@ export class ChatService {
       .limit(20)
       .exec();
 
-    const conversationHistory = previousMessages.map(msg => ({
+    const conversationHistory = previousMessages.map((msg) => ({
       role: msg.role,
       content: msg.message,
     }));
@@ -86,21 +106,27 @@ export class ChatService {
         model,
         userId,
       });
-      
+
       // Provide helpful fallback based on error type
       const errorMessage = error?.message || 'Unknown error';
       if (errorMessage.includes('loading')) {
         aiResponse = {
-          response: 'The AI model is currently loading. Please wait a moment and try again, or switch to a different model.',
+          response:
+            'The AI model is currently loading. Please wait a moment and try again, or switch to a different model.',
         };
-      } else if (errorMessage.includes('not available') || errorMessage.includes('not configured')) {
+      } else if (
+        errorMessage.includes('not available') ||
+        errorMessage.includes('not configured')
+      ) {
         aiResponse = {
-          response: 'This AI model is not available. Please switch to a different model using the settings icon.',
+          response:
+            'This AI model is not available. Please switch to a different model using the settings icon.',
         };
       } else {
         // Generic fallback with helpful message
         aiResponse = {
-          response: 'I apologize, but I encountered an error processing your request. Please try again or switch to a different AI model. You can change models using the settings icon.',
+          response:
+            'I apologize, but I encountered an error processing your request. Please try again or switch to a different AI model. You can change models using the settings icon.',
         };
       }
     }
@@ -114,7 +140,10 @@ export class ChatService {
       );
     } else if (this.isFlightRelatedQuery(dto.message)) {
       // User asked about flights but AI didn't generate packs, fetch real flights
-      aiResponse.flightPacks = await this.fetchRealFlightPacks(userPreferences, userId);
+      aiResponse.flightPacks = await this.fetchRealFlightPacks(
+        userPreferences,
+        userId,
+      );
     }
 
     // Save AI response
@@ -135,7 +164,8 @@ export class ChatService {
     session.current_model = model;
     session.context = {
       user_preferences: userPreferences,
-      conversation_summary: this.generateConversationSummary([...conversationHistory, 
+      conversation_summary: this.generateConversationSummary([
+        ...conversationHistory,
         { role: 'user', content: dto.message },
         { role: 'assistant', content: aiResponse.response },
       ]),
@@ -150,14 +180,21 @@ export class ChatService {
     };
   }
 
-  async switchModel(userId: string, dto: SwitchModelDto): Promise<{ success: boolean; model: string }> {
-    const session = await this.chatSessionModel.findOne({ user_id: new Types.ObjectId(userId) }).exec();
-    
+  async switchModel(
+    userId: string,
+    dto: SwitchModelDto,
+  ): Promise<{ success: boolean; model: string }> {
+    const session = await this.chatSessionModel
+      .findOne({ user_id: new Types.ObjectId(userId) })
+      .exec();
+
     if (!session) {
       await this.createSession(userId);
     } else {
       if (!this.aiService.isModelAvailable(dto.model)) {
-        throw new Error(`Model ${dto.model} is not available. Please check API keys.`);
+        throw new Error(
+          `Model ${dto.model} is not available. Please check API keys.`,
+        );
       }
       session.current_model = dto.model;
       await session.save();
@@ -167,8 +204,10 @@ export class ChatService {
   }
 
   async getHistory(userId: string, limit: number = 50): Promise<any[]> {
-    const session = await this.chatSessionModel.findOne({ user_id: new Types.ObjectId(userId) }).exec();
-    
+    const session = await this.chatSessionModel
+      .findOne({ user_id: new Types.ObjectId(userId) })
+      .exec();
+
     if (!session || !session.messages.length) {
       return [];
     }
@@ -179,7 +218,7 @@ export class ChatService {
       .limit(limit)
       .exec();
 
-    return messages.map(msg => ({
+    return messages.map((msg) => ({
       message: msg.message,
       role: msg.role,
       model_used: msg.model_used,
@@ -189,11 +228,15 @@ export class ChatService {
   }
 
   async clearHistory(userId: string): Promise<{ success: boolean }> {
-    const session = await this.chatSessionModel.findOne({ user_id: new Types.ObjectId(userId) }).exec();
-    
+    const session = await this.chatSessionModel
+      .findOne({ user_id: new Types.ObjectId(userId) })
+      .exec();
+
     if (session) {
       // Delete all messages
-      await this.chatMessageModel.deleteMany({ user_id: new Types.ObjectId(userId) }).exec();
+      await this.chatMessageModel
+        .deleteMany({ user_id: new Types.ObjectId(userId) })
+        .exec();
       // Reset session
       session.messages = [];
       session.context = {};
@@ -203,7 +246,9 @@ export class ChatService {
     return { success: true };
   }
 
-  private async createSession(userId: string): Promise<ChatSessionDocument | null> {
+  private async createSession(
+    userId: string,
+  ): Promise<ChatSessionDocument | null> {
     const sessionId = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const session = new this.chatSessionModel({
       user_id: new Types.ObjectId(userId),
@@ -216,9 +261,18 @@ export class ChatService {
   }
 
   private isFlightRelatedQuery(message: string): boolean {
-    const flightKeywords = ['flight', 'fly', 'ticket', 'pack', 'travel', 'trip', 'destination', 'airline'];
+    const flightKeywords = [
+      'flight',
+      'fly',
+      'ticket',
+      'pack',
+      'travel',
+      'trip',
+      'destination',
+      'airline',
+    ];
     const lowerMessage = message.toLowerCase();
-    return flightKeywords.some(keyword => lowerMessage.includes(keyword));
+    return flightKeywords.some((keyword) => lowerMessage.includes(keyword));
   }
 
   private async enhanceFlightPacksWithRealData(
@@ -259,7 +313,10 @@ export class ChatService {
     return aiPacks;
   }
 
-  private async fetchRealFlightPacks(preferences: any, userId?: string): Promise<any[]> {
+  private async fetchRealFlightPacks(
+    preferences: any,
+    userId?: string,
+  ): Promise<any[]> {
     try {
       const flights = await this.catalogService.getRecommendedFlights(
         userId || 'system',
@@ -271,9 +328,15 @@ export class ChatService {
 
       if (flights?.data && flights.data.length > 0) {
         return flights.data.map((flight: any, index: number) => {
-          const origin = flight.itineraries?.[0]?.segments?.[0]?.departure?.iataCode || 'TUN';
-          const destination = flight.itineraries?.[0]?.segments?.[flight.itineraries[0].segments.length - 1]?.arrival?.iataCode || 'Unknown';
-          const airline = flight.validatingAirlineCodes?.[0] || 'Various Airlines';
+          const origin =
+            flight.itineraries?.[0]?.segments?.[0]?.departure?.iataCode ||
+            'TUN';
+          const destination =
+            flight.itineraries?.[0]?.segments?.[
+              flight.itineraries[0].segments.length - 1
+            ]?.arrival?.iataCode || 'Unknown';
+          const airline =
+            flight.validatingAirlineCodes?.[0] || 'Various Airlines';
           const price = Math.round(flight.price?.total || 0);
 
           return {
@@ -294,11 +357,12 @@ export class ChatService {
     return [];
   }
 
-  private generateConversationSummary(messages: Array<{ role: string; content: string }>): string {
+  private generateConversationSummary(
+    messages: Array<{ role: string; content: string }>,
+  ): string {
     const recentMessages = messages.slice(-5);
     return recentMessages
-      .map(msg => `${msg.role}: ${msg.content.substring(0, 50)}...`)
+      .map((msg) => `${msg.role}: ${msg.content.substring(0, 50)}...`)
       .join(' | ');
   }
 }
-

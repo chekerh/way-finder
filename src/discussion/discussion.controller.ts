@@ -11,7 +11,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { DiscussionService } from './discussion.service';
-import { CreatePostDto, CreateCommentDto, UpdatePostDto } from './discussion.dto';
+import {
+  CreatePostDto,
+  CreateCommentDto,
+  UpdatePostDto,
+} from './discussion.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('discussion')
@@ -44,7 +48,11 @@ export class DiscussionController {
 
   @UseGuards(JwtAuthGuard)
   @Put('posts/:id')
-  async updatePost(@Req() req: any, @Param('id') id: string, @Body() dto: UpdatePostDto) {
+  async updatePost(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdatePostDto,
+  ) {
     return this.discussionService.updatePost(req.user.sub, id, dto);
   }
 
@@ -62,7 +70,11 @@ export class DiscussionController {
 
   @UseGuards(JwtAuthGuard)
   @Post('posts/:id/comments')
-  async createComment(@Req() req: any, @Param('id') postId: string, @Body() dto: CreateCommentDto) {
+  async createComment(
+    @Req() req: any,
+    @Param('id') postId: string,
+    @Body() dto: CreateCommentDto,
+  ) {
     return this.discussionService.createComment(req.user.sub, postId, dto);
   }
 
@@ -72,7 +84,11 @@ export class DiscussionController {
     @Query('limit') limit?: string,
     @Query('skip') skip?: string,
   ) {
-    return this.discussionService.getComments(postId, limit ? Number(limit) : 50, skip ? Number(skip) : 0);
+    return this.discussionService.getComments(
+      postId,
+      limit ? Number(limit) : 50,
+      skip ? Number(skip) : 0,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -87,4 +103,3 @@ export class DiscussionController {
     return this.discussionService.deleteComment(req.user.sub, commentId);
   }
 }
-

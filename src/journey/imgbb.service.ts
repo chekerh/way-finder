@@ -52,7 +52,9 @@ export class ImgBBService {
   constructor(private readonly httpService: HttpService) {
     this.apiKey = process.env.IMGBB_API_KEY || '';
     if (!this.apiKey) {
-      this.logger.warn('IMGBB_API_KEY not configured. Image uploads will fail.');
+      this.logger.warn(
+        'IMGBB_API_KEY not configured. Image uploads will fail.',
+      );
     }
   }
 
@@ -70,7 +72,7 @@ export class ImgBBService {
     try {
       const formData = new FormData();
       const fileStream = fs.createReadStream(filePath);
-      
+
       formData.append('key', this.apiKey);
       formData.append('image', fileStream, {
         filename: fileName || filePath.split('/').pop() || 'image.jpg',
@@ -87,13 +89,20 @@ export class ImgBBService {
       );
 
       if (response.data.success && response.data.data?.url) {
-        this.logger.log(`Image uploaded successfully: ${response.data.data.url}`);
+        this.logger.log(
+          `Image uploaded successfully: ${response.data.data.url}`,
+        );
         return response.data.data.url;
       } else {
-        throw new Error(`ImgBB upload failed: ${JSON.stringify(response.data)}`);
+        throw new Error(
+          `ImgBB upload failed: ${JSON.stringify(response.data)}`,
+        );
       }
     } catch (error) {
-      this.logger.error(`Failed to upload image to ImgBB: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to upload image to ImgBB: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -112,7 +121,9 @@ export class ImgBBService {
       // Upload images in parallel for better performance
       const uploadPromises = filePaths.map((filePath, index) =>
         this.uploadImage(filePath).catch((error) => {
-          this.logger.error(`Failed to upload image ${index + 1}/${filePaths.length}: ${error.message}`);
+          this.logger.error(
+            `Failed to upload image ${index + 1}/${filePaths.length}: ${error.message}`,
+          );
           throw error;
         }),
       );
@@ -121,7 +132,10 @@ export class ImgBBService {
       this.logger.log(`Successfully uploaded ${urls.length} images to ImgBB`);
       return urls;
     } catch (error) {
-      this.logger.error(`Failed to upload images batch: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to upload images batch: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -160,13 +174,20 @@ export class ImgBBService {
       );
 
       if (response.data.success && response.data.data?.url) {
-        this.logger.log(`Image uploaded successfully from buffer: ${response.data.data.url}`);
+        this.logger.log(
+          `Image uploaded successfully from buffer: ${response.data.data.url}`,
+        );
         return response.data.data.url;
       } else {
-        throw new Error(`ImgBB upload failed: ${JSON.stringify(response.data)}`);
+        throw new Error(
+          `ImgBB upload failed: ${JSON.stringify(response.data)}`,
+        );
       }
     } catch (error) {
-      this.logger.error(`Failed to upload image from buffer to ImgBB: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to upload image from buffer to ImgBB: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -179,9 +200,14 @@ export class ImgBBService {
    * @param fileName - Optional custom filename
    * @returns The ImgBB URL of the uploaded video (or null if upload fails)
    */
-  async uploadVideo(filePath: string, fileName?: string): Promise<string | null> {
+  async uploadVideo(
+    filePath: string,
+    fileName?: string,
+  ): Promise<string | null> {
     if (!this.apiKey) {
-      this.logger.warn('IMGBB_API_KEY is not configured. Video upload skipped.');
+      this.logger.warn(
+        'IMGBB_API_KEY is not configured. Video upload skipped.',
+      );
       return null;
     }
 
@@ -193,13 +219,15 @@ export class ImgBBService {
     try {
       const formData = new FormData();
       const fileStream = fs.createReadStream(filePath);
-      
+
       // Get file size for logging
       const stats = fs.statSync(filePath);
       const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-      
-      this.logger.log(`Uploading video ${fileName || filePath} (${fileSizeMB}MB) to ImgBB...`);
-      
+
+      this.logger.log(
+        `Uploading video ${fileName || filePath} (${fileSizeMB}MB) to ImgBB...`,
+      );
+
       formData.append('key', this.apiKey);
       // ImgBB API accepts 'image' field even for videos (we'll try)
       formData.append('image', fileStream, {
@@ -218,17 +246,22 @@ export class ImgBBService {
       );
 
       if (response.data.success && response.data.data?.url) {
-        this.logger.log(`Video uploaded successfully to ImgBB: ${response.data.data.url}`);
+        this.logger.log(
+          `Video uploaded successfully to ImgBB: ${response.data.data.url}`,
+        );
         return response.data.data.url;
       } else {
-        this.logger.warn(`ImgBB upload failed (may not support videos): ${JSON.stringify(response.data)}`);
+        this.logger.warn(
+          `ImgBB upload failed (may not support videos): ${JSON.stringify(response.data)}`,
+        );
         return null;
       }
     } catch (error) {
       // ImgBB may not support video files, so we log as warning instead of error
-      this.logger.warn(`ImgBB video upload failed (service may not support videos): ${error.message}`);
+      this.logger.warn(
+        `ImgBB video upload failed (service may not support videos): ${error.message}`,
+      );
       return null;
     }
   }
 }
-

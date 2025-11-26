@@ -39,5 +39,5 @@ export class OnboardingSession {
 }
 
 export type OnboardingSessionDocument = HydratedDocument<OnboardingSession>;
-export const OnboardingSessionSchema = SchemaFactory.createForClass(OnboardingSession);
-
+export const OnboardingSessionSchema =
+  SchemaFactory.createForClass(OnboardingSession);

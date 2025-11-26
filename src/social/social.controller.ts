@@ -45,7 +45,10 @@ export class SocialController {
   @UseGuards(JwtAuthGuard)
   @Get('follow-status/:userId')
   async checkFollowStatus(@Req() req: any, @Param('userId') userId: string) {
-    const isFollowing = await this.socialService.checkFollowStatus(req.user.sub, userId);
+    const isFollowing = await this.socialService.checkFollowStatus(
+      req.user.sub,
+      userId,
+    );
     return { isFollowing };
   }
 
@@ -107,7 +110,11 @@ export class SocialController {
     @Param('id') tripId: string,
     @Body() updateDto: UpdateSharedTripDto,
   ) {
-    const trip = await this.socialService.updateSharedTrip(req.user.sub, tripId, updateDto);
+    const trip = await this.socialService.updateSharedTrip(
+      req.user.sub,
+      tripId,
+      updateDto,
+    );
     const tripObj = (trip as any).toObject ? (trip as any).toObject() : trip;
     return tripObj;
   }
@@ -168,4 +175,3 @@ export class SocialController {
     return this.socialService.likeSharedTrip(req.user.sub, tripId);
   }
 }
-

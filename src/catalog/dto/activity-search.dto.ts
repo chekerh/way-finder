@@ -4,4 +4,3 @@ export interface ActivitySearchDto {
   limit?: number;
   radiusMeters?: number;
 }
-

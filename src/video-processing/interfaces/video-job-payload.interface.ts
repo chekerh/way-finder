@@ -11,4 +11,3 @@ export interface VideoJobPayload {
   captionText?: string | null;
   slides: VideoSlideInput[];
 }
-

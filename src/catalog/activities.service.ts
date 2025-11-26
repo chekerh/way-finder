@@ -36,15 +36,20 @@ export interface ActivityFeedResponse {
 export class ActivitiesService {
   private readonly logger = new Logger(ActivitiesService.name);
   private readonly apiKey = process.env.OPENTRIPMAP_KEY;
-  private readonly host = process.env.OPENTRIPMAP_HOST ?? 'https://api.opentripmap.com/0.1';
+  private readonly host =
+    process.env.OPENTRIPMAP_HOST ?? 'https://api.opentripmap.com/0.1';
 
   constructor(private readonly http: HttpService) {}
 
-  async findActivities(params: ActivitySearchDto): Promise<ActivityFeedResponse> {
+  async findActivities(
+    params: ActivitySearchDto,
+  ): Promise<ActivityFeedResponse> {
     const safeCity = params.city?.trim() || 'Paris';
 
     if (!this.apiKey) {
-      this.logger.warn('OpenTripMap API key missing, serving fallback activities');
+      this.logger.warn(
+        'OpenTripMap API key missing, serving fallback activities',
+      );
       return this.buildFallbackResponse({ ...params, city: safeCity });
     }
 
@@ -72,12 +77,16 @@ export class ActivitiesService {
       );
 
       const mapped = (response.data ?? [])
-        .filter(activity => Boolean(activity?.name))
-        .map((activity, index) => this.mapExternalActivity(activity, safeCity, index))
-        .filter(Boolean) as FallbackActivity[];
+        .filter((activity) => Boolean(activity?.name))
+        .map((activity, index) =>
+          this.mapExternalActivity(activity, safeCity, index),
+        )
+        .filter(Boolean);
 
       if (!mapped.length) {
-        this.logger.warn(`No activities returned for ${safeCity}, using fallback dataset`);
+        this.logger.warn(
+          `No activities returned for ${safeCity}, using fallback dataset`,
+        );
         return this.buildFallbackResponse({ ...params, city: safeCity });
       }
 
@@ -89,7 +98,10 @@ export class ActivitiesService {
         items: limited,
       };
     } catch (error) {
-      this.logger.error('Failed to fetch activities', error instanceof Error ? error.stack : '');
+      this.logger.error(
+        'Failed to fetch activities',
+        error instanceof Error ? error.stack : '',
+      );
       return this.buildFallbackResponse({ ...params, city: safeCity });
     }
   }
@@ -108,12 +120,16 @@ export class ActivitiesService {
     }
   }
 
-  private buildFallbackResponse(params: ActivitySearchDto & { city: string }): ActivityFeedResponse {
+  private buildFallbackResponse(
+    params: ActivitySearchDto & { city: string },
+  ): ActivityFeedResponse {
     const themes = this.normalizeThemes(params.themes);
     let pool = FALLBACK_ACTIVITIES;
 
     if (params.city) {
-      pool = pool.filter((activity) => activity.city.toLowerCase() === params.city.toLowerCase());
+      pool = pool.filter(
+        (activity) => activity.city.toLowerCase() === params.city.toLowerCase(),
+      );
       if (!pool.length) {
         pool = FALLBACK_ACTIVITIES;
       }
@@ -124,7 +140,9 @@ export class ActivitiesService {
       pool = pool.filter(
         (activity) =>
           normalizedThemes.includes(activity.category.toLowerCase()) ||
-          activity.tags.some((tag) => normalizedThemes.includes(tag.toLowerCase())),
+          activity.tags.some((tag) =>
+            normalizedThemes.includes(tag.toLowerCase()),
+          ),
       );
     }
 
@@ -142,7 +160,10 @@ export class ActivitiesService {
       return [];
     }
     if (Array.isArray(themes)) {
-      return themes.flatMap((theme) => (theme ? theme.split(',') : [])).map((theme) => theme.trim()).filter(Boolean);
+      return themes
+        .flatMap((theme) => (theme ? theme.split(',') : []))
+        .map((theme) => theme.trim())
+        .filter(Boolean);
     }
     return themes
       .split(',')
@@ -150,7 +171,11 @@ export class ActivitiesService {
       .filter(Boolean);
   }
 
-  private mapExternalActivity(activity: OpenTripMapActivity, city: string, index: number): FallbackActivity {
+  private mapExternalActivity(
+    activity: OpenTripMapActivity,
+    city: string,
+    index: number,
+  ): FallbackActivity {
     const category = activity.kinds?.split(',')?.[0]?.trim() || 'Activités';
     const imageUrl = this.getImageForCategory(category, city, index);
     const label = activity.name.trim();
@@ -169,13 +194,21 @@ export class ActivitiesService {
       imageUrl,
       address: `${city}, ${this.getCountryForCity(city)}`,
       price: undefined,
-      rating: activity.rate ? Number((activity.rate / 3).toFixed(1)) : undefined,
-      tags: activity.kinds ? activity.kinds.split(',').map((kind) => kind.trim()) : [],
+      rating: activity.rate
+        ? Number((activity.rate / 3).toFixed(1))
+        : undefined,
+      tags: activity.kinds
+        ? activity.kinds.split(',').map((kind) => kind.trim())
+        : [],
       coordinates,
     };
   }
 
-  private getImageForCategory(category: string, city: string, seed: number): string {
+  private getImageForCategory(
+    category: string,
+    city: string,
+    seed: number,
+  ): string {
     const normalized = category.toLowerCase();
     if (normalized.includes('museum') || normalized.includes('muse')) {
       return 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&h=600&fit=crop&q=80';
@@ -212,4 +245,3 @@ export class ActivitiesService {
     }
   }
 }
-

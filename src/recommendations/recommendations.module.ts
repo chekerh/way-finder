@@ -9,4 +9,3 @@ import { UserModule } from '../user/user.module';
   providers: [RecommendationsService],
 })
 export class RecommendationsModule {}
-

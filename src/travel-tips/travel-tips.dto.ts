@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsEnum, IsNumber, Min, Max, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  Min,
+  Max,
+  IsNotEmpty,
+} from 'class-validator';
 
 export enum TravelTipCategory {
   GENERAL = 'general',
@@ -59,4 +67,3 @@ export class MarkTipHelpfulDto {
   @IsString()
   tipId: string;
 }
-

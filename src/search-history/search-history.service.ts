@@ -2,28 +2,39 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SearchHistory, SearchHistoryDocument } from './search-history.schema';
-import { CreateSearchHistoryDto, UpdateSearchHistoryDto, SaveSearchDto } from './search-history.dto';
+import {
+  CreateSearchHistoryDto,
+  UpdateSearchHistoryDto,
+  SaveSearchDto,
+} from './search-history.dto';
 
 @Injectable()
 export class SearchHistoryService {
   constructor(
-    @InjectModel(SearchHistory.name) private readonly searchHistoryModel: Model<SearchHistoryDocument>,
+    @InjectModel(SearchHistory.name)
+    private readonly searchHistoryModel: Model<SearchHistoryDocument>,
   ) {}
 
-  async recordSearch(userId: string, createSearchDto: CreateSearchHistoryDto): Promise<SearchHistory> {
+  async recordSearch(
+    userId: string,
+    createSearchDto: CreateSearchHistoryDto,
+  ): Promise<SearchHistory> {
     // Check if a similar search already exists
-    const existingSearch = await this.searchHistoryModel.findOne({
-      userId,
-      searchType: createSearchDto.searchType,
-      searchParams: createSearchDto.searchParams,
-      isActive: true,
-    }).exec();
+    const existingSearch = await this.searchHistoryModel
+      .findOne({
+        userId,
+        searchType: createSearchDto.searchType,
+        searchParams: createSearchDto.searchParams,
+        isActive: true,
+      })
+      .exec();
 
     if (existingSearch) {
       // Update existing search: increment count and update timestamp
       existingSearch.searchCount += 1;
       existingSearch.lastSearchedAt = new Date();
-      existingSearch.searchQuery = createSearchDto.searchQuery || existingSearch.searchQuery;
+      existingSearch.searchQuery =
+        createSearchDto.searchQuery || existingSearch.searchQuery;
       if (createSearchDto.isSaved !== undefined) {
         existingSearch.isSaved = createSearchDto.isSaved;
       }
@@ -85,8 +96,14 @@ export class SearchHistoryService {
       .exec();
   }
 
-  async saveSearch(userId: string, searchId: string, saveSearchDto: SaveSearchDto): Promise<SearchHistory> {
-    const search = await this.searchHistoryModel.findOne({ _id: searchId, userId, isActive: true }).exec();
+  async saveSearch(
+    userId: string,
+    searchId: string,
+    saveSearchDto: SaveSearchDto,
+  ): Promise<SearchHistory> {
+    const search = await this.searchHistoryModel
+      .findOne({ _id: searchId, userId, isActive: true })
+      .exec();
 
     if (!search) {
       throw new NotFoundException('Search history not found');
@@ -99,7 +116,9 @@ export class SearchHistoryService {
   }
 
   async unsaveSearch(userId: string, searchId: string): Promise<SearchHistory> {
-    const search = await this.searchHistoryModel.findOne({ _id: searchId, userId, isActive: true }).exec();
+    const search = await this.searchHistoryModel
+      .findOne({ _id: searchId, userId, isActive: true })
+      .exec();
 
     if (!search) {
       throw new NotFoundException('Search history not found');
@@ -116,7 +135,9 @@ export class SearchHistoryService {
     searchId: string,
     updateDto: UpdateSearchHistoryDto,
   ): Promise<SearchHistory> {
-    const search = await this.searchHistoryModel.findOne({ _id: searchId, userId, isActive: true }).exec();
+    const search = await this.searchHistoryModel
+      .findOne({ _id: searchId, userId, isActive: true })
+      .exec();
 
     if (!search) {
       throw new NotFoundException('Search history not found');
@@ -128,17 +149,19 @@ export class SearchHistoryService {
   }
 
   async deleteSearchHistory(userId: string, searchId: string): Promise<void> {
-    const result = await this.searchHistoryModel.updateOne(
-      { _id: searchId, userId },
-      { isActive: false },
-    ).exec();
+    const result = await this.searchHistoryModel
+      .updateOne({ _id: searchId, userId }, { isActive: false })
+      .exec();
 
     if (result.matchedCount === 0) {
       throw new NotFoundException('Search history not found');
     }
   }
 
-  async clearRecentSearches(userId: string, searchType?: string): Promise<void> {
+  async clearRecentSearches(
+    userId: string,
+    searchType?: string,
+  ): Promise<void> {
     const query: any = { userId, isSaved: false, isActive: true };
     if (searchType) {
       query.searchType = searchType;
@@ -155,11 +178,15 @@ export class SearchHistoryService {
   }> {
     const [totalSearches, savedSearches, searchesByType] = await Promise.all([
       this.searchHistoryModel.countDocuments({ userId, isActive: true }).exec(),
-      this.searchHistoryModel.countDocuments({ userId, isSaved: true, isActive: true }).exec(),
-      this.searchHistoryModel.aggregate([
-        { $match: { userId: userId as any, isActive: true } },
-        { $group: { _id: '$searchType', count: { $sum: 1 } } },
-      ]).exec(),
+      this.searchHistoryModel
+        .countDocuments({ userId, isSaved: true, isActive: true })
+        .exec(),
+      this.searchHistoryModel
+        .aggregate([
+          { $match: { userId: userId as any, isActive: true } },
+          { $group: { _id: '$searchType', count: { $sum: 1 } } },
+        ])
+        .exec(),
     ]);
 
     // Get most searched destination
@@ -176,8 +203,9 @@ export class SearchHistoryService {
       }
     });
 
-    const mostSearchedDestination = Object.entries(destinationCounts)
-      .sort(([, a], [, b]) => b - a)[0]?.[0];
+    const mostSearchedDestination = Object.entries(destinationCounts).sort(
+      ([, a], [, b]) => b - a,
+    )[0]?.[0];
 
     const searchesByTypeMap: Record<string, number> = {};
     searchesByType.forEach((item: any) => {
@@ -192,4 +220,3 @@ export class SearchHistoryService {
     };
   }
 }
-

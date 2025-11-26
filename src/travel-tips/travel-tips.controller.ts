@@ -1,6 +1,19 @@
-import { Controller, Get, Post, Body, Query, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { TravelTipsService } from './travel-tips.service';
-import { GetTravelTipsDto, CreateTravelTipDto, MarkTipHelpfulDto, TravelTipCategory } from './travel-tips.dto';
+import {
+  GetTravelTipsDto,
+  CreateTravelTipDto,
+  MarkTipHelpfulDto,
+  TravelTipCategory,
+} from './travel-tips.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('travel-tips')
@@ -43,4 +56,3 @@ export class TravelTipsController {
     return this.travelTipsService.getTipById(tipId);
   }
 }
-

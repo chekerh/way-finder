@@ -1,4 +1,14 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsBoolean, IsNumber, ValidateNested, IsDateString, MinLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  ValidateNested,
+  IsDateString,
+  MinLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ActivityDto {
@@ -146,4 +156,3 @@ export class UpdateItineraryDto {
   @IsOptional()
   currency?: string;
 }
-

@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, IsObject, IsEnum, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  IsObject,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
 
 export class CreatePriceAlertDto {
   @IsString()
@@ -67,4 +76,3 @@ export class UpdatePriceAlertDto {
   @IsOptional()
   sendEmail?: boolean;
 }
-

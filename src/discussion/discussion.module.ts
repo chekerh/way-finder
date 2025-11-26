@@ -25,4 +25,3 @@ import { UserModule } from '../user/user.module';
   exports: [DiscussionService],
 })
 export class DiscussionModule {}
-

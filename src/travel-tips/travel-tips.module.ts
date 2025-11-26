@@ -6,11 +6,12 @@ import { TravelTip, TravelTipSchema } from './travel-tips.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: TravelTip.name, schema: TravelTipSchema }]),
+    MongooseModule.forFeature([
+      { name: TravelTip.name, schema: TravelTipSchema },
+    ]),
   ],
   controllers: [TravelTipsController],
   providers: [TravelTipsService],
   exports: [TravelTipsService],
 })
 export class TravelTipsModule {}
-

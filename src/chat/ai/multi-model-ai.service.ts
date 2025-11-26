@@ -9,7 +9,8 @@ export class MultiModelAIService {
   private readonly logger = new Logger(MultiModelAIService.name);
   private openai: OpenAI | null = null;
   private readonly huggingFaceApiKey = process.env.HUGGINGFACE_API_KEY;
-  private readonly huggingFaceModel = process.env.HUGGINGFACE_MODEL || 'mistralai/Mistral-7B-Instruct-v0.2';
+  private readonly huggingFaceModel =
+    process.env.HUGGINGFACE_MODEL || 'mistralai/Mistral-7B-Instruct-v0.2';
 
   constructor(private readonly http: HttpService) {
     const openaiKey = process.env.OPENAI_API_KEY;
@@ -17,13 +18,17 @@ export class MultiModelAIService {
       this.openai = new OpenAI({ apiKey: openaiKey });
       this.logger.log('OpenAI client initialized for chat');
     } else {
-      this.logger.warn('OPENAI_API_KEY not set, OpenAI models will be unavailable');
+      this.logger.warn(
+        'OPENAI_API_KEY not set, OpenAI models will be unavailable',
+      );
     }
 
     if (this.huggingFaceApiKey) {
       this.logger.log('Hugging Face API key configured');
     } else {
-      this.logger.warn('HUGGINGFACE_API_KEY not set, Hugging Face model will be unavailable');
+      this.logger.warn(
+        'HUGGINGFACE_API_KEY not set, Hugging Face model will be unavailable',
+      );
     }
   }
 
@@ -37,11 +42,28 @@ export class MultiModelAIService {
 
     switch (model) {
       case ChatModel.HUGGINGFACE:
-        return this.generateHuggingFaceResponse(userMessage, conversationHistory, systemPrompt, userPreferences);
+        return this.generateHuggingFaceResponse(
+          userMessage,
+          conversationHistory,
+          systemPrompt,
+          userPreferences,
+        );
       case ChatModel.OPENAI_GPT4O_MINI:
-        return this.generateOpenAIResponse(userMessage, conversationHistory, systemPrompt, userPreferences, 'gpt-4o-mini');
+        return this.generateOpenAIResponse(
+          userMessage,
+          conversationHistory,
+          systemPrompt,
+          userPreferences,
+          'gpt-4o-mini',
+        );
       case ChatModel.OPENAI_GPT4O:
-        return this.generateOpenAIResponse(userMessage, conversationHistory, systemPrompt, userPreferences, 'gpt-4o');
+        return this.generateOpenAIResponse(
+          userMessage,
+          conversationHistory,
+          systemPrompt,
+          userPreferences,
+          'gpt-4o',
+        );
       default:
         throw new Error(`Unknown model: ${model}`);
     }
@@ -49,11 +71,13 @@ export class MultiModelAIService {
 
   private buildSystemPrompt(userPreferences: any): string {
     const prefs = userPreferences || {};
-    const interests = Array.isArray(prefs.interests) ? prefs.interests.join(', ') : 'general travel';
+    const interests = Array.isArray(prefs.interests)
+      ? prefs.interests.join(', ')
+      : 'general travel';
     const budget = prefs.budget || 'mid-range';
     const travelType = prefs.travel_type || 'leisure';
-    const destinations = Array.isArray(prefs.destination_preferences) 
-      ? prefs.destination_preferences.join(', ') 
+    const destinations = Array.isArray(prefs.destination_preferences)
+      ? prefs.destination_preferences.join(', ')
       : 'various destinations';
 
     return `You are a helpful travel assistant for WayFinder. Your role is to help users find the perfect travel packages (flights, hotels, activities) based on their preferences.
@@ -115,10 +139,11 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
 
       // Handle different response formats from Hugging Face API
       let generatedText = '';
-      
+
       if (Array.isArray(response.data)) {
         // Response is an array
-        generatedText = response.data[0]?.generated_text || response.data[0] || '';
+        generatedText =
+          response.data[0]?.generated_text || response.data[0] || '';
       } else if (typeof response.data === 'string') {
         // Response is a string
         generatedText = response.data;
@@ -129,7 +154,7 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
         // Fallback: try to extract text from any format
         generatedText = JSON.stringify(response.data);
       }
-      
+
       // Extract the assistant's response (remove the prompt)
       if (generatedText.includes(prompt)) {
         generatedText = generatedText.split(prompt)[1]?.trim() || generatedText;
@@ -137,11 +162,12 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
 
       // If still empty or too short, provide fallback
       if (!generatedText || generatedText.length < 10) {
-        generatedText = "I'm here to help you with your travel plans! Based on your preferences, I can suggest flight packages. What destination are you interested in?";
+        generatedText =
+          "I'm here to help you with your travel plans! Based on your preferences, I can suggest flight packages. What destination are you interested in?";
       }
 
       const flightPacks = this.extractFlightPacks(generatedText);
-      
+
       return {
         response: generatedText.trim(),
         flightPacks,
@@ -152,13 +178,15 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
         response: error?.response?.data,
         status: error?.response?.status,
       });
-      
+
       // Check if model is loading
       if (error?.response?.data?.error?.includes('loading')) {
         throw new Error('Model is loading. Please try again in a few seconds.');
       }
-      
-      throw new Error('Failed to generate response from Hugging Face. Please try again or switch to a different model.');
+
+      throw new Error(
+        'Failed to generate response from Hugging Face. Please try again or switch to a different model.',
+      );
     }
   }
 
@@ -176,7 +204,7 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
     try {
       const messages: any[] = [
         { role: 'system', content: systemPrompt },
-        ...conversationHistory.slice(-10).map(msg => ({
+        ...conversationHistory.slice(-10).map((msg) => ({
           role: msg.role,
           content: msg.content,
         })),
@@ -190,7 +218,9 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
         max_tokens: 1000,
       });
 
-      const response = completion.choices[0]?.message?.content || 'I apologize, I could not generate a response.';
+      const response =
+        completion.choices[0]?.message?.content ||
+        'I apologize, I could not generate a response.';
       const flightPacks = this.extractFlightPacks(response);
 
       return {
@@ -203,22 +233,28 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
     }
   }
 
-  private formatHuggingFacePrompt(messages: Array<{ role: string; content: string }>): string {
+  private formatHuggingFacePrompt(
+    messages: Array<{ role: string; content: string }>,
+  ): string {
     // Format for Mistral instruct model
     // Combine system prompt with user messages
-    const systemMsg = messages.find(m => m.role === 'system');
-    const userMessages = messages.filter(m => m.role === 'user');
-    const assistantMessages = messages.filter(m => m.role === 'assistant');
-    
+    const systemMsg = messages.find((m) => m.role === 'system');
+    const userMessages = messages.filter((m) => m.role === 'user');
+    const assistantMessages = messages.filter((m) => m.role === 'assistant');
+
     let prompt = '';
-    
+
     // Add system instruction
     if (systemMsg) {
       prompt += `[INST] System: ${systemMsg.content}\n\n`;
     }
-    
+
     // Add conversation history
-    for (let i = 0; i < Math.max(userMessages.length, assistantMessages.length); i++) {
+    for (
+      let i = 0;
+      i < Math.max(userMessages.length, assistantMessages.length);
+      i++
+    ) {
       if (userMessages[i]) {
         prompt += `User: ${userMessages[i].content}\n`;
       }
@@ -226,16 +262,17 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
         prompt += `Assistant: ${assistantMessages[i].content}\n`;
       }
     }
-    
+
     // Add final instruction
     prompt += `\nPlease respond as the Assistant: [/INST]`;
-    
+
     return prompt;
   }
 
   private extractFlightPacks(text: string): any[] {
     const packs: any[] = [];
-    const packRegex = /Pack\s+(\d+):\s*([^→]+)→\s*([^-]+)-\s*([^-]+)-\s*(\d+)\s*TND/gi;
+    const packRegex =
+      /Pack\s+(\d+):\s*([^→]+)→\s*([^-]+)-\s*([^-]+)-\s*(\d+)\s*TND/gi;
     let match;
 
     while ((match = packRegex.exec(text)) !== null) {
@@ -264,4 +301,3 @@ IMPORTANT: When proposing flight packs, return them in a structured format that 
     }
   }
 }
-

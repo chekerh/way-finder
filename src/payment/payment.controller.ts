@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreatePaypalOrderDto } from './dto/paypal-order.dto';
 import { PaymentService } from './payment.service';
@@ -62,12 +70,17 @@ export class PaymentController {
 
   @UseGuards(JwtAuthGuard)
   @Post('paypal/capture/:orderId')
-  async capturePaypalOrder(@Param('orderId') orderId: string, @Body() body?: { bookingId?: string }) {
+  async capturePaypalOrder(
+    @Param('orderId') orderId: string,
+    @Body() body?: { bookingId?: string },
+  ) {
     const capture = await this.paypalService.captureOrder(orderId);
-    const paymentStatus = capture?.status === 'COMPLETED' ? 'success' : 'failed';
+    const paymentStatus =
+      capture?.status === 'COMPLETED' ? 'success' : 'failed';
 
     // Find the payment to get the bookingId from metadata if not provided
-    const existingPayment = await this.paymentService.findByTransactionId(orderId);
+    const existingPayment =
+      await this.paymentService.findByTransactionId(orderId);
     const bookingId = body?.bookingId || existingPayment?.metadata?.bookingId;
 
     await this.paymentService.updateStatus(orderId, paymentStatus, {
@@ -85,4 +98,3 @@ export class PaymentController {
     return this.paypalService.getOrder(orderId);
   }
 }
-

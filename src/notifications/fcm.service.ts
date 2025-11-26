@@ -45,7 +45,9 @@ export class FcmService {
       }
     } catch (error) {
       this.logger.warn('Failed to initialize Firebase Admin SDK', error);
-      this.logger.warn('Notifications will be saved to database but push notifications will not be sent.');
+      this.logger.warn(
+        'Notifications will be saved to database but push notifications will not be sent.',
+      );
       // Don't throw error - allow app to continue without FCM
       this.firebaseApp = null;
     }
@@ -63,22 +65,30 @@ export class FcmService {
     },
   ): Promise<boolean> {
     if (!this.firebaseApp) {
-      this.logger.warn('❌ FCM not initialized - skipping push notification (notification saved to database)');
-      this.logger.warn('   Configure FIREBASE_SERVICE_ACCOUNT_KEY environment variable on Render');
+      this.logger.warn(
+        '❌ FCM not initialized - skipping push notification (notification saved to database)',
+      );
+      this.logger.warn(
+        '   Configure FIREBASE_SERVICE_ACCOUNT_KEY environment variable on Render',
+      );
       return false;
     }
-    
+
     if (!fcmToken) {
-      this.logger.warn('❌ FCM token not provided - skipping push notification (notification saved to database)');
+      this.logger.warn(
+        '❌ FCM token not provided - skipping push notification (notification saved to database)',
+      );
       return false;
     }
 
     try {
-      this.logger.log(`📤 [FCM] Sending notification to token: ${fcmToken.substring(0, 20)}...`);
+      this.logger.log(
+        `📤 [FCM] Sending notification to token: ${fcmToken.substring(0, 20)}...`,
+      );
       this.logger.log(`📤 [FCM] Title: ${title}`);
       this.logger.log(`📤 [FCM] Message: ${message}`);
       this.logger.log(`📤 [FCM] Data: ${JSON.stringify(data)}`);
-      
+
       const messagePayload: admin.messaging.Message = {
         token: fcmToken,
         notification: {
@@ -91,12 +101,19 @@ export class FcmService {
           ...(data?.type && { type: data.type }),
           ...(data?.notificationId && { notificationId: data.notificationId }),
           ...(data?.actionUrl && { actionUrl: data.actionUrl }),
-          ...Object.entries(data || {}).reduce((acc, [key, value]) => {
-            if (key !== 'type' && key !== 'notificationId' && key !== 'actionUrl') {
-              acc[key] = String(value);
-            }
-            return acc;
-          }, {} as Record<string, string>),
+          ...Object.entries(data || {}).reduce(
+            (acc, [key, value]) => {
+              if (
+                key !== 'type' &&
+                key !== 'notificationId' &&
+                key !== 'actionUrl'
+              ) {
+                acc[key] = String(value);
+              }
+              return acc;
+            },
+            {} as Record<string, string>,
+          ),
         },
         android: {
           priority: 'high' as const,
@@ -122,25 +139,35 @@ export class FcmService {
       };
 
       const response = await admin.messaging().send(messagePayload);
-      this.logger.log(`✅ [FCM] Successfully sent FCM notification: ${response}`);
+      this.logger.log(
+        `✅ [FCM] Successfully sent FCM notification: ${response}`,
+      );
       return true;
     } catch (error: any) {
       // Log detailed error information
-      this.logger.error(`❌ [FCM] Failed to send FCM notification: ${error.message}`);
+      this.logger.error(
+        `❌ [FCM] Failed to send FCM notification: ${error.message}`,
+      );
       if (error.code) {
         this.logger.error(`❌ [FCM] Error code: ${error.code}`);
       }
       if (error.stack) {
         this.logger.error(`❌ [FCM] Error stack: ${error.stack}`);
       }
-      this.logger.warn('⚠️ [FCM] Notification was saved to database but push notification failed');
-      
+      this.logger.warn(
+        '⚠️ [FCM] Notification was saved to database but push notification failed',
+      );
+
       // Check for common FCM errors
-      if (error.code === 'messaging/invalid-registration-token' || 
-          error.code === 'messaging/registration-token-not-registered') {
-        this.logger.error('❌ [FCM] Invalid or unregistered FCM token - user needs to re-register token');
+      if (
+        error.code === 'messaging/invalid-registration-token' ||
+        error.code === 'messaging/registration-token-not-registered'
+      ) {
+        this.logger.error(
+          '❌ [FCM] Invalid or unregistered FCM token - user needs to re-register token',
+        );
       }
-      
+
       return false;
     }
   }
@@ -165,10 +192,13 @@ export class FcmService {
         data: {
           title,
           message,
-          ...Object.entries(data || {}).reduce((acc, [key, value]) => {
-            acc[key] = String(value);
-            return acc;
-          }, {} as Record<string, string>),
+          ...Object.entries(data || {}).reduce(
+            (acc, [key, value]) => {
+              acc[key] = String(value);
+              return acc;
+            },
+            {} as Record<string, string>,
+          ),
         },
         android: {
           priority: 'high' as const,
@@ -198,14 +228,19 @@ export class FcmService {
       }));
 
       const response = await admin.messaging().sendEach(messages);
-      this.logger.log(`Successfully sent ${response.successCount} FCM notifications`);
+      this.logger.log(
+        `Successfully sent ${response.successCount} FCM notifications`,
+      );
       return {
         responses: response.responses,
         successCount: response.successCount,
         failureCount: response.failureCount,
       } as any;
     } catch (error) {
-      this.logger.error(`Error sending FCM notifications: ${error.message}`, error);
+      this.logger.error(
+        `Error sending FCM notifications: ${error.message}`,
+        error,
+      );
       throw error;
     }
   }
@@ -214,4 +249,3 @@ export class FcmService {
     return this.firebaseApp !== null;
   }
 }
-

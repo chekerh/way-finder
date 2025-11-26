@@ -5,7 +5,11 @@ import { UserService } from '../user/user.service';
 export class RecommendationsService {
   constructor(private readonly userService: UserService) {}
 
-  async generatePersonalizedRecommendations(userId: string, type: string = 'all', limit: number = 10): Promise<any> {
+  async generatePersonalizedRecommendations(
+    userId: string,
+    type: string = 'all',
+    limit: number = 10,
+  ): Promise<any> {
     const user = await this.userService.findById(userId);
     if (!user) {
       throw new Error('User not found');
@@ -19,7 +23,7 @@ export class RecommendationsService {
     const offers = this.matchOffers(preferences, limit);
     const activities = this.matchActivities(preferences, limit);
 
-    let result: any = {
+    const result: any = {
       generated_at: new Date().toISOString(),
       preferences_used: preferences,
     };
@@ -40,14 +44,42 @@ export class RecommendationsService {
   private matchDestinations(preferences: any, limit: number): any[] {
     // Mock destination data - replace with real data source
     const allDestinations = [
-      { id: 'dest_1', name: 'Paris, France', image_url: '', match_score: 0, highlights: ['Eiffel Tower', 'Louvre Museum'], estimated_cost: { flight: 450, hotel_per_night: 120, currency: 'USD' } },
-      { id: 'dest_2', name: 'Tokyo, Japan', image_url: '', match_score: 0, highlights: ['Shibuya', 'Temples'], estimated_cost: { flight: 800, hotel_per_night: 150, currency: 'USD' } },
-      { id: 'dest_3', name: 'Bali, Indonesia', image_url: '', match_score: 0, highlights: ['Beaches', 'Temples'], estimated_cost: { flight: 600, hotel_per_night: 80, currency: 'USD' } },
-      { id: 'dest_4', name: 'New York, USA', image_url: '', match_score: 0, highlights: ['Statue of Liberty', 'Broadway'], estimated_cost: { flight: 400, hotel_per_night: 200, currency: 'USD' } },
+      {
+        id: 'dest_1',
+        name: 'Paris, France',
+        image_url: '',
+        match_score: 0,
+        highlights: ['Eiffel Tower', 'Louvre Museum'],
+        estimated_cost: { flight: 450, hotel_per_night: 120, currency: 'USD' },
+      },
+      {
+        id: 'dest_2',
+        name: 'Tokyo, Japan',
+        image_url: '',
+        match_score: 0,
+        highlights: ['Shibuya', 'Temples'],
+        estimated_cost: { flight: 800, hotel_per_night: 150, currency: 'USD' },
+      },
+      {
+        id: 'dest_3',
+        name: 'Bali, Indonesia',
+        image_url: '',
+        match_score: 0,
+        highlights: ['Beaches', 'Temples'],
+        estimated_cost: { flight: 600, hotel_per_night: 80, currency: 'USD' },
+      },
+      {
+        id: 'dest_4',
+        name: 'New York, USA',
+        image_url: '',
+        match_score: 0,
+        highlights: ['Statue of Liberty', 'Broadway'],
+        estimated_cost: { flight: 400, hotel_per_night: 200, currency: 'USD' },
+      },
     ];
 
     return allDestinations
-      .map(dest => ({
+      .map((dest) => ({
         ...dest,
         match_score: this.calculateDestinationMatchScore(dest, preferences),
         reason: this.generateDestinationReason(dest, preferences),
@@ -59,13 +91,31 @@ export class RecommendationsService {
   private matchOffers(preferences: any, limit: number): any[] {
     // Mock offers - replace with real booking provider integration
     const allOffers = [
-      { id: 'offer_1', type: 'flight', destination: 'Paris', price: 450, match_score: 0 },
-      { id: 'offer_2', type: 'hotel', destination: 'Paris', price: 120, match_score: 0 },
-      { id: 'offer_3', type: 'activity', destination: 'Paris', price: 25, match_score: 0 },
+      {
+        id: 'offer_1',
+        type: 'flight',
+        destination: 'Paris',
+        price: 450,
+        match_score: 0,
+      },
+      {
+        id: 'offer_2',
+        type: 'hotel',
+        destination: 'Paris',
+        price: 120,
+        match_score: 0,
+      },
+      {
+        id: 'offer_3',
+        type: 'activity',
+        destination: 'Paris',
+        price: 25,
+        match_score: 0,
+      },
     ];
 
     return allOffers
-      .map(offer => ({
+      .map((offer) => ({
         ...offer,
         match_score: this.calculateOfferMatchScore(offer, preferences),
         reason: this.generateOfferReason(offer, preferences),
@@ -77,13 +127,34 @@ export class RecommendationsService {
   private matchActivities(preferences: any, limit: number): any[] {
     // Mock activities - replace with real data source
     const allActivities = [
-      { id: 'activity_1', name: 'Seine River Cruise', type: 'sightseeing', destination: 'Paris', price: 25, match_score: 0 },
-      { id: 'activity_2', name: 'Eiffel Tower Tour', type: 'sightseeing', destination: 'Paris', price: 30, match_score: 0 },
-      { id: 'activity_3', name: 'Louvre Museum Visit', type: 'culture', destination: 'Paris', price: 20, match_score: 0 },
+      {
+        id: 'activity_1',
+        name: 'Seine River Cruise',
+        type: 'sightseeing',
+        destination: 'Paris',
+        price: 25,
+        match_score: 0,
+      },
+      {
+        id: 'activity_2',
+        name: 'Eiffel Tower Tour',
+        type: 'sightseeing',
+        destination: 'Paris',
+        price: 30,
+        match_score: 0,
+      },
+      {
+        id: 'activity_3',
+        name: 'Louvre Museum Visit',
+        type: 'culture',
+        destination: 'Paris',
+        price: 20,
+        match_score: 0,
+      },
     ];
 
     return allActivities
-      .map(activity => ({
+      .map((activity) => ({
         ...activity,
         match_score: this.calculateActivityMatchScore(activity, preferences),
         reason: this.generateActivityReason(activity, preferences),
@@ -92,31 +163,53 @@ export class RecommendationsService {
       .slice(0, limit);
   }
 
-  private calculateDestinationMatchScore(destination: any, preferences: any): number {
+  private calculateDestinationMatchScore(
+    destination: any,
+    preferences: any,
+  ): number {
     let score = 0;
     let factors = 0;
 
     // Budget matching
     if (preferences.budget && destination.estimated_cost) {
-      const totalCost = destination.estimated_cost.flight + (destination.estimated_cost.hotel_per_night * 5);
+      const totalCost =
+        destination.estimated_cost.flight +
+        destination.estimated_cost.hotel_per_night * 5;
       if (preferences.budget === 'low' && totalCost < 1000) score += 0.3;
-      else if (preferences.budget === 'mid_range' && totalCost >= 1000 && totalCost < 3000) score += 0.3;
-      else if (preferences.budget === 'high' && totalCost >= 3000 && totalCost < 10000) score += 0.3;
-      else if (preferences.budget === 'luxury' && totalCost >= 10000) score += 0.3;
+      else if (
+        preferences.budget === 'mid_range' &&
+        totalCost >= 1000 &&
+        totalCost < 3000
+      )
+        score += 0.3;
+      else if (
+        preferences.budget === 'high' &&
+        totalCost >= 3000 &&
+        totalCost < 10000
+      )
+        score += 0.3;
+      else if (preferences.budget === 'luxury' && totalCost >= 10000)
+        score += 0.3;
       factors += 0.3;
     }
 
     // Interest matching (if destination highlights match interests)
     if (preferences.interests && Array.isArray(preferences.interests)) {
-      const matchingInterests = preferences.interests.filter((interest: string) =>
-        destination.highlights.some((highlight: string) => highlight.toLowerCase().includes(interest.toLowerCase()))
+      const matchingInterests = preferences.interests.filter(
+        (interest: string) =>
+          destination.highlights.some((highlight: string) =>
+            highlight.toLowerCase().includes(interest.toLowerCase()),
+          ),
       ).length;
       score += (matchingInterests / preferences.interests.length) * 0.4;
       factors += 0.4;
     }
 
     // Destination preference matching
-    if (preferences.destination_preferences && Array.isArray(preferences.destination_preferences)) {
+    if (
+      preferences.destination_preferences &&
+      Array.isArray(preferences.destination_preferences)
+    ) {
       // Simple matching logic - can be enhanced
       score += 0.3;
       factors += 0.3;
@@ -131,13 +224,24 @@ export class RecommendationsService {
     // Budget matching
     if (preferences.budget) {
       if (preferences.budget === 'low' && offer.price < 100) score += 0.2;
-      else if (preferences.budget === 'mid_range' && offer.price >= 100 && offer.price < 500) score += 0.2;
-      else if (preferences.budget === 'high' && offer.price >= 500) score += 0.2;
+      else if (
+        preferences.budget === 'mid_range' &&
+        offer.price >= 100 &&
+        offer.price < 500
+      )
+        score += 0.2;
+      else if (preferences.budget === 'high' && offer.price >= 500)
+        score += 0.2;
     }
 
     // Type matching
-    if (preferences.travel_type === 'business' && offer.type === 'flight') score += 0.3;
-    else if (preferences.travel_type === 'leisure' && (offer.type === 'hotel' || offer.type === 'activity')) score += 0.3;
+    if (preferences.travel_type === 'business' && offer.type === 'flight')
+      score += 0.3;
+    else if (
+      preferences.travel_type === 'leisure' &&
+      (offer.type === 'hotel' || offer.type === 'activity')
+    )
+      score += 0.3;
 
     return Math.min(score, 1.0);
   }
@@ -148,26 +252,35 @@ export class RecommendationsService {
     // Interest matching
     if (preferences.interests && Array.isArray(preferences.interests)) {
       if (preferences.interests.includes(activity.type)) score += 0.3;
-      if (preferences.interests.includes('sightseeing') && activity.type === 'sightseeing') score += 0.2;
+      if (
+        preferences.interests.includes('sightseeing') &&
+        activity.type === 'sightseeing'
+      )
+        score += 0.2;
     }
 
     return Math.min(score, 1.0);
   }
 
-  private generateDestinationReason(destination: any, preferences: any): string {
+  private generateDestinationReason(
+    destination: any,
+    preferences: any,
+  ): string {
     const reasons: string[] = [];
-    
+
     if (preferences.budget) {
       reasons.push(`matches your ${preferences.budget} budget`);
     }
     if (preferences.interests && preferences.interests.length > 0) {
-      reasons.push(`aligns with your interests in ${preferences.interests.slice(0, 2).join(' and ')}`);
+      reasons.push(
+        `aligns with your interests in ${preferences.interests.slice(0, 2).join(' and ')}`,
+      );
     }
     if (preferences.travel_type) {
       reasons.push(`perfect for ${preferences.travel_type} travel`);
     }
 
-    return reasons.length > 0 
+    return reasons.length > 0
       ? `Matches your preferences: ${reasons.join(', ')}`
       : 'Recommended based on popular destinations';
   }
@@ -180,10 +293,12 @@ export class RecommendationsService {
   }
 
   private generateActivityReason(activity: any, preferences: any): string {
-    if (preferences.interests && preferences.interests.includes(activity.type)) {
+    if (
+      preferences.interests &&
+      preferences.interests.includes(activity.type)
+    ) {
       return `Matches your interest in ${activity.type}`;
     }
     return 'Popular activity';
   }
 }
-

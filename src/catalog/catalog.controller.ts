@@ -37,10 +37,15 @@ export class CatalogController {
   }
 
   @Get('activities')
-  async getActivities(@Query() query: ActivitySearchDto): Promise<ActivityFeedResponse> {
+  async getActivities(
+    @Query() query: ActivitySearchDto,
+  ): Promise<ActivityFeedResponse> {
     const themes =
       typeof query.themes === 'string'
-        ? query.themes.split(',').map(theme => theme.trim()).filter(Boolean)
+        ? query.themes
+            .split(',')
+            .map((theme) => theme.trim())
+            .filter(Boolean)
         : query.themes;
 
     return this.catalogService.getActivitiesFeed({
@@ -51,4 +56,3 @@ export class CatalogController {
     });
   }
 }
-

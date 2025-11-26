@@ -44,7 +44,7 @@ export class UserService {
       .findByIdAndUpdate(
         userId,
         { $set: { google_id: googleId } },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       )
       .exec();
     if (!updated) throw new NotFoundException('User not found');
@@ -55,14 +55,14 @@ export class UserService {
     const updated = await this.userModel
       .findByIdAndUpdate(
         userId,
-        { 
-          $set: { 
+        {
+          $set: {
             email_verified: true,
             email_verified_at: new Date(),
           },
           $unset: { email_verification_token: '' },
         },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       )
       .exec();
     if (!updated) throw new NotFoundException('User not found');
@@ -74,14 +74,17 @@ export class UserService {
       .findByIdAndUpdate(
         userId,
         { $set: { email_verification_token: token } },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       )
       .exec();
     if (!updated) throw new NotFoundException('User not found');
     return updated;
   }
 
-  async updateProfile(userId: string, updateUserDto: UpdateUserDto): Promise<User> {
+  async updateProfile(
+    userId: string,
+    updateUserDto: UpdateUserDto,
+  ): Promise<User> {
     const updatePayload: Partial<User> = { ...updateUserDto };
 
     if (updatePayload.email) {
@@ -89,7 +92,11 @@ export class UserService {
     }
 
     const updated = await this.userModel
-      .findByIdAndUpdate(userId, { $set: updatePayload }, { new: true, runValidators: true })
+      .findByIdAndUpdate(
+        userId,
+        { $set: updatePayload },
+        { new: true, runValidators: true },
+      )
       .exec();
     if (!updated) throw new NotFoundException('User not found');
     return updated;
@@ -100,7 +107,7 @@ export class UserService {
       .findByIdAndUpdate(
         userId,
         { $set: { fcm_token: fcmToken } },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       )
       .exec();
     if (!updated) throw new NotFoundException('User not found');
@@ -108,7 +115,10 @@ export class UserService {
   }
 
   async getFcmToken(userId: string): Promise<string | null> {
-    const user = await this.userModel.findById(userId).select('fcm_token').exec();
+    const user = await this.userModel
+      .findById(userId)
+      .select('fcm_token')
+      .exec();
     return user?.fcm_token || null;
   }
 }

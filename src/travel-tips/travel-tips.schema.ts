@@ -18,7 +18,15 @@ export class TravelTip {
   country?: string;
 
   @Prop({ required: true, type: String })
-  category: 'general' | 'transportation' | 'accommodation' | 'food' | 'culture' | 'safety' | 'budget' | 'weather';
+  category:
+    | 'general'
+    | 'transportation'
+    | 'accommodation'
+    | 'food'
+    | 'culture'
+    | 'safety'
+    | 'budget'
+    | 'weather';
 
   @Prop({ required: true })
   title: string;
@@ -50,4 +58,3 @@ export const TravelTipSchema = SchemaFactory.createForClass(TravelTip);
 // Create indexes for efficient queries
 TravelTipSchema.index({ destinationId: 1, category: 1 });
 TravelTipSchema.index({ destinationId: 1, isActive: 1 });
-

@@ -4,7 +4,14 @@ import { HttpModule } from '@nestjs/axios';
 import { JourneyController } from './journey.controller';
 import { JourneyService } from './journey.service';
 import { ImgBBService } from './imgbb.service';
-import { Journey, JourneySchema, JourneyLike, JourneyLikeSchema, JourneyComment, JourneyCommentSchema } from './journey.schema';
+import {
+  Journey,
+  JourneySchema,
+  JourneyLike,
+  JourneyLikeSchema,
+  JourneyComment,
+  JourneyCommentSchema,
+} from './journey.schema';
 import { BookingModule } from '../booking/booking.module';
 import { VideoProcessingModule } from '../video-processing/video-processing.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -28,4 +35,3 @@ import { UserModule } from '../user/user.module';
   exports: [JourneyService, ImgBBService],
 })
 export class JourneyModule {}
-

@@ -1,6 +1,15 @@
 import { Body, Controller, Post, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, GoogleSignInDto, VerifyEmailDto, SendOTPDto, VerifyOTPDto, RegisterWithOTPDto, SendOTPForRegistrationDto } from './auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  GoogleSignInDto,
+  VerifyEmailDto,
+  SendOTPDto,
+  VerifyOTPDto,
+  RegisterWithOTPDto,
+  SendOTPForRegistrationDto,
+} from './auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -56,4 +65,3 @@ export class AuthController {
     return this.authService.registerWithOTP(dto);
   }
 }
-

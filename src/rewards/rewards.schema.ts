@@ -26,9 +26,9 @@ export class PointsTransaction {
 }
 
 export type PointsTransactionDocument = HydratedDocument<PointsTransaction>;
-export const PointsTransactionSchema = SchemaFactory.createForClass(PointsTransaction);
+export const PointsTransactionSchema =
+  SchemaFactory.createForClass(PointsTransaction);
 
 // Index for efficient queries
 PointsTransactionSchema.index({ user_id: 1, transaction_date: -1 });
 PointsTransactionSchema.index({ user_id: 1, type: 1 });
-

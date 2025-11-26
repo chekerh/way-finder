@@ -1,6 +1,23 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Req, Param, Put, Delete, UsePipes, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+  Param,
+  Put,
+  Delete,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { BookingService } from './booking.service';
-import { ConfirmBookingDto, CreateBookingDto, UpdateBookingDto } from './booking.dto';
+import {
+  ConfirmBookingDto,
+  CreateBookingDto,
+  UpdateBookingDto,
+} from './booking.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('booking')
@@ -19,11 +36,13 @@ export class BookingController {
 
   @UseGuards(JwtAuthGuard)
   @Post('confirm')
-  @UsePipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: false, // Allow extra properties (like null total_price)
-    transform: true,
-  }))
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: false, // Allow extra properties (like null total_price)
+      transform: true,
+    }),
+  )
   async confirm(@Req() req: any, @Body() dto: ConfirmBookingDto) {
     console.log('Confirm booking request:', JSON.stringify(dto, null, 2));
     return this.bookingService.confirm(req.user.sub, dto);
@@ -55,7 +74,11 @@ export class BookingController {
 
   @UseGuards(JwtAuthGuard)
   @Put(':id')
-  async update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateBookingDto) {
+  async update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateBookingDto,
+  ) {
     return this.bookingService.update(req.user.sub, id, dto);
   }
 

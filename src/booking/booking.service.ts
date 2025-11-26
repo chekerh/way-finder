@@ -1,23 +1,46 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Booking, BookingDocument } from './booking.schema';
-import { ConfirmBookingDto, CreateBookingDto, UpdateBookingDto } from './booking.dto';
+import {
+  ConfirmBookingDto,
+  CreateBookingDto,
+  UpdateBookingDto,
+} from './booking.dto';
 import { BookingStatus } from '../common/enums/booking-status.enum';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BookingService {
   constructor(
-    @InjectModel(Booking.name) private readonly bookingModel: Model<BookingDocument>,
+    @InjectModel(Booking.name)
+    private readonly bookingModel: Model<BookingDocument>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async searchOffers(query: { destination?: string; dates?: string; type?: string }) {
+  async searchOffers(query: {
+    destination?: string;
+    dates?: string;
+    type?: string;
+  }) {
     // Stub: integrate with providers later
     return [
-      { id: 'offer_1', type: query.type ?? 'flight', destination: query.destination ?? 'N/A', price: 199 },
-      { id: 'offer_2', type: query.type ?? 'hotel', destination: query.destination ?? 'N/A', price: 99 },
+      {
+        id: 'offer_1',
+        type: query.type ?? 'flight',
+        destination: query.destination ?? 'N/A',
+        price: 199,
+      },
+      {
+        id: 'offer_2',
+        type: query.type ?? 'hotel',
+        destination: query.destination ?? 'N/A',
+        price: 99,
+      },
     ];
   }
 
@@ -42,14 +65,18 @@ export class BookingService {
 
   async confirm(userId: string, dto: ConfirmBookingDto) {
     // Check if user already has a confirmed booking for this offer
-    const existingBooking = await this.bookingModel.findOne({
-      user_id: this.toObjectId(userId, 'user id'),
-      offer_id: dto.offer_id,
-      status: BookingStatus.CONFIRMED,
-    }).exec();
+    const existingBooking = await this.bookingModel
+      .findOne({
+        user_id: this.toObjectId(userId, 'user id'),
+        offer_id: dto.offer_id,
+        status: BookingStatus.CONFIRMED,
+      })
+      .exec();
 
     if (existingBooking) {
-      throw new BadRequestException('Vous avez déjà une réservation confirmée pour cette offre. Vous ne pouvez pas réserver deux fois le même voyage.');
+      throw new BadRequestException(
+        'Vous avez déjà une réservation confirmée pour cette offre. Vous ne pouvez pas réserver deux fois le même voyage.',
+      );
     }
 
     const confirmation_number = `CONF-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
@@ -65,9 +92,10 @@ export class BookingService {
       trip_details: dto.trip_details, // Include trip details (destination, etc.)
     });
     const savedBooking = await booking.save();
-    
+
     // Send notification for confirmed booking
-    const destinationName = dto.trip_details?.destination || 'votre destination';
+    const destinationName =
+      dto.trip_details?.destination || 'votre destination';
     await this.notificationsService.createBookingNotification(
       userId,
       'booking_confirmed',
@@ -79,7 +107,7 @@ export class BookingService {
         tripDetails: dto.trip_details,
       },
     );
-    
+
     return savedBooking;
   }
 
@@ -128,39 +156,49 @@ export class BookingService {
         user_id: this.toObjectId(userId, 'user id'),
       })
       .exec();
-    
+
     if (!oldBooking) {
       throw new NotFoundException('Booking not found');
     }
-    
+
     const oldStatus = oldBooking.status;
-    
+
     const booking = await this.bookingModel
       .findOneAndUpdate(
-        { _id: this.toObjectId(bookingId, 'booking id'), user_id: this.toObjectId(userId, 'user id') },
+        {
+          _id: this.toObjectId(bookingId, 'booking id'),
+          user_id: this.toObjectId(userId, 'user id'),
+        },
         {
           $set: {
-            ...('trip_details' in dto ? { trip_details: dto.trip_details } : {}),
+            ...('trip_details' in dto
+              ? { trip_details: dto.trip_details }
+              : {}),
             ...('passengers' in dto ? { passengers: dto.passengers } : {}),
             ...('notes' in dto ? { notes: dto.notes } : {}),
             ...('status' in dto ? { status: dto.status } : {}),
-            ...('payment_details' in dto ? { payment_details: dto.payment_details } : {}),
+            ...('payment_details' in dto
+              ? { payment_details: dto.payment_details }
+              : {}),
             ...('total_price' in dto ? { total_price: dto.total_price } : {}),
           },
         },
         { new: true, runValidators: true },
       )
       .exec();
-    
+
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
-    
+
     // Send notification if status changed
     if ('status' in dto && dto.status !== oldStatus) {
-      const destinationName = booking.trip_details?.destination || booking.trip_details?.origin || 'votre destination';
+      const destinationName =
+        booking.trip_details?.destination ||
+        booking.trip_details?.origin ||
+        'votre destination';
       let message = '';
-      
+
       if (dto.status === BookingStatus.CONFIRMED) {
         message = `Votre réservation pour ${destinationName} a été confirmée. Numéro de confirmation: ${booking.confirmation_number}`;
       } else if (dto.status === BookingStatus.CANCELLED) {
@@ -168,12 +206,14 @@ export class BookingService {
       } else {
         message = `Votre réservation pour ${destinationName} a été mise à jour.`;
       }
-      
+
       await this.notificationsService.createBookingNotification(
         userId,
-        dto.status === BookingStatus.CONFIRMED ? 'booking_confirmed' :
-        dto.status === BookingStatus.CANCELLED ? 'booking_cancelled' :
-        'booking_updated',
+        dto.status === BookingStatus.CONFIRMED
+          ? 'booking_confirmed'
+          : dto.status === BookingStatus.CANCELLED
+            ? 'booking_cancelled'
+            : 'booking_updated',
         booking._id.toString(),
         message,
         {
@@ -184,7 +224,10 @@ export class BookingService {
       );
     } else if (dto.trip_details || dto.total_price || dto.passengers) {
       // Send update notification if important fields changed (but status didn't)
-      const destinationName = booking.trip_details?.destination || booking.trip_details?.origin || 'votre destination';
+      const destinationName =
+        booking.trip_details?.destination ||
+        booking.trip_details?.origin ||
+        'votre destination';
       await this.notificationsService.createBookingNotification(
         userId,
         'booking_updated',
@@ -197,14 +240,17 @@ export class BookingService {
         },
       );
     }
-    
+
     return booking;
   }
 
   async cancel(userId: string, bookingId: string) {
     const booking = await this.bookingModel
       .findOneAndUpdate(
-        { _id: this.toObjectId(bookingId, 'booking id'), user_id: this.toObjectId(userId, 'user id') },
+        {
+          _id: this.toObjectId(bookingId, 'booking id'),
+          user_id: this.toObjectId(userId, 'user id'),
+        },
         { $set: { status: BookingStatus.CANCELLED } },
         { new: true },
       )
@@ -212,9 +258,12 @@ export class BookingService {
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
-    
+
     // Send notification for cancelled booking
-    const destinationName = booking.trip_details?.destination || booking.trip_details?.origin || 'votre destination';
+    const destinationName =
+      booking.trip_details?.destination ||
+      booking.trip_details?.origin ||
+      'votre destination';
     await this.notificationsService.createBookingNotification(
       userId,
       'booking_cancelled',
@@ -226,7 +275,7 @@ export class BookingService {
         tripDetails: booking.trip_details,
       },
     );
-    
+
     return booking;
   }
 }

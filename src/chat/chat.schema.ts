@@ -12,7 +12,11 @@ export class ChatMessage {
   @Prop({ type: String, enum: ['user', 'assistant'], required: true })
   role: 'user' | 'assistant';
 
-  @Prop({ type: String, enum: ['huggingface', 'openai_gpt4o_mini', 'openai_gpt4o'], required: true })
+  @Prop({
+    type: String,
+    enum: ['huggingface', 'openai_gpt4o_mini', 'openai_gpt4o'],
+    required: true,
+  })
   model_used: string;
 
   @Prop({ type: Object, default: {} })
@@ -31,7 +35,13 @@ export class ChatMessage {
 
 @Schema({ timestamps: true })
 export class ChatSession {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true, index: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true,
+    index: true,
+  })
   user_id: Types.ObjectId;
 
   @Prop({ type: String, required: true, unique: true })
@@ -40,7 +50,11 @@ export class ChatSession {
   @Prop({ type: [Types.ObjectId], ref: 'ChatMessage', default: [] })
   messages: Types.ObjectId[];
 
-  @Prop({ type: String, enum: ['huggingface', 'openai_gpt4o_mini', 'openai_gpt4o'], default: 'huggingface' })
+  @Prop({
+    type: String,
+    enum: ['huggingface', 'openai_gpt4o_mini', 'openai_gpt4o'],
+    default: 'huggingface',
+  })
   current_model: string;
 
   @Prop({ type: Object, default: {} })
@@ -55,4 +69,3 @@ export type ChatSessionDocument = HydratedDocument<ChatSession>;
 
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
 export const ChatSessionSchema = SchemaFactory.createForClass(ChatSession);
-

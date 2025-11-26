@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Review, ReviewDocument, ReviewItemType } from './reviews.schema';
@@ -7,10 +11,14 @@ import { CreateReviewDto, UpdateReviewDto } from './reviews.dto';
 @Injectable()
 export class ReviewsService {
   constructor(
-    @InjectModel(Review.name) private readonly reviewModel: Model<ReviewDocument>,
+    @InjectModel(Review.name)
+    private readonly reviewModel: Model<ReviewDocument>,
   ) {}
 
-  async createReview(userId: string, createReviewDto: CreateReviewDto): Promise<Review> {
+  async createReview(
+    userId: string,
+    createReviewDto: CreateReviewDto,
+  ): Promise<Review> {
     // Check if user already reviewed this item
     const existing = await this.reviewModel.findOne({
       userId,
@@ -19,7 +27,9 @@ export class ReviewsService {
     });
 
     if (existing) {
-      throw new BadRequestException('You have already reviewed this item. Use update instead.');
+      throw new BadRequestException(
+        'You have already reviewed this item. Use update instead.',
+      );
     }
 
     const review = new this.reviewModel({
@@ -28,30 +38,47 @@ export class ReviewsService {
     });
 
     const savedReview = await review.save();
-    return this.reviewModel.findById(savedReview._id).populate('userId', 'username first_name last_name profile_image_url').exec() as any;
+    return this.reviewModel
+      .findById(savedReview._id)
+      .populate('userId', 'username first_name last_name profile_image_url')
+      .exec() as any;
   }
 
-  async updateReview(userId: string, reviewId: string, updateReviewDto: UpdateReviewDto): Promise<Review> {
+  async updateReview(
+    userId: string,
+    reviewId: string,
+    updateReviewDto: UpdateReviewDto,
+  ): Promise<Review> {
     const review = await this.reviewModel.findOne({ _id: reviewId, userId });
 
     if (!review) {
-      throw new NotFoundException('Review not found or you do not have permission to update it');
+      throw new NotFoundException(
+        'Review not found or you do not have permission to update it',
+      );
     }
 
     Object.assign(review, updateReviewDto);
     const savedReview = await review.save();
-    return this.reviewModel.findById(savedReview._id).populate('userId', 'username first_name last_name profile_image_url').exec() as any;
+    return this.reviewModel
+      .findById(savedReview._id)
+      .populate('userId', 'username first_name last_name profile_image_url')
+      .exec() as any;
   }
 
   async deleteReview(userId: string, reviewId: string): Promise<void> {
     const result = await this.reviewModel.deleteOne({ _id: reviewId, userId });
 
     if (result.deletedCount === 0) {
-      throw new NotFoundException('Review not found or you do not have permission to delete it');
+      throw new NotFoundException(
+        'Review not found or you do not have permission to delete it',
+      );
     }
   }
 
-  async getReviews(itemType: ReviewItemType, itemId: string): Promise<Review[]> {
+  async getReviews(
+    itemType: ReviewItemType,
+    itemId: string,
+  ): Promise<Review[]> {
     return this.reviewModel
       .find({ itemType, itemId, isVisible: true })
       .populate('userId', 'username first_name last_name profile_image_url')
@@ -59,7 +86,10 @@ export class ReviewsService {
       .exec();
   }
 
-  async getUserReviews(userId: string, itemType?: ReviewItemType): Promise<Review[]> {
+  async getUserReviews(
+    userId: string,
+    itemType?: ReviewItemType,
+  ): Promise<Review[]> {
     const query: any = { userId };
     if (itemType) {
       query.itemType = itemType;
@@ -71,12 +101,17 @@ export class ReviewsService {
       .exec();
   }
 
-  async getReviewStats(itemType: ReviewItemType, itemId: string): Promise<{
+  async getReviewStats(
+    itemType: ReviewItemType,
+    itemId: string,
+  ): Promise<{
     averageRating: number;
     totalReviews: number;
     ratingDistribution: { [key: number]: number };
   }> {
-    const reviews = await this.reviewModel.find({ itemType, itemId, isVisible: true }).exec();
+    const reviews = await this.reviewModel
+      .find({ itemType, itemId, isVisible: true })
+      .exec();
 
     if (reviews.length === 0) {
       return {
@@ -101,8 +136,14 @@ export class ReviewsService {
     };
   }
 
-  async checkUserReview(userId: string, itemType: ReviewItemType, itemId: string): Promise<Review | null> {
-    return this.reviewModel.findOne({ userId, itemType, itemId }).populate('userId', 'username first_name last_name profile_image_url').exec();
+  async checkUserReview(
+    userId: string,
+    itemType: ReviewItemType,
+    itemId: string,
+  ): Promise<Review | null> {
+    return this.reviewModel
+      .findOne({ userId, itemType, itemId })
+      .populate('userId', 'username first_name last_name profile_image_url')
+      .exec();
   }
 }
-

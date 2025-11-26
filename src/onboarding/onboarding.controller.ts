@@ -43,4 +43,3 @@ export class OnboardingController {
     return this.onboardingService.resetOnboarding(req.user.sub);
   }
 }
-

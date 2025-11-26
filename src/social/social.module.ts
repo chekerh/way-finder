@@ -19,4 +19,3 @@ import { JourneyModule } from '../journey/journey.module';
   exports: [SocialService],
 })
 export class SocialModule {}
-

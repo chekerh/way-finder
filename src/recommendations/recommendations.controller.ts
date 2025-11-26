@@ -4,7 +4,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('recommendations')
 export class RecommendationsController {
-  constructor(private readonly recommendationsService: RecommendationsService) {}
+  constructor(
+    private readonly recommendationsService: RecommendationsService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('personalized')
@@ -24,7 +26,8 @@ export class RecommendationsController {
   @UseGuards(JwtAuthGuard)
   @Get('regenerate')
   async regenerate(@Req() req: any) {
-    return this.recommendationsService.generatePersonalizedRecommendations(req.user.sub);
+    return this.recommendationsService.generatePersonalizedRecommendations(
+      req.user.sub,
+    );
   }
 }
-

@@ -39,14 +39,22 @@ export class AiVideoService {
   }
 
   async generateVideo(payload: VideoJobPayload): Promise<AiVideoResponse> {
-    this.logger.log(`Generating video for journey ${payload.journeyId} with ${payload.slides.length} slides`);
+    this.logger.log(
+      `Generating video for journey ${payload.journeyId} with ${payload.slides.length} slides`,
+    );
 
     // Priority 1: Cloudinary (most reliable for image-to-video montages)
-    if (this.cloudinaryCloudName && this.cloudinaryApiKey && this.cloudinaryApiSecret) {
+    if (
+      this.cloudinaryCloudName &&
+      this.cloudinaryApiKey &&
+      this.cloudinaryApiSecret
+    ) {
       try {
         return await this.generateWithCloudinary(payload);
       } catch (error) {
-        this.logger.warn(`Cloudinary failed: ${error.message}, trying next option`);
+        this.logger.warn(
+          `Cloudinary failed: ${error.message}, trying next option`,
+        );
       }
     }
 
@@ -56,7 +64,9 @@ export class AiVideoService {
       try {
         return await this.generateWithCustomService(customEndpoint, payload);
       } catch (error) {
-        this.logger.warn(`Custom AI service failed: ${error.message}, trying next option`);
+        this.logger.warn(
+          `Custom AI service failed: ${error.message}, trying next option`,
+        );
       }
     }
 
@@ -65,7 +75,9 @@ export class AiVideoService {
       try {
         return await this.generateWithReplicate(payload);
       } catch (error) {
-        this.logger.warn(`Replicate API failed: ${error.message}, trying next option`);
+        this.logger.warn(
+          `Replicate API failed: ${error.message}, trying next option`,
+        );
       }
     }
 
@@ -74,7 +86,9 @@ export class AiVideoService {
       try {
         return await this.generateWithKaggle(payload);
       } catch (error) {
-        this.logger.warn(`Kaggle API failed: ${error.message}, trying next option`);
+        this.logger.warn(
+          `Kaggle API failed: ${error.message}, trying next option`,
+        );
       }
     }
 
@@ -83,14 +97,16 @@ export class AiVideoService {
       try {
         return await this.generateWithHuggingFace(payload);
       } catch (error) {
-        this.logger.warn(`Hugging Face API failed: ${error.message}, using fallback`);
+        this.logger.warn(
+          `Hugging Face API failed: ${error.message}, using fallback`,
+        );
       }
     }
 
     // Fallback: Use reliable placeholder video that always works
     this.logger.warn(
       'No AI video service configured. Using reliable placeholder video URL. ' +
-      'Set CLOUDINARY_* (recommended), AI_VIDEO_SERVICE_URL, REPLICATE_API_TOKEN, KAGGLE_*, or HUGGINGFACE_API_KEY to enable video generation.',
+        'Set CLOUDINARY_* (recommended), AI_VIDEO_SERVICE_URL, REPLICATE_API_TOKEN, KAGGLE_*, or HUGGINGFACE_API_KEY to enable video generation.',
     );
     return this.getPlaceholderVideo();
   }
@@ -100,34 +116,43 @@ export class AiVideoService {
    * Cloudinary can create video montages from images with transitions and effects
    * This is the most reliable method for creating travel montage videos
    */
-  private async generateWithCloudinary(payload: VideoJobPayload): Promise<AiVideoResponse> {
+  private async generateWithCloudinary(
+    payload: VideoJobPayload,
+  ): Promise<AiVideoResponse> {
     try {
       if (payload.slides.length === 0) {
         throw new Error('No images provided for video generation');
       }
 
-      this.logger.log(`Generating video montage with Cloudinary for ${payload.slides.length} images`);
+      this.logger.log(
+        `Generating video montage with Cloudinary for ${payload.slides.length} images`,
+      );
 
       // Cloudinary video generation from images using their API
       // For full implementation, install: npm install cloudinary
       // Then use Cloudinary SDK to upload images and generate video
-      
+
       // For now, we'll use a simplified approach
       // Full implementation would:
       // 1. Upload images to Cloudinary (or use existing public IDs)
       // 2. Create a video from the images using Cloudinary's video generation API
       // 3. Apply transitions and effects
       // 4. Return the generated video URL
-      
-      this.logger.log('Cloudinary video generation: Full implementation requires cloudinary npm package');
+
+      this.logger.log(
+        'Cloudinary video generation: Full implementation requires cloudinary npm package',
+      );
       this.logger.log('Install: npm install cloudinary');
       this.logger.log('Then implement full Cloudinary SDK integration');
-      
+
       // For now, fallback to reliable placeholder
       // TODO: Implement full Cloudinary integration with SDK
       return this.getPlaceholderVideo();
     } catch (error) {
-      this.logger.error(`Cloudinary video generation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Cloudinary video generation failed: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -135,13 +160,15 @@ export class AiVideoService {
   /**
    * Generate video using Kaggle Notebook API
    * Kaggle allows running notebooks via API for custom model inference
-   * 
+   *
    * To use this:
    * 1. Create a Kaggle notebook with video generation code (see KAGGLE_NOTEBOOK_TEMPLATE.py)
    * 2. Publish the notebook on Kaggle
    * 3. Set KAGGLE_USERNAME, KAGGLE_KEY, and optionally KAGGLE_NOTEBOOK_URL
    */
-  private async generateWithKaggle(payload: VideoJobPayload): Promise<AiVideoResponse> {
+  private async generateWithKaggle(
+    payload: VideoJobPayload,
+  ): Promise<AiVideoResponse> {
     try {
       this.logger.log('Attempting video generation with Kaggle Notebook API');
 
@@ -163,18 +190,20 @@ export class AiVideoService {
 
       // This requires the Kaggle API Python package or HTTP API calls
       // Example API endpoint: https://www.kaggle.com/api/v1/kernels/push
-      
-      this.logger.log(`Kaggle integration: Would process ${payload.slides.length} images`);
+
+      this.logger.log(
+        `Kaggle integration: Would process ${payload.slides.length} images`,
+      );
       this.logger.log('Full Kaggle API integration requires:');
       this.logger.log('1. Kaggle API Python package (kaggle)');
       this.logger.log('2. Creating a dataset with images');
       this.logger.log('3. Running notebook via API');
       this.logger.log('4. Retrieving output video');
-      
+
       this.logger.warn(
         'Kaggle notebook API integration is complex and requires additional setup. ' +
-        'See KAGGLE_NOTEBOOK_SETUP.md for detailed instructions. ' +
-        'Consider using Cloudinary or Replicate for simpler integration.',
+          'See KAGGLE_NOTEBOOK_SETUP.md for detailed instructions. ' +
+          'Consider using Cloudinary or Replicate for simpler integration.',
       );
 
       // For now, fallback to placeholder
@@ -220,13 +249,20 @@ export class AiVideoService {
       // Validate the returned URL
       const isValid = await this.validateVideoUrl(response.data.videoUrl);
       if (!isValid) {
-        throw new Error(`Invalid video URL returned by custom service: ${response.data.videoUrl}`);
+        throw new Error(
+          `Invalid video URL returned by custom service: ${response.data.videoUrl}`,
+        );
       }
 
-      this.logger.log(`Video generated successfully via custom service: ${response.data.videoUrl}`);
+      this.logger.log(
+        `Video generated successfully via custom service: ${response.data.videoUrl}`,
+      );
       return response.data;
     } catch (error) {
-      this.logger.error(`Custom AI service failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Custom AI service failed: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -235,12 +271,15 @@ export class AiVideoService {
    * Generate video using Replicate API
    * Replicate has excellent video generation models
    */
-  private async generateWithReplicate(payload: VideoJobPayload): Promise<AiVideoResponse> {
+  private async generateWithReplicate(
+    payload: VideoJobPayload,
+  ): Promise<AiVideoResponse> {
     try {
       // Replicate API endpoint for video generation
       // Using a video montage model (you can change the model ID)
-      const modelId = process.env.REPLICATE_VIDEO_MODEL || 'anotherjesse/zeroscope-v2-xl';
-      
+      const modelId =
+        process.env.REPLICATE_VIDEO_MODEL || 'anotherjesse/zeroscope-v2-xl';
+
       this.logger.log(`Generating video with Replicate model: ${modelId}`);
 
       // For image-to-video, we'll use a montage approach
@@ -279,22 +318,28 @@ export class AiVideoService {
         await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
 
         const statusResponse = await firstValueFrom(
-          this.httpService.get(`https://api.replicate.com/v1/predictions/${predictionId}`, {
-            headers: {
-              Authorization: `Token ${this.replicateApiToken}`,
+          this.httpService.get(
+            `https://api.replicate.com/v1/predictions/${predictionId}`,
+            {
+              headers: {
+                Authorization: `Token ${this.replicateApiToken}`,
+              },
+              timeout: 10000,
             },
-            timeout: 10000,
-          }),
+          ),
         );
 
         const status = statusResponse.data.status;
         this.logger.log(`Replicate prediction status: ${status}`);
 
         if (status === 'succeeded') {
-          videoUrl = statusResponse.data.output?.[0] || statusResponse.data.output;
+          videoUrl =
+            statusResponse.data.output?.[0] || statusResponse.data.output;
           break;
         } else if (status === 'failed' || status === 'canceled') {
-          throw new Error(`Replicate prediction ${status}: ${statusResponse.data.error || 'Unknown error'}`);
+          throw new Error(
+            `Replicate prediction ${status}: ${statusResponse.data.error || 'Unknown error'}`,
+          );
         }
 
         attempts++;
@@ -310,12 +355,16 @@ export class AiVideoService {
         throw new Error(`Invalid video URL returned by Replicate: ${videoUrl}`);
       }
 
-      this.logger.log(`Video generated successfully via Replicate: ${videoUrl}`);
+      this.logger.log(
+        `Video generated successfully via Replicate: ${videoUrl}`,
+      );
       return { videoUrl };
     } catch (error) {
       this.logger.error(`Replicate API failed: ${error.message}`, error.stack);
       // Fallback to placeholder if Replicate fails
-      this.logger.warn('Falling back to placeholder video due to Replicate error');
+      this.logger.warn(
+        'Falling back to placeholder video due to Replicate error',
+      );
       return this.getPlaceholderVideo();
     }
   }
@@ -324,18 +373,24 @@ export class AiVideoService {
    * Generate video using Hugging Face Inference API
    * Uses Hugging Face Spaces or Inference API for video generation
    */
-  private async generateWithHuggingFace(payload: VideoJobPayload): Promise<AiVideoResponse> {
+  private async generateWithHuggingFace(
+    payload: VideoJobPayload,
+  ): Promise<AiVideoResponse> {
     try {
       // Hugging Face Spaces for video generation
       // Example: Using a video generation space (you can change the model name)
-      const modelName = process.env.HUGGINGFACE_VIDEO_MODEL || 'damo-vilab/modelscope-text-to-video-synthesis';
-      
-      this.logger.log(`Attempting video generation with Hugging Face model: ${modelName}`);
-      
+      const modelName =
+        process.env.HUGGINGFACE_VIDEO_MODEL ||
+        'damo-vilab/modelscope-text-to-video-synthesis';
+
+      this.logger.log(
+        `Attempting video generation with Hugging Face model: ${modelName}`,
+      );
+
       // For image-to-video, we can use a Hugging Face Space
       // Note: Most HF models are text-to-video, not image-to-video
       // For image-to-video, Replicate or a custom service is recommended
-      
+
       // Try to use a Hugging Face Space API if available
       const spaceUrl = process.env.HUGGINGFACE_SPACE_URL;
       if (spaceUrl) {
@@ -361,7 +416,9 @@ export class AiVideoService {
             const videoUrl = response.data.video_url || response.data.output;
             const isValid = await this.validateVideoUrl(videoUrl);
             if (isValid) {
-              this.logger.log(`Video generated successfully via Hugging Face Space: ${videoUrl}`);
+              this.logger.log(
+                `Video generated successfully via Hugging Face Space: ${videoUrl}`,
+              );
               return { videoUrl };
             }
           }
@@ -369,17 +426,20 @@ export class AiVideoService {
           this.logger.warn(`Hugging Face Space failed: ${spaceError.message}`);
         }
       }
-      
+
       // Fallback: Hugging Face doesn't have reliable image-to-video models
       // Recommend using Replicate or custom service
       this.logger.warn(
         'Hugging Face video generation not fully supported for image-to-video. ' +
-        'Consider using Replicate API (REPLICATE_API_TOKEN) or a custom service (AI_VIDEO_SERVICE_URL) for better results.',
+          'Consider using Replicate API (REPLICATE_API_TOKEN) or a custom service (AI_VIDEO_SERVICE_URL) for better results.',
       );
-      
+
       return this.getPlaceholderVideo();
     } catch (error) {
-      this.logger.error(`Hugging Face API failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Hugging Face API failed: ${error.message}`,
+        error.stack,
+      );
       return this.getPlaceholderVideo();
     }
   }
@@ -403,12 +463,14 @@ export class AiVideoService {
 
     this.logger.log(
       `Using reliable placeholder video URL: ${placeholderUrl}. ` +
-      'This is a test video that works on all devices. ' +
-      'Configure REPLICATE_API_TOKEN or AI_VIDEO_SERVICE_URL for real AI video generation.',
+        'This is a test video that works on all devices. ' +
+        'Configure REPLICATE_API_TOKEN or AI_VIDEO_SERVICE_URL for real AI video generation.',
     );
 
     // Simulate processing latency (2-3 seconds to mimic real processing)
-    await new Promise((resolve) => setTimeout(resolve, 2000 + Math.random() * 1000));
+    await new Promise((resolve) =>
+      setTimeout(resolve, 2000 + Math.random() * 1000),
+    );
 
     // Validate URL format
     try {
@@ -417,7 +479,10 @@ export class AiVideoService {
         throw new Error('URL must use HTTP or HTTPS protocol');
       }
     } catch (error) {
-      this.logger.error(`Invalid placeholder URL format: ${placeholderUrl}`, error);
+      this.logger.error(
+        `Invalid placeholder URL format: ${placeholderUrl}`,
+        error,
+      );
       throw new Error('Invalid video URL configuration');
     }
 
@@ -432,7 +497,7 @@ export class AiVideoService {
     try {
       // Basic URL format validation
       new URL(url);
-      
+
       // Check if URL is from a trusted source or is a valid format
       const trustedDomains = [
         'commondatastorage.googleapis.com',
@@ -440,15 +505,21 @@ export class AiVideoService {
         'replicate.delivery',
         'cdn.replicate.com',
       ];
-      
+
       const urlObj = new URL(url);
-      const isTrusted = trustedDomains.some((domain) => urlObj.hostname.includes(domain));
-      
-      if (!isTrusted && !url.startsWith('http://') && !url.startsWith('https://')) {
+      const isTrusted = trustedDomains.some((domain) =>
+        urlObj.hostname.includes(domain),
+      );
+
+      if (
+        !isTrusted &&
+        !url.startsWith('http://') &&
+        !url.startsWith('https://')
+      ) {
         this.logger.warn(`Video URL from untrusted domain: ${urlObj.hostname}`);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       this.logger.error(`Invalid video URL: ${url}`, error);
@@ -456,4 +527,3 @@ export class AiVideoService {
     }
   }
 }
-

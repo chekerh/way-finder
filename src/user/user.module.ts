@@ -17,4 +17,3 @@ import { IndexFixService } from './index-fix.service';
   exports: [UserService, MongooseModule], // Export MongooseModule so other modules can use UserModel
 })
 export class UserModule {}
-

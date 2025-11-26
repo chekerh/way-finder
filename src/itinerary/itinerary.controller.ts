@@ -12,7 +12,11 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ItineraryService } from './itinerary.service';
-import { CreateItineraryDto, UpdateItineraryDto, ActivityDto } from './itinerary.dto';
+import {
+  CreateItineraryDto,
+  UpdateItineraryDto,
+  ActivityDto,
+} from './itinerary.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('itinerary')
@@ -20,20 +24,33 @@ export class ItineraryController {
   constructor(private readonly itineraryService: ItineraryService) {}
 
   @Post()
-  async create(@Req() req: any, @Body() createItineraryDto: CreateItineraryDto) {
-    const itinerary = await this.itineraryService.create(req.user.sub, createItineraryDto);
-    const itineraryObj = (itinerary as any).toObject ? (itinerary as any).toObject() : itinerary;
+  async create(
+    @Req() req: any,
+    @Body() createItineraryDto: CreateItineraryDto,
+  ) {
+    const itinerary = await this.itineraryService.create(
+      req.user.sub,
+      createItineraryDto,
+    );
+    const itineraryObj = (itinerary as any).toObject
+      ? (itinerary as any).toObject()
+      : itinerary;
     return itineraryObj;
   }
 
   @Get()
-  async findAll(@Req() req: any, @Query('includePublic') includePublic?: string) {
+  async findAll(
+    @Req() req: any,
+    @Query('includePublic') includePublic?: string,
+  ) {
     const itineraries = await this.itineraryService.findAll(
       req.user.sub,
       includePublic === 'true',
     );
     return itineraries.map((itinerary) => {
-      const itineraryObj = (itinerary as any).toObject ? (itinerary as any).toObject() : itinerary;
+      const itineraryObj = (itinerary as any).toObject
+        ? (itinerary as any).toObject()
+        : itinerary;
       return itineraryObj;
     });
   }
@@ -41,7 +58,9 @@ export class ItineraryController {
   @Get(':id')
   async findOne(@Req() req: any, @Param('id') id: string) {
     const itinerary = await this.itineraryService.findOne(id, req.user.sub);
-    const itineraryObj = (itinerary as any).toObject ? (itinerary as any).toObject() : itinerary;
+    const itineraryObj = (itinerary as any).toObject
+      ? (itinerary as any).toObject()
+      : itinerary;
     return itineraryObj;
   }
 
@@ -51,8 +70,14 @@ export class ItineraryController {
     @Param('id') id: string,
     @Body() updateItineraryDto: UpdateItineraryDto,
   ) {
-    const itinerary = await this.itineraryService.update(id, req.user.sub, updateItineraryDto);
-    const itineraryObj = (itinerary as any).toObject ? (itinerary as any).toObject() : itinerary;
+    const itinerary = await this.itineraryService.update(
+      id,
+      req.user.sub,
+      updateItineraryDto,
+    );
+    const itineraryObj = (itinerary as any).toObject
+      ? (itinerary as any).toObject()
+      : itinerary;
     return itineraryObj;
   }
 
@@ -69,8 +94,15 @@ export class ItineraryController {
     @Param('dayDate') dayDate: string,
     @Body() activity: ActivityDto,
   ) {
-    const itinerary = await this.itineraryService.addActivity(id, req.user.sub, dayDate, activity);
-    const itineraryObj = (itinerary as any).toObject ? (itinerary as any).toObject() : itinerary;
+    const itinerary = await this.itineraryService.addActivity(
+      id,
+      req.user.sub,
+      dayDate,
+      activity,
+    );
+    const itineraryObj = (itinerary as any).toObject
+      ? (itinerary as any).toObject()
+      : itinerary;
     return itineraryObj;
   }
 
@@ -87,8 +119,9 @@ export class ItineraryController {
       dayDate,
       parseInt(activityIndex, 10),
     );
-    const itineraryObj = (itinerary as any).toObject ? (itinerary as any).toObject() : itinerary;
+    const itineraryObj = (itinerary as any).toObject
+      ? (itinerary as any).toObject()
+      : itinerary;
     return itineraryObj;
   }
 }
-

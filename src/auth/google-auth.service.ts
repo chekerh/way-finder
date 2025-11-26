@@ -20,12 +20,16 @@ export class GoogleAuthService {
     } else {
       this.webClient = null;
       if (this.webClientId && !clientSecret) {
-        this.logger.warn('Google OAuth Web client ID provided but no secret. Web OAuth will be disabled.');
+        this.logger.warn(
+          'Google OAuth Web client ID provided but no secret. Web OAuth will be disabled.',
+        );
       }
     }
 
     if (!this.androidClientId) {
-      this.logger.warn('Google OAuth Android client ID not configured. Android Google Sign-In will not work.');
+      this.logger.warn(
+        'Google OAuth Android client ID not configured. Android Google Sign-In will not work.',
+      );
     } else {
       this.logger.log('Google OAuth Android client ID configured');
     }
@@ -37,7 +41,10 @@ export class GoogleAuthService {
    * @param clientType - 'web' or 'android' to determine which client ID to verify against
    * @returns User information from Google
    */
-  async verifyIdToken(idToken: string, clientType: 'web' | 'android' = 'android'): Promise<{
+  async verifyIdToken(
+    idToken: string,
+    clientType: 'web' | 'android' = 'android',
+  ): Promise<{
     googleId: string;
     email: string;
     emailVerified: boolean;
@@ -48,11 +55,13 @@ export class GoogleAuthService {
   }> {
     try {
       let ticket;
-      
+
       if (clientType === 'android') {
         // For Android, verify using Android client ID (no secret needed)
         if (!this.androidClientId) {
-          throw new UnauthorizedException('Google OAuth Android client ID not configured');
+          throw new UnauthorizedException(
+            'Google OAuth Android client ID not configured',
+          );
         }
 
         // Create a client without secret for Android token verification
@@ -64,7 +73,9 @@ export class GoogleAuthService {
       } else {
         // For Web, verify using Web client ID and secret
         if (!this.webClient) {
-          throw new UnauthorizedException('Google OAuth Web client not configured. Please configure GOOGLE_CLIENT_ID_WEB and GOOGLE_CLIENT_SECRET_WEB');
+          throw new UnauthorizedException(
+            'Google OAuth Web client not configured. Please configure GOOGLE_CLIENT_ID_WEB and GOOGLE_CLIENT_SECRET_WEB',
+          );
         }
 
         ticket = await this.webClient.verifyIdToken({
@@ -74,7 +85,7 @@ export class GoogleAuthService {
       }
 
       const payload = ticket.getPayload();
-      
+
       if (!payload) {
         throw new UnauthorizedException('Invalid Google token: no payload');
       }
@@ -122,7 +133,10 @@ export class GoogleAuthService {
   isConfigured(): boolean {
     // At minimum, Android client ID should be configured
     // Web client is optional
-    return !!this.androidClientId || !!(this.webClientId && process.env.GOOGLE_CLIENT_SECRET_WEB);
+    return (
+      !!this.androidClientId ||
+      !!(this.webClientId && process.env.GOOGLE_CLIENT_SECRET_WEB)
+    );
   }
 
   /**
@@ -132,4 +146,3 @@ export class GoogleAuthService {
     return !!this.androidClientId;
   }
 }
-

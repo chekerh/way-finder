@@ -7,7 +7,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class PaymentService {
   constructor(
-    @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
+    @InjectModel(Payment.name)
+    private readonly paymentModel: Model<PaymentDocument>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -22,7 +23,9 @@ export class PaymentService {
     bookingId?: string;
   }) {
     const payment = new this.paymentModel({
-      transaction_id: params.transaction_id || `txn_${Math.random().toString(36).slice(2, 10)}`,
+      transaction_id:
+        params.transaction_id ||
+        `txn_${Math.random().toString(36).slice(2, 10)}`,
       user_id: new Types.ObjectId(params.userId),
       amount: params.amount,
       payment_status: params.payment_status,
@@ -32,7 +35,7 @@ export class PaymentService {
       metadata: params.metadata || {},
     });
     const savedPayment = await payment.save();
-    
+
     // Send notification based on payment status
     if (params.payment_status === 'success') {
       await this.notificationsService.createPaymentNotification(
@@ -49,20 +52,29 @@ export class PaymentService {
         params.amount,
       );
     }
-    
+
     return savedPayment;
   }
 
   async findByUser(userId: string) {
-    return this.paymentModel.find({ user_id: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).exec();
+    return this.paymentModel
+      .find({ user_id: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
   async findByTransactionId(transactionId: string) {
     return this.paymentModel.findOne({ transaction_id: transactionId }).exec();
   }
 
-  async updateStatus(transactionId: string, status: string, metadata?: Record<string, any>) {
-    const payment = await this.paymentModel.findOne({ transaction_id: transactionId }).exec();
+  async updateStatus(
+    transactionId: string,
+    status: string,
+    metadata?: Record<string, any>,
+  ) {
+    const payment = await this.paymentModel
+      .findOne({ transaction_id: transactionId })
+      .exec();
     if (!payment) {
       return null;
     }
@@ -74,7 +86,7 @@ export class PaymentService {
     }
 
     const savedPayment = await payment.save();
-    
+
     // Send notification if status changed to success or failed
     if (oldStatus !== status && (status === 'success' || status === 'failed')) {
       const bookingId = metadata?.bookingId || savedPayment._id.toString();
@@ -89,4 +101,3 @@ export class PaymentService {
     return savedPayment;
   }
 }
-

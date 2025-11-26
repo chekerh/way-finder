@@ -1,5 +1,9 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { AxiosRequestConfig } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { CreatePaypalOrderDto } from './dto/paypal-order.dto';
@@ -19,7 +23,9 @@ export class PaypalService {
   constructor(private readonly http: HttpService) {
     this.baseUrl =
       process.env.PAYPAL_API_BASE_URL ||
-      (process.env.PAYPAL_MODE === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com');
+      (process.env.PAYPAL_MODE === 'live'
+        ? 'https://api-m.paypal.com'
+        : 'https://api-m.sandbox.paypal.com');
   }
 
   private getCredentials() {
@@ -27,7 +33,9 @@ export class PaypalService {
     const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-      throw new InternalServerErrorException('PayPal credentials are not configured');
+      throw new InternalServerErrorException(
+        'PayPal credentials are not configured',
+      );
     }
 
     return { clientId, clientSecret };
@@ -59,8 +67,13 @@ export class PaypalService {
 
       return response.data.access_token;
     } catch (error) {
-      this.logger.error('Failed to fetch PayPal access token', error?.response?.data || error?.message);
-      throw new InternalServerErrorException('Unable to authenticate with PayPal');
+      this.logger.error(
+        'Failed to fetch PayPal access token',
+        error?.response?.data || error?.message,
+      );
+      throw new InternalServerErrorException(
+        'Unable to authenticate with PayPal',
+      );
     }
   }
 
@@ -94,7 +107,8 @@ export class PaypalService {
       },
     }));
     const itemsTotal = items?.reduce(
-      (acc, item) => acc + Number(item.unit_amount.value) * Number(item.quantity),
+      (acc, item) =>
+        acc + Number(item.unit_amount.value) * Number(item.quantity),
       0,
     );
 
@@ -104,7 +118,8 @@ export class PaypalService {
         {
           amount: {
             currency_code: currency,
-            value: items && items.length ? itemsTotal?.toFixed(2) : purchaseAmount,
+            value:
+              items && items.length ? itemsTotal?.toFixed(2) : purchaseAmount,
             ...(items && items.length
               ? {
                   breakdown: {
@@ -153,5 +168,3 @@ export class PaypalService {
     return order?.links?.find((link: any) => link.rel === 'approve')?.href;
   }
 }
-
-

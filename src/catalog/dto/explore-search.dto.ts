@@ -6,4 +6,3 @@ export interface ExploreSearchDto {
   budget?: number;
   limit?: number;
 }
-

@@ -5,4 +5,3 @@ export enum BookingStatus {
 }
 
 export default BookingStatus;
-

@@ -28,4 +28,3 @@ OTPSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
 OTPSchema.index({ email: 1, used: 1 });
 // Create index on last_sent_at for cooldown checks
 OTPSchema.index({ email: 1, last_sent_at: 1 });
-

@@ -18,7 +18,11 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { JourneyService } from './journey.service';
-import { CreateJourneyDto, UpdateJourneyDto, CreateJourneyCommentDto } from './journey.dto';
+import {
+  CreateJourneyDto,
+  UpdateJourneyDto,
+  CreateJourneyCommentDto,
+} from './journey.dto';
 import { Logger } from '@nestjs/common';
 
 @Controller('journey')
@@ -36,7 +40,8 @@ export class JourneyController {
         destination: './uploads/journeys',
         filename: (req, file, cb) => {
           const userId = (req as any).user?.sub;
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
           const ext = extname(file.originalname);
           cb(null, `journey-${userId}-${uniqueSuffix}${ext}`);
         },
@@ -46,7 +51,10 @@ export class JourneyController {
       },
       fileFilter: (req, file, cb) => {
         if (!file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
-          return cb(new BadRequestException('Only image files are allowed!'), false);
+          return cb(
+            new BadRequestException('Only image files are allowed!'),
+            false,
+          );
         }
         cb(null, true);
       },
@@ -61,18 +69,25 @@ export class JourneyController {
       throw new BadRequestException('At least one image is required');
     }
 
-    this.logger.log(`Uploading ${files.length} images to ImgBB for user ${req.user.sub}`);
-    
+    this.logger.log(
+      `Uploading ${files.length} images to ImgBB for user ${req.user.sub}`,
+    );
+
     try {
       // Upload images to ImgBB and get URLs
       const imageUrls = await this.journeyService.uploadImagesToImgBB(files);
 
-      this.logger.log(`Successfully uploaded ${imageUrls.length} images, creating journey...`);
+      this.logger.log(
+        `Successfully uploaded ${imageUrls.length} images, creating journey...`,
+      );
       return this.journeyService.createJourney(req.user.sub, dto, imageUrls);
     } catch (error) {
-      this.logger.error(`Error uploading images: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error uploading images: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException(
-        'Image upload failed. Please try again with fewer or smaller images.'
+        'Image upload failed. Please try again with fewer or smaller images.',
       );
     }
   }
@@ -83,7 +98,7 @@ export class JourneyController {
     @Query('limit') limit?: string,
     @Query('skip') skip?: string,
   ) {
-    const userId = (req as any).user?.sub;
+    const userId = req.user?.sub;
     const limitNum = limit ? parseInt(limit, 10) : 20;
     const skipNum = skip ? parseInt(skip, 10) : 0;
     return this.journeyService.getJourneys(userId, limitNum, skipNum);
@@ -109,7 +124,7 @@ export class JourneyController {
 
   @Get(':id')
   async getJourneyById(@Req() req: any, @Param('id') id: string) {
-    const userId = (req as any).user?.sub;
+    const userId = req.user?.sub;
     return this.journeyService.getJourneyById(id, userId);
   }
 
@@ -168,4 +183,3 @@ export class JourneyController {
     return this.journeyService.regenerateVideo(req.user.sub, id);
   }
 }
-

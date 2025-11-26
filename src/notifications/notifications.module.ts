@@ -8,7 +8,9 @@ import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Notification.name, schema: NotificationSchema }]),
+    MongooseModule.forFeature([
+      { name: Notification.name, schema: NotificationSchema },
+    ]),
     UserModule,
   ],
   controllers: [NotificationsController],
@@ -16,4 +18,3 @@ import { UserModule } from '../user/user.module';
   exports: [NotificationsService, FcmService],
 })
 export class NotificationsModule {}
-

@@ -79,4 +79,3 @@ export class Itinerary {
 
 export type ItineraryDocument = HydratedDocument<Itinerary>;
 export const ItinerarySchema = SchemaFactory.createForClass(Itinerary);
-

@@ -5,8 +5,13 @@ import { UserService } from '../user/user.service';
 
 describe('CatalogService', () => {
   let catalogService: CatalogService;
-  const amadeus = { searchFlights: jest.fn(), isConfigured: jest.fn() } as unknown as AmadeusService;
-  const activities = { findActivities: jest.fn() } as unknown as ActivitiesService;
+  const amadeus = {
+    searchFlights: jest.fn(),
+    isConfigured: jest.fn(),
+  } as unknown as AmadeusService;
+  const activities = {
+    findActivities: jest.fn(),
+  } as unknown as ActivitiesService;
   const userService = { findById: jest.fn() } as unknown as UserService;
 
   beforeEach(() => {
@@ -33,7 +38,10 @@ describe('CatalogService', () => {
 
     (amadeus.searchFlights as jest.Mock).mockResolvedValue({ data: [] });
 
-    await catalogService.getRecommendedFlights('user123', { adults: 2, maxResults: 3 });
+    await catalogService.getRecommendedFlights('user123', {
+      adults: 2,
+      maxResults: 3,
+    });
 
     expect(amadeus.searchFlights).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -64,7 +72,9 @@ describe('CatalogService', () => {
   });
 
   it('delegates activity lookups to OpenTripMap service', async () => {
-    (activities.findActivities as jest.Mock).mockResolvedValue([{ name: 'Louvre' }]);
+    (activities.findActivities as jest.Mock).mockResolvedValue([
+      { name: 'Louvre' },
+    ]);
 
     await catalogService.getActivitiesFeed({
       city: 'Paris',
@@ -81,4 +91,3 @@ describe('CatalogService', () => {
     });
   });
 });
-

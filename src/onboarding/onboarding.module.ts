@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { MongooseModule } from '@nestjs/mongoose';
-import { OnboardingSession, OnboardingSessionSchema } from './onboarding.schema';
+import {
+  OnboardingSession,
+  OnboardingSessionSchema,
+} from './onboarding.schema';
 import { OnboardingService } from './onboarding.service';
 import { OnboardingController } from './onboarding.controller';
 import { OnboardingAIService } from './ai/onboarding-ai.service';
@@ -10,7 +13,9 @@ import { RewardsModule } from '../rewards/rewards.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: OnboardingSession.name, schema: OnboardingSessionSchema }]),
+    MongooseModule.forFeature([
+      { name: OnboardingSession.name, schema: OnboardingSessionSchema },
+    ]),
     UserModule,
     RewardsModule,
     HttpModule.register({
@@ -23,4 +28,3 @@ import { RewardsModule } from '../rewards/rewards.module';
   exports: [OnboardingService],
 })
 export class OnboardingModule {}
-

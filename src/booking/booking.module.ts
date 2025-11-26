@@ -15,4 +15,3 @@ import { NotificationsModule } from '../notifications/notifications.module';
   exports: [BookingService],
 })
 export class BookingModule {}
-

@@ -48,4 +48,3 @@ export class Booking {
 
 export type BookingDocument = HydratedDocument<Booking>;
 export const BookingSchema = SchemaFactory.createForClass(Booking);
-

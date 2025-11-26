@@ -14,7 +14,9 @@ import { DestinationVideoService } from './destination-video.service';
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class DestinationVideoController {
-  constructor(private readonly destinationVideoService: DestinationVideoService) {}
+  constructor(
+    private readonly destinationVideoService: DestinationVideoService,
+  ) {}
 
   /**
    * Generate video for a specific destination
@@ -28,7 +30,9 @@ export class DestinationVideoController {
   ) {
     // Verify that the authenticated user matches userId
     if (req.user.sub !== userId) {
-      throw new BadRequestException('You can only generate videos for your own account');
+      throw new BadRequestException(
+        'You can only generate videos for your own account',
+      );
     }
 
     if (!destination || destination.trim().length === 0) {
@@ -84,8 +88,8 @@ export class DestinationVideoController {
       imageCount: destinationVideo.image_count,
       generatedAt: destinationVideo.generated_at || null,
       errorMessage: destinationVideo.error_message || null,
-      errorDetails: destinationVideo.error_message 
-        ? `Video generation failed: ${destinationVideo.error_message}` 
+      errorDetails: destinationVideo.error_message
+        ? `Video generation failed: ${destinationVideo.error_message}`
         : null,
     };
   }
@@ -95,18 +99,16 @@ export class DestinationVideoController {
    * GET /api/users/:userId/destinations
    */
   @Get(':userId/destinations')
-  async getUserDestinations(
-    @Param('userId') userId: string,
-    @Req() req: any,
-  ) {
+  async getUserDestinations(@Param('userId') userId: string, @Req() req: any) {
     // Allow users to check their own destinations
     if (req.user.sub !== userId) {
       throw new BadRequestException('You can only view your own destinations');
     }
 
-    const destinations = await this.destinationVideoService.getUserDestinationsWithVideoStatus(
-      userId,
-    );
+    const destinations =
+      await this.destinationVideoService.getUserDestinationsWithVideoStatus(
+        userId,
+      );
 
     return {
       destinations,
@@ -127,7 +129,8 @@ export class DestinationVideoController {
       throw new BadRequestException('You can only view your own videos');
     }
 
-    const videos = await this.destinationVideoService.getUserDestinationVideos(userId);
+    const videos =
+      await this.destinationVideoService.getUserDestinationVideos(userId);
 
     return {
       videos: videos.map((v) => ({
@@ -140,4 +143,3 @@ export class DestinationVideoController {
     };
   }
 }
-

@@ -19,4 +19,3 @@ import { UserModule } from '../user/user.module';
   exports: [CatalogService],
 })
 export class CatalogModule {}
-

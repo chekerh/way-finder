@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsEnum, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+  IsEnum,
+  IsObject,
+} from 'class-validator';
 import type { NotificationType } from './notifications.schema';
 
 export class CreateNotificationDto {
@@ -10,7 +17,7 @@ export class CreateNotificationDto {
     'payment_success',
     'payment_failed',
     'trip_reminder',
-    'general'
+    'general',
   ])
   @IsNotEmpty()
   type: NotificationType;
@@ -37,4 +44,3 @@ export class UpdateNotificationDto {
   @IsOptional()
   isRead?: boolean;
 }
-

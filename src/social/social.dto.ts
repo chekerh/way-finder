@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsBoolean, IsEnum, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsObject,
+} from 'class-validator';
 
 export class FollowUserDto {
   @IsString()
@@ -65,4 +73,3 @@ export class UpdateSharedTripDto {
   @IsOptional()
   isPublic?: boolean;
 }
-
