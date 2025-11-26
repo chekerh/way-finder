@@ -52,6 +52,15 @@ export class OnboardingAIService {
 
     try {
       const question = await this.generateAIContextualQuestion(session);
+
+      // If AI couldn't generate a question, fall back to deterministic questions
+      if (!question) {
+        this.logger.warn(
+          'AI did not return a question, using fallback question generator',
+        );
+        return this.generateFallbackQuestion(answeredIds);
+      }
+
       const normalizedQuestion = this.normalizeQuestion(question, answeredIds);
       if (!normalizedQuestion) {
         return this.generateFallbackQuestion(answeredIds);
