@@ -22,6 +22,8 @@ import {
 } from './journey.dto';
 import { BookingService } from '../booking/booking.service';
 import { VideoProcessingService } from '../video-processing/video-processing.service';
+import { AiVideoService } from '../video-processing/ai-video.service';
+import type { VideoJobPayload } from '../video-processing/interfaces/video-job-payload.interface';
 import { ImgBBService } from './imgbb.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserService } from '../user/user.service';
@@ -41,6 +43,7 @@ export class JourneyService {
     private readonly journeyCommentModel: Model<JourneyCommentDocument>,
     private readonly bookingService: BookingService,
     private readonly videoProcessingService: VideoProcessingService,
+    private readonly aiVideoService: AiVideoService,
     private readonly imgbbService: ImgBBService,
     private readonly notificationsService: NotificationsService,
     private readonly userService: UserService,
@@ -298,26 +301,39 @@ export class JourneyService {
 
     const savedJourney = await journey.save();
 
-    // Enqueue video generation job
-    try {
-      await this.videoProcessingService.enqueueJourneyVideo({
+    // Enqueue video generation job (async - doesn't block journey creation)
+    // If queue fails, we'll process it directly as fallback
+    this.videoProcessingService
+      .enqueueJourneyVideo({
         journeyId: savedJourney._id.toString(),
         userId,
         destination,
         musicTheme: null,
         captionText: null,
         slides: queueSlides,
+      })
+      .then(() => {
+        this.logger.log(
+          `Video generation job enqueued for journey ${savedJourney._id}`,
+        );
+      })
+      .catch((error) => {
+        this.logger.error(
+          `Failed to enqueue video job for journey ${savedJourney._id}, will process directly: ${error.message}`,
+        );
+        // Fallback: Process video generation directly if queue fails
+        // This ensures video generation always works even without Redis
+        this.processVideoGenerationDirectly(
+          savedJourney,
+          queueSlides,
+          userId,
+          destination,
+        ).catch((directError) => {
+          this.logger.error(
+            `Direct video generation also failed: ${directError.message}`,
+          );
+        });
       });
-      this.logger.log(
-        `Video generation job enqueued for journey ${savedJourney._id}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to enqueue video job for journey ${savedJourney._id}`,
-        error as Error,
-      );
-      // Don't fail the journey creation if video generation fails
-    }
 
     // Ensure image_urls is always an array
     const journeyObj = savedJourney.toObject
@@ -843,5 +859,77 @@ export class JourneyService {
       journey_id: journeyId,
       video_status: 'pending',
     };
+  }
+
+  /**
+   * Fallback method to process video generation directly if queue fails
+   * This ensures video generation works even without Redis/Bull queue
+   */
+  private async processVideoGenerationDirectly(
+    journey: JourneyDocument,
+    slides: Array<{ imageUrl: string; caption: string | null }>,
+    userId: string,
+    destination: string,
+  ): Promise<void> {
+    this.logger.log(
+      `Processing video generation directly (fallback) for journey ${journey._id}`,
+    );
+
+    // Set status to processing
+    journey.video_status = 'processing';
+    journey.video_url = undefined;
+    await journey.save();
+
+    try {
+      const videoPayload: VideoJobPayload = {
+        journeyId: journey._id.toString(),
+        userId,
+        destination,
+        musicTheme: null,
+        captionText: null,
+        slides,
+      };
+
+      const response = await this.aiVideoService.generateVideo(videoPayload);
+
+      if (response.videoUrl && response.videoUrl.trim().length > 0) {
+        try {
+          new URL(response.videoUrl);
+          journey.video_url = response.videoUrl;
+          journey.video_status = 'completed';
+          await journey.save();
+          this.logger.log(
+            `✅ Direct video generation completed for journey ${journey._id}: ${response.videoUrl}`,
+          );
+        } catch (urlError) {
+          this.logger.error(
+            `Invalid video URL format: ${response.videoUrl}`,
+            urlError,
+          );
+          journey.video_status = 'failed';
+          journey.video_url = undefined;
+          await journey.save();
+        }
+      } else {
+        this.logger.warn(
+          `No valid video URL returned for journey ${journey._id}`,
+        );
+        journey.video_status = 'failed';
+        journey.video_url = undefined;
+        await journey.save();
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Unknown error during direct video generation';
+      this.logger.error(
+        `❌ Direct video generation failed for journey ${journey._id}: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      journey.video_status = 'failed';
+      journey.video_url = undefined;
+      await journey.save();
+    }
   }
 }
