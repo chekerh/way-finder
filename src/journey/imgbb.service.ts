@@ -84,7 +84,7 @@ export class ImgBBService {
           headers: formData.getHeaders(),
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 60000, // 60 seconds timeout per image
+          timeout: 30000, // 30 seconds timeout per image (reduced for faster response)
         }),
       );
 
@@ -169,7 +169,7 @@ export class ImgBBService {
           headers: formData.getHeaders(),
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
-          timeout: 60000, // 60 seconds timeout per image
+          timeout: 30000, // 30 seconds timeout per image (reduced for faster response)
         }),
       );
 

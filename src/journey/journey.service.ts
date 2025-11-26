@@ -60,8 +60,9 @@ export class JourneyService {
    */
   async uploadImagesToImgBB(files: Express.Multer.File[]): Promise<string[]> {
     try {
-      // Limit concurrent uploads to avoid overwhelming ImgBB API (max 3 at a time)
-      const MAX_CONCURRENT_UPLOADS = 3;
+      // Upload images in parallel batches for faster processing
+      // Use batches of 5 to avoid overwhelming ImgBB API while still being fast
+      const MAX_CONCURRENT_UPLOADS = 5;
       const imageUrls: string[] = [];
 
       for (let i = 0; i < files.length; i += MAX_CONCURRENT_UPLOADS) {
@@ -77,17 +78,19 @@ export class JourneyService {
               file.originalname,
             );
 
-            // Clean up local file after successful upload
-            try {
-              if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                this.logger.debug(`Deleted local file: ${filePath}`);
+            // Clean up local file after successful upload (async, don't block)
+            setImmediate(() => {
+              try {
+                if (fs.existsSync(filePath)) {
+                  fs.unlinkSync(filePath);
+                  this.logger.debug(`Deleted local file: ${filePath}`);
+                }
+              } catch (cleanupError) {
+                this.logger.warn(
+                  `Failed to delete local file ${filePath}: ${cleanupError.message}`,
+                );
               }
-            } catch (cleanupError) {
-              this.logger.warn(
-                `Failed to delete local file ${filePath}: ${cleanupError.message}`,
-              );
-            }
+            });
 
             return imgbbUrl;
           } catch (error) {

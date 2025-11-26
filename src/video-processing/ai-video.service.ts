@@ -142,38 +142,40 @@ export class AiVideoService {
         `Generating video montage with Cloudinary for ${payload.slides.length} images`,
       );
 
-      // Step 1: Upload images to Cloudinary (if they're not already there)
-      const uploadedImagePublicIds: string[] = [];
-      
-      for (const slide of payload.slides) {
+      // Step 1: Upload images to Cloudinary in parallel (much faster!)
+      const uploadPromises = payload.slides.map(async (slide) => {
         try {
           // Check if image is already a Cloudinary URL
           if (slide.imageUrl.includes('cloudinary.com')) {
             // Extract public_id from Cloudinary URL
             const urlMatch = slide.imageUrl.match(/\/v\d+\/(.+?)(?:\.[^.]+)?$/);
             if (urlMatch && urlMatch[1]) {
-              uploadedImagePublicIds.push(urlMatch[1]);
-              continue;
+              return urlMatch[1];
             }
           }
 
-          // Upload image to Cloudinary
+          // Upload image to Cloudinary (parallel uploads)
           const uploadResult = await cloudinary.uploader.upload(slide.imageUrl, {
             resource_type: 'image',
             folder: 'wayfinder/journeys',
             transformation: [
               { width: 1920, height: 1080, crop: 'fill', quality: 'auto' },
             ],
+            timeout: 30000, // 30 seconds per image (reduced from default)
           });
-          uploadedImagePublicIds.push(uploadResult.public_id);
           this.logger.log(`Uploaded image to Cloudinary: ${uploadResult.public_id}`);
+          return uploadResult.public_id;
         } catch (uploadError) {
           this.logger.warn(
             `Failed to upload image ${slide.imageUrl}: ${uploadError.message}`,
           );
-          // Continue with other images
+          return null; // Return null for failed uploads
         }
-      }
+      });
+
+      // Wait for all uploads in parallel
+      const uploadResults = await Promise.all(uploadPromises);
+      const uploadedImagePublicIds = uploadResults.filter((id): id is string => id !== null);
 
       if (uploadedImagePublicIds.length === 0) {
         throw new Error('Failed to upload any images to Cloudinary');
@@ -531,6 +533,7 @@ export class AiVideoService {
    * Get placeholder video URL for development/testing
    * Uses a reliable, publicly accessible test video
    * This video is guaranteed to be accessible and playable on all devices
+   * NOTE: No artificial delay - returns immediately for fast response
    */
   private async getPlaceholderVideo(): Promise<AiVideoResponse> {
     // Use multiple reliable video URLs as fallbacks
@@ -550,10 +553,8 @@ export class AiVideoService {
         'Configure REPLICATE_API_TOKEN or AI_VIDEO_SERVICE_URL for real AI video generation.',
     );
 
-    // Simulate processing latency (2-3 seconds to mimic real processing)
-    await new Promise((resolve) =>
-      setTimeout(resolve, 2000 + Math.random() * 1000),
-    );
+    // NO ARTIFICIAL DELAY - Return immediately for fast response
+    // Video generation is async anyway, so no need to simulate processing time
 
     // Validate URL format
     try {
