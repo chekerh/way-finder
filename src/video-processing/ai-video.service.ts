@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { v2 as cloudinary } from 'cloudinary';
 import { VideoJobPayload } from './interfaces/video-job-payload.interface';
 
 interface AiVideoResponse {
@@ -36,6 +37,19 @@ export class AiVideoService {
     this.cloudinaryApiSecret = process.env.CLOUDINARY_API_SECRET;
     this.kaggleUsername = process.env.KAGGLE_USERNAME;
     this.kaggleKey = process.env.KAGGLE_KEY;
+
+    // Configure Cloudinary if credentials are available
+    if (
+      this.cloudinaryCloudName &&
+      this.cloudinaryApiKey &&
+      this.cloudinaryApiSecret
+    ) {
+      cloudinary.config({
+        cloud_name: this.cloudinaryCloudName,
+        api_key: this.cloudinaryApiKey,
+        api_secret: this.cloudinaryApiSecret,
+      });
+    }
   }
 
   async generateVideo(payload: VideoJobPayload): Promise<AiVideoResponse> {
@@ -128,26 +142,83 @@ export class AiVideoService {
         `Generating video montage with Cloudinary for ${payload.slides.length} images`,
       );
 
-      // Cloudinary video generation from images using their API
-      // For full implementation, install: npm install cloudinary
-      // Then use Cloudinary SDK to upload images and generate video
+      // Step 1: Upload images to Cloudinary (if they're not already there)
+      const uploadedImagePublicIds: string[] = [];
+      
+      for (const slide of payload.slides) {
+        try {
+          // Check if image is already a Cloudinary URL
+          if (slide.imageUrl.includes('cloudinary.com')) {
+            // Extract public_id from Cloudinary URL
+            const urlMatch = slide.imageUrl.match(/\/v\d+\/(.+?)(?:\.[^.]+)?$/);
+            if (urlMatch && urlMatch[1]) {
+              uploadedImagePublicIds.push(urlMatch[1]);
+              continue;
+            }
+          }
 
-      // For now, we'll use a simplified approach
-      // Full implementation would:
-      // 1. Upload images to Cloudinary (or use existing public IDs)
-      // 2. Create a video from the images using Cloudinary's video generation API
-      // 3. Apply transitions and effects
-      // 4. Return the generated video URL
+          // Upload image to Cloudinary
+          const uploadResult = await cloudinary.uploader.upload(slide.imageUrl, {
+            resource_type: 'image',
+            folder: 'wayfinder/journeys',
+            transformation: [
+              { width: 1920, height: 1080, crop: 'fill', quality: 'auto' },
+            ],
+          });
+          uploadedImagePublicIds.push(uploadResult.public_id);
+          this.logger.log(`Uploaded image to Cloudinary: ${uploadResult.public_id}`);
+        } catch (uploadError) {
+          this.logger.warn(
+            `Failed to upload image ${slide.imageUrl}: ${uploadError.message}`,
+          );
+          // Continue with other images
+        }
+      }
+
+      if (uploadedImagePublicIds.length === 0) {
+        throw new Error('Failed to upload any images to Cloudinary');
+      }
+
+      // Step 2: Create video montage
+      // Note: Cloudinary's free tier doesn't support direct video generation from multiple images
+      // For a proper video montage, we need to either:
+      // 1. Use Cloudinary's video generation API (paid feature)
+      // 2. Use a third-party service like Shotstack, Creatomate, or similar
+      // 3. Use FFmpeg server-side to create the montage and upload to Cloudinary
+      
+      // For now, we'll create a simple video from the first image
+      // In production, implement one of the above solutions
+      const firstImageId = uploadedImagePublicIds[0];
+      const totalDuration = Math.min(
+        Math.max(uploadedImagePublicIds.length * 3, 10),
+        60,
+      );
+
+      // Generate a video URL from the first image
+      // This is a placeholder - Cloudinary will generate a static video from the image
+      const generatedVideoUrl = cloudinary.url(firstImageId, {
+        resource_type: 'video',
+        transformation: [
+          {
+            width: 1920,
+            height: 1080,
+            crop: 'fill',
+            format: 'mp4',
+            duration: totalDuration,
+            fps: 24,
+          },
+        ],
+      });
 
       this.logger.log(
-        'Cloudinary video generation: Full implementation requires cloudinary npm package',
+        `Video URL generated from first image: ${generatedVideoUrl}`,
       );
-      this.logger.log('Install: npm install cloudinary');
-      this.logger.log('Then implement full Cloudinary SDK integration');
+      this.logger.warn(
+        'Note: This creates a static video from one image. For a proper montage with multiple images, ' +
+          'implement a video generation service (Shotstack, Creatomate, or FFmpeg-based solution).',
+      );
 
-      // For now, fallback to reliable placeholder
-      // TODO: Implement full Cloudinary integration with SDK
-      return this.getPlaceholderVideo();
+      return { videoUrl: generatedVideoUrl };
     } catch (error) {
       this.logger.error(
         `Cloudinary video generation failed: ${error.message}`,
@@ -282,17 +353,29 @@ export class AiVideoService {
 
       this.logger.log(`Generating video with Replicate model: ${modelId}`);
 
-      // For image-to-video, we'll use a montage approach
-      // First, create a prediction
+      // For image-to-video montage, we need to use a model that supports multiple images
+      // Replicate's API structure: we need to use model version ID, not just model name
+      // For image-to-video, we'll use the first image and create a video
+      // Note: Most Replicate models are text-to-video, not image-to-video
+      // For image montages, consider using a custom service or Cloudinary
+      
+      // Use the first image for video generation
+      const firstImageUrl = payload.slides[0]?.imageUrl;
+      if (!firstImageUrl) {
+        throw new Error('No images provided for video generation');
+      }
+
+      // Create a prediction using Replicate API
+      // Note: The model ID format should be "owner/model:version" or just use version ID
       const predictionResponse = await firstValueFrom(
         this.httpService.post(
           'https://api.replicate.com/v1/predictions',
           {
-            version: modelId,
+            version: modelId.includes(':') ? modelId : `${modelId}:latest`,
             input: {
-              images: payload.slides.map((slide) => slide.imageUrl),
-              destination: payload.destination || 'Travel Destination',
-              duration: 30, // 30 seconds
+              image: firstImageUrl,
+              // For image-to-video models, adjust parameters as needed
+              num_frames: 50,
               fps: 24,
             },
           },
@@ -504,6 +587,10 @@ export class AiVideoService {
         'storage.googleapis.com',
         'replicate.delivery',
         'cdn.replicate.com',
+        'res.cloudinary.com',
+        'cloudinary.com',
+        'sample-videos.com',
+        'learningcontainer.com',
       ];
 
       const urlObj = new URL(url);
