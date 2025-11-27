@@ -188,16 +188,8 @@ export class AiVideoService {
       }
     }
 
-    // Fallback: Use reliable placeholder video that always works
-    // This ensures video generation NEVER fails - always returns a valid video URL
-    this.logger.log(
-      '⚠️  No AI video service configured or all services failed. Using reliable placeholder video URL. ' +
-        'To enable real video generation, set one of: ' +
-        'SHOTSTACK_API_KEY (recommended - 50 free videos/month), ' +
-        'CLOUDINARY_CLOUD_NAME + CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET, ' +
-        'or AI_VIDEO_SERVICE_URL.',
-    );
-    return this.getPlaceholderVideo();
+    // No provider succeeded – surface an explicit error so the UI can show a waiting/failed state
+    this.handleVideoGenerationUnavailable();
   }
 
   /**
@@ -502,12 +494,12 @@ export class AiVideoService {
           'Consider using Cloudinary or Replicate for simpler integration.',
       );
 
-      // For now, fallback to placeholder
+      // For now, explicitly signal that generation is unavailable
       // TODO: Implement full Kaggle API integration with:
       // - Dataset creation via API
       // - Notebook execution via API
       // - Output retrieval
-      return this.getPlaceholderVideo();
+      return this.handleVideoGenerationUnavailable();
     } catch (error) {
       this.logger.error(`Kaggle API failed: ${error.message}`, error.stack);
       throw error;
@@ -610,9 +602,9 @@ export class AiVideoService {
       this.logger.error(`Replicate API failed: ${error.message}`, error.stack);
       // Fallback to placeholder if Replicate fails
       this.logger.warn(
-        'Falling back to placeholder video due to Replicate error',
+        'Replicate error – no alternative provider available for this request',
       );
-      return this.getPlaceholderVideo();
+      return this.handleVideoGenerationUnavailable();
     }
   }
 
@@ -678,61 +670,30 @@ export class AiVideoService {
       // Recommend using Replicate or custom service
       this.logger.warn(
         'Hugging Face video generation not fully supported for image-to-video. ' +
-          'Consider using Replicate API (REPLICATE_API_TOKEN) or a custom service (AI_VIDEO_SERVICE_URL) for better results.',
+          'Consider using Shotstack, Cloudinary, or a custom service for better results.',
       );
 
-      return this.getPlaceholderVideo();
+      return this.handleVideoGenerationUnavailable();
     } catch (error) {
       this.logger.error(
         `Hugging Face API failed: ${error.message}`,
         error.stack,
       );
-      return this.getPlaceholderVideo();
+      return this.handleVideoGenerationUnavailable();
     }
   }
 
   /**
-   * Get placeholder video URL for development/testing
-   * Uses a reliable, publicly accessible test video
-   * This video is guaranteed to be accessible and playable on all devices
-   * NOTE: No artificial delay - returns immediately for fast response
+   * Surface an explicit error when no provider can generate the video.
    */
-  private async getPlaceholderVideo(): Promise<AiVideoResponse> {
-    // Use multiple reliable video URLs as fallbacks
-    // These are publicly accessible test videos that work on all platforms
-    const reliableVideoUrls = [
-      process.env.DEFAULT_VIDEO_PLACEHOLDER_URL,
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-      'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-      'https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4',
-    ].filter(Boolean) as string[];
-
-    const placeholderUrl = reliableVideoUrls[0];
-
-    this.logger.log(
-      `Using reliable placeholder video URL: ${placeholderUrl}. ` +
-        'This is a test video that works on all devices. ' +
-        'Configure REPLICATE_API_TOKEN or AI_VIDEO_SERVICE_URL for real AI video generation.',
+  private handleVideoGenerationUnavailable(): never {
+    this.logger.error(
+      '⚠️  Aucun service vidéo disponible. Configurez SHOTSTACK_API_KEY (recommandé), ' +
+        'CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET, AI_VIDEO_SERVICE_URL, ou REPLICATE_API_TOKEN.',
     );
-
-    // NO ARTIFICIAL DELAY - Return immediately for fast response
-    // Video generation is async anyway, so no need to simulate processing time
-
-    // Validate URL format
-    try {
-      const url = new URL(placeholderUrl);
-      if (!url.protocol.startsWith('http')) {
-        throw new Error('URL must use HTTP or HTTPS protocol');
-      }
-    } catch (error) {
-      this.logger.error(
-        `Invalid placeholder URL format: ${placeholderUrl}`,
-        error,
-      );
-      throw new Error('Invalid video URL configuration');
-    }
-
-    return { videoUrl: placeholderUrl };
+    throw new Error(
+      'Génération vidéo indisponible pour le moment. Merci de réessayer après configuration d’un service.',
+    );
   }
 
   /**
