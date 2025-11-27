@@ -45,7 +45,7 @@ const createRedisOptions = (): RedisOptions => {
   const sharedOptions: Partial<RedisOptions> = {
     maxRetriesPerRequest: null, // Required by Bull for subscriber clients
     enableReadyCheck: false, // Avoid ready check for subscriber connections
-    enableOfflineQueue: false,
+    enableOfflineQueue: true, // Allow Bull to queue commands while Redis connects
     lazyConnect: true,
     connectTimeout: 10_000,
         retryStrategy: (times) => {
