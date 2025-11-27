@@ -3,6 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { v2 as cloudinary } from 'cloudinary';
 import { VideoJobPayload } from './interfaces/video-job-payload.interface';
+import type { AxiosError } from 'axios';
 
 interface AiVideoResponse {
   videoUrl: string;
@@ -265,7 +266,7 @@ export class AiVideoService {
       const renderResponse = await firstValueFrom(
         this.httpService.post(
           `${this.shotstackApiUrl}/render`,
-          { edit: renderRequest },
+          renderRequest,
           {
             headers: {
               'x-api-key': this.shotstackApiKey,
@@ -326,10 +327,23 @@ export class AiVideoService {
       );
       return { videoUrl: videoUrl };
     } catch (error) {
-      this.logger.error(
-        `Shotstack API failed: ${error.message}`,
-        error.stack,
-      );
+      if ((error as AxiosError).isAxiosError) {
+        const axiosError = error as AxiosError;
+        const payloadPreview = JSON.stringify(
+          axiosError.response?.data,
+          null,
+          2,
+        );
+        this.logger.error(
+          `Shotstack API failed: ${axiosError.message} (status ${axiosError.response?.status}) - ${payloadPreview}`,
+          axiosError.stack,
+        );
+      } else {
+        this.logger.error(
+          `Shotstack API failed: ${(error as Error).message}`,
+          (error as Error).stack,
+        );
+      }
       throw error;
     }
   }

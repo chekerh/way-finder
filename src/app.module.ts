@@ -48,15 +48,15 @@ const createRedisOptions = (): RedisOptions => {
     enableOfflineQueue: false,
     lazyConnect: true,
     connectTimeout: 10_000,
-    retryStrategy: (times) => {
+        retryStrategy: (times) => {
       const delay = Math.min(times * 50, 5_000);
-      if (times <= 3) {
-        console.warn(
-          `Redis connection retry attempt ${times}, waiting ${delay}ms`,
-        );
-      }
-      return delay;
-    },
+          if (times <= 3) {
+            console.warn(
+              `Redis connection retry attempt ${times}, waiting ${delay}ms`,
+            );
+          }
+          return delay;
+        },
   };
 
   const shouldUseTls = process.env.REDIS_TLS === 'true';
@@ -72,9 +72,14 @@ const createRedisOptions = (): RedisOptions => {
         }
       : undefined;
 
-  if (process.env.REDIS_URL) {
+  const urlFromEnv =
+    process.env.REDIS_URL ||
+    process.env.UPSTASH_REDIS_URL ||
+    process.env.REDISS_URL;
+
+  if (urlFromEnv) {
     try {
-      const url = new URL(process.env.REDIS_URL);
+      const url = new URL(urlFromEnv);
       const usesTls = url.protocol === 'rediss:';
       return {
         host: url.hostname,
@@ -94,7 +99,7 @@ const createRedisOptions = (): RedisOptions => {
       } as RedisOptions;
     } catch (error) {
       console.warn(
-        `Invalid REDIS_URL provided (${process.env.REDIS_URL}): ${error.message}. Falling back to host/port configuration.`,
+        `Invalid Redis URL provided (${urlFromEnv}): ${error.message}. Falling back to host/port configuration.`,
       );
     }
   }
