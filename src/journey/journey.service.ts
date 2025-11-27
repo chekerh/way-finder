@@ -281,7 +281,7 @@ export class JourneyService {
         : `${publicBaseUrl}${slide.imageUrl.startsWith('/') ? '' : '/'}${slide.imageUrl}`;
       return {
         imageUrl,
-        caption: slide.caption,
+        caption: slide.caption ?? null,
       };
     });
 
@@ -823,13 +823,13 @@ export class JourneyService {
       'http://localhost:3000'
     ).replace(/\/$/, '');
 
-    const queueSlides = journey.slides.map((slide) => {
+    const queueSlides = (journey.slides || []).map((slide) => {
       const imageUrl = slide.imageUrl.startsWith('http')
         ? slide.imageUrl
         : `${publicBaseUrl}${slide.imageUrl.startsWith('/') ? '' : '/'}${slide.imageUrl}`;
       return {
         imageUrl,
-        caption: slide.caption,
+        caption: slide.caption ?? null,
       };
     });
 

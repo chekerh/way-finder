@@ -324,7 +324,7 @@ export class AiVideoService {
       this.logger.log(
         `Video generated successfully via Shotstack: ${videoUrl}`,
       );
-      return { videoUrl };
+      return { videoUrl: videoUrl };
     } catch (error) {
       this.logger.error(
         `Shotstack API failed: ${error.message}`,
@@ -592,60 +592,6 @@ export class AiVideoService {
       throw new Error(
         'Replicate API is not suitable for image montage generation. Use Shotstack or Cloudinary instead.',
       );
-
-      const predictionId = predictionResponse.data.id;
-      this.logger.log(`Replicate prediction created: ${predictionId}`);
-
-      // Poll for completion (Replicate predictions are async)
-      let videoUrl: string | null = null;
-      const maxAttempts = 60; // 5 minutes max (60 * 5 seconds)
-      let attempts = 0;
-
-      while (attempts < maxAttempts && !videoUrl) {
-        await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
-
-        const statusResponse = await firstValueFrom(
-          this.httpService.get(
-            `https://api.replicate.com/v1/predictions/${predictionId}`,
-            {
-              headers: {
-                Authorization: `Token ${this.replicateApiToken}`,
-              },
-              timeout: 10000,
-            },
-          ),
-        );
-
-        const status = statusResponse.data.status;
-        this.logger.log(`Replicate prediction status: ${status}`);
-
-        if (status === 'succeeded') {
-          videoUrl =
-            statusResponse.data.output?.[0] || statusResponse.data.output;
-          break;
-        } else if (status === 'failed' || status === 'canceled') {
-          throw new Error(
-            `Replicate prediction ${status}: ${statusResponse.data.error || 'Unknown error'}`,
-          );
-        }
-
-        attempts++;
-      }
-
-      if (!videoUrl) {
-        throw new Error('Replicate prediction timed out after 5 minutes');
-      }
-
-      // Validate the returned URL
-      const isValid = await this.validateVideoUrl(videoUrl);
-      if (!isValid) {
-        throw new Error(`Invalid video URL returned by Replicate: ${videoUrl}`);
-      }
-
-      this.logger.log(
-        `Video generated successfully via Replicate: ${videoUrl}`,
-      );
-      return { videoUrl };
     } catch (error) {
       this.logger.error(`Replicate API failed: ${error.message}`, error.stack);
       // Fallback to placeholder if Replicate fails
