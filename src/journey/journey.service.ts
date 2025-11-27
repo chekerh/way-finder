@@ -851,7 +851,16 @@ export class JourneyService {
         `Failed to enqueue video regeneration for journey ${journeyId}`,
         error as Error,
       );
-      throw error;
+      // If Redis/queue is unavailable, process directly (fallback)
+      this.logger.log(
+        `Processing video generation directly (fallback) for journey ${journeyId}`,
+      );
+      await this.processVideoGenerationDirectly(
+        journey,
+        queueSlides,
+        userId,
+        journey.destination,
+      );
     }
 
     return {

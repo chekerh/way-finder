@@ -28,6 +28,8 @@ export class AiVideoService {
   private readonly cloudinaryApiSecret: string | undefined;
   private readonly kaggleUsername: string | undefined;
   private readonly kaggleKey: string | undefined;
+  private readonly shotstackApiKey: string | undefined;
+  private readonly shotstackApiUrl: string | undefined;
 
   constructor(private readonly httpService: HttpService) {
     this.huggingFaceApiKey = process.env.HUGGINGFACE_API_KEY;
@@ -37,18 +39,54 @@ export class AiVideoService {
     this.cloudinaryApiSecret = process.env.CLOUDINARY_API_SECRET;
     this.kaggleUsername = process.env.KAGGLE_USERNAME;
     this.kaggleKey = process.env.KAGGLE_KEY;
+    this.shotstackApiKey = process.env.SHOTSTACK_API_KEY;
+    
+    // Auto-detect environment based on API key or use explicit URL
+    if (process.env.SHOTSTACK_API_URL) {
+      this.shotstackApiUrl = process.env.SHOTSTACK_API_URL;
+    } else if (this.shotstackApiKey) {
+      // Sandbox keys typically start with 'z' or are shorter, Production keys start with 'i' or 'H'
+      // Default to production, but user can override with SHOTSTACK_API_URL
+      // Sandbox: https://api.shotstack.io/stage
+      // Production: https://api.shotstack.io/v1
+      const isSandbox = this.shotstackApiKey.startsWith('z') || 
+                       this.shotstackApiKey.startsWith('zk') ||
+                       process.env.SHOTSTACK_ENV === 'sandbox';
+      this.shotstackApiUrl = isSandbox 
+        ? 'https://api.shotstack.io/stage' 
+        : 'https://api.shotstack.io/v1';
+    } else {
+      this.shotstackApiUrl = 'https://api.shotstack.io/v1'; // Default to production
+    }
 
     // Configure Cloudinary if credentials are available
+    // Only configure if cloud_name is valid (not a placeholder like "wayfinder")
     if (
       this.cloudinaryCloudName &&
       this.cloudinaryApiKey &&
-      this.cloudinaryApiSecret
+      this.cloudinaryApiSecret &&
+      this.cloudinaryCloudName !== 'wayfinder' && // Skip if placeholder value
+      this.cloudinaryCloudName.length > 3 // Basic validation
     ) {
-      cloudinary.config({
-        cloud_name: this.cloudinaryCloudName,
-        api_key: this.cloudinaryApiKey,
-        api_secret: this.cloudinaryApiSecret,
-      });
+      try {
+        cloudinary.config({
+          cloud_name: this.cloudinaryCloudName,
+          api_key: this.cloudinaryApiKey,
+          api_secret: this.cloudinaryApiSecret,
+          secure: true,
+        });
+        this.logger.log('Cloudinary configured successfully');
+      } catch (error) {
+        this.logger.warn(
+          `Failed to configure Cloudinary: ${error.message}. Video generation will use other services.`,
+        );
+      }
+    } else if (this.cloudinaryCloudName === 'wayfinder') {
+      this.logger.warn(
+        'Cloudinary cloud_name appears to be a placeholder ("wayfinder"). ' +
+          'Please set a valid CLOUDINARY_CLOUD_NAME from your Cloudinary dashboard. ' +
+          'Video generation will use other services or fallback.',
+      );
     }
   }
 
@@ -57,22 +95,52 @@ export class AiVideoService {
       `Generating video for journey ${payload.journeyId} with ${payload.slides.length} slides`,
     );
 
-    // Priority 1: Cloudinary (most reliable for image-to-video montages)
+    // Priority 1: Shotstack API (best for video montages from multiple images)
+    if (this.shotstackApiKey) {
+      try {
+        this.logger.log('Attempting video generation with Shotstack API...');
+        return await this.generateWithShotstack(payload);
+      } catch (error) {
+        this.logger.warn(
+          `Shotstack failed: ${error.message}, trying next option`,
+        );
+      }
+    } else {
+      this.logger.debug(
+        'Shotstack API key not configured. Set SHOTSTACK_API_KEY to enable.',
+      );
+    }
+
+    // Priority 2: Cloudinary (most reliable for image-to-video montages)
+    // Only use if cloud_name is valid (not placeholder)
     if (
       this.cloudinaryCloudName &&
       this.cloudinaryApiKey &&
-      this.cloudinaryApiSecret
+      this.cloudinaryApiSecret &&
+      this.cloudinaryCloudName !== 'wayfinder' &&
+      this.cloudinaryCloudName.length > 3
     ) {
       try {
+        this.logger.log('Attempting video generation with Cloudinary...');
         return await this.generateWithCloudinary(payload);
       } catch (error) {
         this.logger.warn(
           `Cloudinary failed: ${error.message}, trying next option`,
         );
       }
+    } else {
+      if (this.cloudinaryCloudName === 'wayfinder') {
+        this.logger.debug(
+          'Cloudinary cloud_name is placeholder. Set valid CLOUDINARY_CLOUD_NAME to enable.',
+        );
+      } else {
+        this.logger.debug(
+          'Cloudinary not fully configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to enable.',
+        );
+      }
     }
 
-    // Priority 2: Custom AI service endpoint
+    // Priority 3: Custom AI service endpoint
     const customEndpoint = process.env.AI_VIDEO_SERVICE_URL;
     if (customEndpoint) {
       try {
@@ -84,18 +152,20 @@ export class AiVideoService {
       }
     }
 
-    // Priority 3: Replicate API (better for AI video generation)
-    if (this.replicateApiToken) {
-      try {
-        return await this.generateWithReplicate(payload);
-      } catch (error) {
-        this.logger.warn(
-          `Replicate API failed: ${error.message}, trying next option`,
-        );
-      }
-    }
+    // Priority 4: Replicate API (better for AI video generation from text/prompts)
+    // Note: Replicate is not ideal for image montages - skip it for this use case
+    // Replicate models are primarily text-to-video, not image-to-video montages
+    // if (this.replicateApiToken) {
+    //   try {
+    //     return await this.generateWithReplicate(payload);
+    //   } catch (error) {
+    //     this.logger.warn(
+    //       `Replicate API failed: ${error.message}, trying next option`,
+    //     );
+    //   }
+    // }
 
-    // Priority 4: Kaggle Notebook API (for custom models)
+    // Priority 5: Kaggle Notebook API (for custom models)
     if (this.kaggleUsername && this.kaggleKey) {
       try {
         return await this.generateWithKaggle(payload);
@@ -106,7 +176,7 @@ export class AiVideoService {
       }
     }
 
-    // Priority 5: Hugging Face Inference API
+    // Priority 6: Hugging Face Inference API
     if (this.huggingFaceApiKey) {
       try {
         return await this.generateWithHuggingFace(payload);
@@ -120,10 +190,148 @@ export class AiVideoService {
     // Fallback: Use reliable placeholder video that always works
     // This ensures video generation NEVER fails - always returns a valid video URL
     this.logger.log(
-      'No AI video service configured. Using reliable placeholder video URL. ' +
-        'Set CLOUDINARY_* (recommended), AI_VIDEO_SERVICE_URL, REPLICATE_API_TOKEN, KAGGLE_*, or HUGGINGFACE_API_KEY to enable real AI video generation.',
+      '⚠️  No AI video service configured or all services failed. Using reliable placeholder video URL. ' +
+        'To enable real video generation, set one of: ' +
+        'SHOTSTACK_API_KEY (recommended - 50 free videos/month), ' +
+        'CLOUDINARY_CLOUD_NAME + CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET, ' +
+        'or AI_VIDEO_SERVICE_URL.',
     );
     return this.getPlaceholderVideo();
+  }
+
+  /**
+   * Generate video montage using Shotstack API
+   * Shotstack is specifically designed for creating video montages from images
+   * Free tier: 50 videos/month
+   * Sign up at: https://shotstack.io/
+   */
+  private async generateWithShotstack(
+    payload: VideoJobPayload,
+  ): Promise<AiVideoResponse> {
+    try {
+      if (payload.slides.length === 0) {
+        throw new Error('No images provided for video generation');
+      }
+
+      this.logger.log(
+        `Generating video montage with Shotstack for ${payload.slides.length} images`,
+      );
+
+      // Calculate timing: 3 seconds per image, minimum 10 seconds, maximum 60 seconds
+      const durationPerImage = 3;
+      const totalDuration = Math.min(
+        Math.max(payload.slides.length * durationPerImage, 10),
+        60,
+      );
+
+      // Create timeline with all images
+      const timeline = {
+        soundtrack: {
+          src: 'https://shotstack-assets.s3.amazonaws.com/music/freepd/ambient_acoustic_guitar.mp3',
+          effect: 'fadeOut',
+        },
+        tracks: [
+          {
+            clips: payload.slides.map((slide, index) => ({
+              asset: {
+                type: 'image',
+                src: slide.imageUrl,
+              },
+              start: index * durationPerImage,
+              length: durationPerImage,
+              transition: {
+                in: 'fade',
+                out: 'fade',
+              },
+              effect: 'zoomIn',
+              scale: 1.1,
+            })),
+          },
+        ],
+      };
+
+      // Create render request
+      const renderRequest = {
+        timeline,
+        output: {
+          format: 'mp4',
+          resolution: 'hd',
+          fps: 30,
+          quality: 'high',
+        },
+      };
+
+      // Submit render job
+      const renderResponse = await firstValueFrom(
+        this.httpService.post(
+          `${this.shotstackApiUrl}/render`,
+          { edit: renderRequest },
+          {
+            headers: {
+              'x-api-key': this.shotstackApiKey,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000,
+          },
+        ),
+      );
+
+      const renderId = renderResponse.data.response.id;
+      this.logger.log(`Shotstack render job created: ${renderId}`);
+
+      // Poll for completion (Shotstack renders are async)
+      let videoUrl: string | null = null;
+      const maxAttempts = 60; // 5 minutes max (60 * 5 seconds)
+      let attempts = 0;
+
+      while (attempts < maxAttempts && !videoUrl) {
+        await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
+
+        const statusResponse = await firstValueFrom(
+          this.httpService.get(`${this.shotstackApiUrl}/render/${renderId}`, {
+            headers: {
+              'x-api-key': this.shotstackApiKey,
+            },
+            timeout: 10000,
+          }),
+        );
+
+        const status = statusResponse.data.response.status;
+        this.logger.log(`Shotstack render status: ${status}`);
+
+        if (status === 'done') {
+          videoUrl = statusResponse.data.response.url;
+          break;
+        } else if (status === 'failed') {
+          throw new Error(
+            `Shotstack render failed: ${statusResponse.data.response.error || 'Unknown error'}`,
+          );
+        }
+
+        attempts++;
+      }
+
+      if (!videoUrl) {
+        throw new Error('Shotstack render timed out after 5 minutes');
+      }
+
+      // Validate the returned URL
+      const isValid = await this.validateVideoUrl(videoUrl);
+      if (!isValid) {
+        throw new Error(`Invalid video URL returned by Shotstack: ${videoUrl}`);
+      }
+
+      this.logger.log(
+        `Video generated successfully via Shotstack: ${videoUrl}`,
+      );
+      return { videoUrl };
+    } catch (error) {
+      this.logger.error(
+        `Shotstack API failed: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -369,27 +577,20 @@ export class AiVideoService {
       }
 
       // Create a prediction using Replicate API
-      // Note: The model ID format should be "owner/model:version" or just use version ID
-      const predictionResponse = await firstValueFrom(
-        this.httpService.post(
-          'https://api.replicate.com/v1/predictions',
-          {
-            version: modelId.includes(':') ? modelId : `${modelId}:latest`,
-            input: {
-              image: firstImageUrl,
-              // For image-to-video models, adjust parameters as needed
-              num_frames: 50,
-              fps: 24,
-            },
-          },
-          {
-            headers: {
-              Authorization: `Token ${this.replicateApiToken}`,
-              'Content-Type': 'application/json',
-            },
-            timeout: 10000, // 10 seconds for initial request
-          },
-        ),
+      // Note: zeroscope-v2-xl is a text-to-video model, not image-to-video
+      // For image-to-video, we need a different approach or model
+      // For now, we'll skip Replicate for image montages and use it only for text-to-video
+      // If you have an image-to-video model, update the model ID and input format
+      
+      this.logger.warn(
+        `Replicate model ${modelId} is designed for text-to-video, not image montages. ` +
+          'Skipping Replicate for image montage generation. ' +
+          'Use SHOTSTACK_API_KEY or CLOUDINARY_* for proper image montage generation.',
+      );
+      
+      // Skip Replicate for image montages - it's not suitable
+      throw new Error(
+        'Replicate API is not suitable for image montage generation. Use Shotstack or Cloudinary instead.',
       );
 
       const predictionId = predictionResponse.data.id;
@@ -593,6 +794,9 @@ export class AiVideoService {
         'cloudinary.com',
         'sample-videos.com',
         'learningcontainer.com',
+        'shotstack.io',
+        'cdn.shotstack.io',
+        's3.amazonaws.com',
       ];
 
       const urlObj = new URL(url);

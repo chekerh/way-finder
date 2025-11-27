@@ -47,6 +47,21 @@ const mongoUri = (() => {
       redis: {
         host: process.env.REDIS_HOST || 'localhost',
         port: Number(process.env.REDIS_PORT) || 6379,
+        password: process.env.REDIS_PASSWORD || undefined,
+        maxRetriesPerRequest: 3, // Reduced from default 20 to fail faster
+        retryStrategy: (times) => {
+          // Exponential backoff with max delay of 5 seconds
+          const delay = Math.min(times * 50, 5000);
+          if (times <= 3) {
+            console.warn(
+              `Redis connection retry attempt ${times}, waiting ${delay}ms`,
+            );
+          }
+          return delay;
+        },
+        enableReadyCheck: true,
+        enableOfflineQueue: false, // Don't queue commands when offline
+        lazyConnect: true, // Don't connect immediately
       },
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
