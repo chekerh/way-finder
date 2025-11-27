@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bull';
+import type { RedisOptions } from 'ioredis';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
@@ -40,29 +41,78 @@ const mongoUri = (() => {
   return 'mongodb://localhost:27017/wayfindr';
 })();
 
+const createRedisOptions = (): RedisOptions => {
+  const sharedOptions: Partial<RedisOptions> = {
+    maxRetriesPerRequest: null, // Required by Bull for subscriber clients
+    enableReadyCheck: false, // Avoid ready check for subscriber connections
+    enableOfflineQueue: false,
+    lazyConnect: true,
+    connectTimeout: 10_000,
+    retryStrategy: (times) => {
+      const delay = Math.min(times * 50, 5_000);
+      if (times <= 3) {
+        console.warn(
+          `Redis connection retry attempt ${times}, waiting ${delay}ms`,
+        );
+      }
+      return delay;
+    },
+  };
+
+  const shouldUseTls = process.env.REDIS_TLS === 'true';
+  const tlsOptions =
+    shouldUseTls
+      ? {
+          tls: {
+            rejectUnauthorized:
+              process.env.REDIS_TLS_REJECT_UNAUTHORIZED === 'false'
+                ? false
+                : true,
+          },
+        }
+      : undefined;
+
+  if (process.env.REDIS_URL) {
+    try {
+      const url = new URL(process.env.REDIS_URL);
+      const usesTls = url.protocol === 'rediss:';
+      return {
+        host: url.hostname,
+        port: Number(url.port || '6379'),
+        password: url.password || undefined,
+        ...(usesTls
+          ? {
+              tls: {
+                rejectUnauthorized:
+                  process.env.REDIS_TLS_REJECT_UNAUTHORIZED === 'false'
+                    ? false
+                    : true,
+              },
+            }
+          : tlsOptions),
+        ...sharedOptions,
+      } as RedisOptions;
+    } catch (error) {
+      console.warn(
+        `Invalid REDIS_URL provided (${process.env.REDIS_URL}): ${error.message}. Falling back to host/port configuration.`,
+      );
+    }
+  }
+
+  return {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: Number(process.env.REDIS_PORT) || 6379,
+    password: process.env.REDIS_PASSWORD || undefined,
+    ...(tlsOptions || {}),
+    ...sharedOptions,
+  } as RedisOptions;
+};
+
 @Module({
   imports: [
     MongooseModule.forRoot(mongoUri),
     BullModule.forRoot({
-      redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: Number(process.env.REDIS_PORT) || 6379,
-        password: process.env.REDIS_PASSWORD || undefined,
-        maxRetriesPerRequest: 3, // Reduced from default 20 to fail faster
-        retryStrategy: (times) => {
-          // Exponential backoff with max delay of 5 seconds
-          const delay = Math.min(times * 50, 5000);
-          if (times <= 3) {
-            console.warn(
-              `Redis connection retry attempt ${times}, waiting ${delay}ms`,
-            );
-          }
-          return delay;
-        },
-        enableReadyCheck: true,
-        enableOfflineQueue: false, // Don't queue commands when offline
-        lazyConnect: true, // Don't connect immediately
-      },
+      redis: createRedisOptions(),
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     UserModule,
