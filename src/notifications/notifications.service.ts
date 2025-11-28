@@ -19,16 +19,14 @@ export class NotificationsService {
     userId: string,
     createNotificationDto: CreateNotificationDto,
   ): Promise<NotificationDocument> {
-    // For booking operations (cancelled, confirmed, updated), always create a new notification
-    // and send push notification - user should see popup every time an action is performed
-    const isBookingNotification =
-      createNotificationDto.type === 'booking_cancelled' ||
-      createNotificationDto.type === 'booking_confirmed' ||
-      createNotificationDto.type === 'booking_updated';
+    // For booking cancellation, prevent duplicates within 10 minutes for the same bookingId
+    // This prevents multiple notifications when both cancel() and update() are called
+    const isBookingCancellation =
+      createNotificationDto.type === 'booking_cancelled';
 
     // For likes/comments, prevent duplicates within 5 minutes to avoid spam
     const shouldPreventDuplicates =
-      !isBookingNotification &&
+      !isBookingCancellation &&
       (createNotificationDto.type === 'post_liked' ||
         createNotificationDto.type === 'post_commented' ||
         createNotificationDto.type === 'journey_liked' ||
@@ -36,7 +34,33 @@ export class NotificationsService {
 
     let existingNotification: NotificationDocument | null = null;
 
-    if (shouldPreventDuplicates) {
+    // Special handling for booking cancellations: prevent duplicates for same bookingId
+    if (isBookingCancellation && createNotificationDto.data?.bookingId) {
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+      existingNotification = await this.notificationModel
+        .findOne({
+          userId,
+          type: 'booking_cancelled',
+          'data.bookingId': createNotificationDto.data.bookingId,
+          createdAt: { $gte: tenMinutesAgo },
+        })
+        .sort({ createdAt: -1 }) // Get the most recent one
+        .exec();
+
+      if (existingNotification) {
+        console.log(
+          `[NotificationsService] ⚠️ Duplicate cancellation notification prevented for user ${userId}, bookingId ${createNotificationDto.data.bookingId}`,
+        );
+        console.log(
+          `[NotificationsService] Existing notification ID: ${existingNotification._id}, created at: ${existingNotification.createdAt}`,
+        );
+        console.log(
+          `[NotificationsService] Skipping notification creation to prevent duplicate cancellation notifications`,
+        );
+        // Return existing notification without creating a new one
+        return existingNotification;
+      }
+    } else if (shouldPreventDuplicates) {
       // Only prevent duplicates for likes/comments within the last 5 minutes
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const existingNotificationQuery: any = {
@@ -79,7 +103,7 @@ export class NotificationsService {
       notificationToReturn = existingNotification;
       shouldSendFCM = false; // DO NOT send FCM for duplicate likes/comments
     } else {
-      // For booking notifications: Always create new notification and send push
+      // For booking notifications (except cancellations which are handled above): Always create new notification and send push
       // For likes/comments: No recent duplicate found - create new one
       const notification = new this.notificationModel({
         userId,

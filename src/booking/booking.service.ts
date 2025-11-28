@@ -192,7 +192,14 @@ export class BookingService {
     }
 
     // Send notification if status changed
-    if ('status' in dto && dto.status !== oldStatus) {
+    // IMPORTANT: If status changes to CANCELLED via update(), don't create notification
+    // because cancel() method should be used for cancellations and it already creates the notification
+    // This prevents duplicate cancellation notifications
+    if (
+      'status' in dto &&
+      dto.status !== oldStatus &&
+      dto.status !== BookingStatus.CANCELLED
+    ) {
       const destinationName =
         booking.trip_details?.destination ||
         booking.trip_details?.origin ||
@@ -201,8 +208,6 @@ export class BookingService {
 
       if (dto.status === BookingStatus.CONFIRMED) {
         message = `Votre réservation pour ${destinationName} a été confirmée. Numéro de confirmation: ${booking.confirmation_number}`;
-      } else if (dto.status === BookingStatus.CANCELLED) {
-        message = `Votre réservation pour ${destinationName} a été annulée.`;
       } else {
         message = `Votre réservation pour ${destinationName} a été mise à jour.`;
       }
@@ -211,9 +216,7 @@ export class BookingService {
         userId,
         dto.status === BookingStatus.CONFIRMED
           ? 'booking_confirmed'
-          : dto.status === BookingStatus.CANCELLED
-            ? 'booking_cancelled'
-            : 'booking_updated',
+          : 'booking_updated',
         booking._id.toString(),
         message,
         {
