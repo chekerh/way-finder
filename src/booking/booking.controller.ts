@@ -87,4 +87,11 @@ export class BookingController {
   async cancel(@Req() req: any, @Param('id') id: string) {
     return this.bookingService.cancel(req.user.sub, id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/permanent')
+  async delete(@Req() req: any, @Param('id') id: string) {
+    await this.bookingService.delete(req.user.sub, id);
+    return { message: 'Booking permanently deleted' };
+  }
 }

@@ -281,4 +281,17 @@ export class BookingService {
 
     return booking;
   }
+
+  async delete(userId: string, bookingId: string): Promise<void> {
+    const booking = await this.bookingModel
+      .findOneAndDelete({
+        _id: this.toObjectId(bookingId, 'booking id'),
+        user_id: this.toObjectId(userId, 'user id'),
+      })
+      .exec();
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    // No notification sent for deletion (different from cancellation)
+  }
 }
