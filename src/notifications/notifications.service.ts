@@ -240,6 +240,10 @@ export class NotificationsService {
       .exec();
   }
 
+  async deleteAllNotifications(userId: string): Promise<void> {
+    await this.notificationModel.deleteMany({ userId }).exec();
+  }
+
   // Helper methods for creating specific notification types
   async createBookingNotification(
     userId: string,
