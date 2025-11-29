@@ -29,6 +29,10 @@ export class NotificationsService {
       createNotificationDto.type === 'booking_cancelled' ||
       createNotificationDto.type === 'booking_updated';
 
+    // Declare variables that will be used in both branches
+    let notificationToReturn: NotificationDocument;
+    let shouldSendFCM = false;
+
     if (isBookingNotification && createNotificationDto.data?.bookingId) {
       const bookingId = createNotificationDto.data.bookingId;
       
@@ -48,14 +52,17 @@ export class NotificationsService {
         );
       }
 
-      // PERMANENT deduplication: Check if we already sent this exact notification type for this booking
-      // This prevents infinite loops even if the booking exists
+      // PERMANENT deduplication: Use atomic findOneAndUpdate to prevent race conditions
+      // This prevents multiple notifications from being created simultaneously
+      const deduplicationKey = {
+        userId: new Types.ObjectId(userId),
+        type: createNotificationDto.type,
+        'data.bookingId': bookingId,
+      };
+
+      // Try to find existing notification atomically
       const existingNotification = await this.notificationModel
-        .findOne({
-          userId: new Types.ObjectId(userId),
-          type: createNotificationDto.type,
-          'data.bookingId': bookingId,
-        })
+        .findOne(deduplicationKey)
         .sort({ createdAt: -1 })
         .exec();
 
@@ -72,72 +79,150 @@ export class NotificationsService {
         // Return existing notification without creating a new one or sending FCM
         return existingNotification;
       }
-    }
 
-    // For likes/comments, prevent duplicates within 5 minutes to avoid spam
-    const shouldPreventDuplicates =
-      !isBookingNotification &&
-      (createNotificationDto.type === 'post_liked' ||
-        createNotificationDto.type === 'post_commented' ||
-        createNotificationDto.type === 'journey_liked' ||
-        createNotificationDto.type === 'journey_commented');
-
-    let existingNotification: NotificationDocument | null = null;
-
-    if (shouldPreventDuplicates) {
-      // Only prevent duplicates for likes/comments within the last 5 minutes
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      const existingNotificationQuery: any = {
+      // CRITICAL: Use findOneAndUpdate with upsert to atomically create or return existing
+      // This prevents race conditions where multiple requests try to create the same notification
+      const notificationData = {
         userId: new Types.ObjectId(userId),
         type: createNotificationDto.type,
-        createdAt: { $gte: fiveMinutesAgo },
+        title: createNotificationDto.title,
+        message: createNotificationDto.message,
+        data: createNotificationDto.data || {},
+        actionUrl: createNotificationDto.actionUrl,
+        isRead: false,
       };
 
-      if (createNotificationDto.data?.postId) {
-        existingNotificationQuery['data.postId'] =
-          createNotificationDto.data.postId;
+      // Try to atomically create the notification or get existing one
+      // $setOnInsert ensures we only set values when creating, not when updating existing
+      let atomicNotification: NotificationDocument;
+      try {
+        atomicNotification = await this.notificationModel
+          .findOneAndUpdate(
+            deduplicationKey,
+            {
+              $setOnInsert: notificationData, // Only set on insert, not on update
+            },
+            {
+              upsert: true,
+              new: true,
+              setDefaultsOnInsert: true,
+            },
+          )
+          .exec();
+      } catch (error: any) {
+        // If unique index violation (duplicate key error), fetch the existing notification
+        if (error.code === 11000 || error.codeName === 'DuplicateKey') {
+          console.log(
+            `[NotificationsService] ⚠️ Unique index violation - notification already exists. Fetching existing notification.`,
+          );
+          atomicNotification = await this.notificationModel
+            .findOne(deduplicationKey)
+            .exec();
+          if (!atomicNotification) {
+            throw new Error('Failed to find existing notification after duplicate key error');
+          }
+          // Return existing notification without sending FCM
+          return atomicNotification;
+        }
+        throw error;
       }
-      if (createNotificationDto.data?.journeyId) {
-        existingNotificationQuery['data.journeyId'] =
-          createNotificationDto.data.journeyId;
+
+      // Check if this was a newly created notification
+      // If we found an existing notification before the upsert, this is definitely not new
+      // If createdAt is very recent (within last 1 second), it might be newly created
+      // But if we found existingNotification earlier, we know it's not new
+      if (existingNotification) {
+        console.log(
+          `[NotificationsService] ⚠️ RACE CONDITION PREVENTED: Another request created the notification first. Using existing notification.`,
+        );
+        // Return the existing notification without sending FCM again
+        return atomicNotification;
+      }
+      
+      // Double-check: if createdAt is older than 1 second, it's definitely not new
+      const now = new Date();
+      const createdAt = atomicNotification.createdAt || now;
+      const timeDiff = now.getTime() - createdAt.getTime();
+      if (timeDiff > 1000) {
+        console.log(
+          `[NotificationsService] ⚠️ Notification appears to be existing (created ${timeDiff}ms ago). Skipping FCM.`,
+        );
+        return atomicNotification;
       }
 
-      existingNotification = await this.notificationModel
-        .findOne(existingNotificationQuery)
-        .exec();
-    }
-
-    let notificationToReturn: NotificationDocument;
-    let shouldSendFCM = false;
-
-    if (existingNotification && shouldPreventDuplicates) {
-      // For likes/comments: A notification already exists within the last 5 minutes
-      // DO NOT create a new one or send another FCM notification to avoid spam
       console.log(
-        `[NotificationsService] ⚠️ Duplicate notification prevented for user ${userId}, type ${createNotificationDto.type}`,
+        `[NotificationsService] ✅ Atomically created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${atomicNotification._id}`,
       );
-      console.log(
-        `[NotificationsService] Existing notification ID: ${existingNotification._id}, created at: ${existingNotification.createdAt}`,
-      );
-      console.log(
-        `[NotificationsService] Skipping notification creation and FCM send to prevent spam`,
-      );
-
-      // Return existing notification without sending FCM
-      notificationToReturn = existingNotification;
-      shouldSendFCM = false; // DO NOT send FCM for duplicate likes/comments
+      
+      // Continue with FCM sending for the newly created notification
+      notificationToReturn = atomicNotification;
+      shouldSendFCM = true;
+      
+      // Skip the rest of the notification creation logic since we already created it atomically
+      // Go directly to FCM sending section at the end
     } else {
-      // For booking notifications: Create new notification only if booking exists and no duplicate exists
-      // For likes/comments: No recent duplicate found - create new one
-      const notification = new this.notificationModel({
-        userId: new Types.ObjectId(userId),
-        ...createNotificationDto,
-      });
-      notificationToReturn = await notification.save();
-      console.log(
-        `[NotificationsService] ✅ Created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${notificationToReturn._id}`,
-      );
-      shouldSendFCM = true; // Always send FCM for new notifications (especially booking operations)
+      // For non-booking notifications, use normal flow
+      
+      // For likes/comments, prevent duplicates within 5 minutes to avoid spam
+      const shouldPreventDuplicates =
+        createNotificationDto.type === 'post_liked' ||
+        createNotificationDto.type === 'post_commented' ||
+        createNotificationDto.type === 'journey_liked' ||
+        createNotificationDto.type === 'journey_commented';
+
+      let existingNotificationForSocial: NotificationDocument | null = null;
+
+      if (shouldPreventDuplicates) {
+        // Only prevent duplicates for likes/comments within the last 5 minutes
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const existingNotificationQuery: any = {
+          userId: new Types.ObjectId(userId),
+          type: createNotificationDto.type,
+          createdAt: { $gte: fiveMinutesAgo },
+        };
+
+        if (createNotificationDto.data?.postId) {
+          existingNotificationQuery['data.postId'] =
+            createNotificationDto.data.postId;
+        }
+        if (createNotificationDto.data?.journeyId) {
+          existingNotificationQuery['data.journeyId'] =
+            createNotificationDto.data.journeyId;
+        }
+
+        existingNotificationForSocial = await this.notificationModel
+          .findOne(existingNotificationQuery)
+          .exec();
+      }
+
+      if (existingNotificationForSocial && shouldPreventDuplicates) {
+        // For likes/comments: A notification already exists within the last 5 minutes
+        // DO NOT create a new one or send another FCM notification to avoid spam
+        console.log(
+          `[NotificationsService] ⚠️ Duplicate notification prevented for user ${userId}, type ${createNotificationDto.type}`,
+        );
+        console.log(
+          `[NotificationsService] Existing notification ID: ${existingNotificationForSocial._id}, created at: ${existingNotificationForSocial.createdAt}`,
+        );
+        console.log(
+          `[NotificationsService] Skipping notification creation and FCM send to prevent spam`,
+        );
+
+        // Return existing notification without sending FCM
+        notificationToReturn = existingNotificationForSocial;
+        shouldSendFCM = false; // DO NOT send FCM for duplicate likes/comments
+      } else {
+        // For non-booking notifications: No recent duplicate found - create new one
+        const notification = new this.notificationModel({
+          userId: new Types.ObjectId(userId),
+          ...createNotificationDto,
+        });
+        notificationToReturn = await notification.save();
+        console.log(
+          `[NotificationsService] ✅ Created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${notificationToReturn._id}`,
+        );
+        shouldSendFCM = true; // Always send FCM for new notifications
+      }
     }
 
     // Send FCM push notification ONLY if this is a new notification (not a duplicate)

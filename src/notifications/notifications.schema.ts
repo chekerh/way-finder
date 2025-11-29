@@ -74,12 +74,17 @@ export const NotificationSchema = SchemaFactory.createForClass(Notification);
 // Indexes for efficient queries
 NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
 NotificationSchema.index({ userId: 1, createdAt: -1 });
-// Compound index for deduplication: userId + type + bookingId (for booking notifications)
+// CRITICAL: Unique partial index to prevent duplicate notifications for the same booking and type
+// This ensures at the database level that we can't have duplicate booking notifications of the same type
+// Example: Can have both booking_confirmed AND booking_cancelled for same booking, but not two booking_cancelled
 NotificationSchema.index(
   { userId: 1, type: 1, 'data.bookingId': 1 },
   {
-    unique: false, // Not unique because we want to allow multiple notifications for same booking if status changes
-    sparse: true, // Only index documents where data.bookingId exists
-    name: 'deduplication_index',
+    unique: true,
+    partialFilterExpression: {
+      type: { $in: ['booking_cancelled', 'booking_confirmed', 'booking_updated'] },
+      'data.bookingId': { $exists: true },
+    },
+    name: 'unique_booking_notification_index',
   },
 );
