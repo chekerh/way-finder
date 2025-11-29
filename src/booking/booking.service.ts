@@ -192,7 +192,14 @@ export class BookingService {
     }
 
     // Send notification if status changed
-    if ('status' in dto && dto.status !== oldStatus) {
+    // IMPORTANT: If status changes to CANCELLED via update(), don't create notification
+    // because cancel() method should be used for cancellations and it already creates the notification
+    // This prevents duplicate cancellation notifications
+    if (
+      'status' in dto &&
+      dto.status !== oldStatus &&
+      dto.status !== BookingStatus.CANCELLED
+    ) {
       const destinationName =
         booking.trip_details?.destination ||
         booking.trip_details?.origin ||
@@ -201,8 +208,6 @@ export class BookingService {
 
       if (dto.status === BookingStatus.CONFIRMED) {
         message = `Votre réservation pour ${destinationName} a été confirmée. Numéro de confirmation: ${booking.confirmation_number}`;
-      } else if (dto.status === BookingStatus.CANCELLED) {
-        message = `Votre réservation pour ${destinationName} a été annulée.`;
       } else {
         message = `Votre réservation pour ${destinationName} a été mise à jour.`;
       }
@@ -211,9 +216,7 @@ export class BookingService {
         userId,
         dto.status === BookingStatus.CONFIRMED
           ? 'booking_confirmed'
-          : dto.status === BookingStatus.CANCELLED
-            ? 'booking_cancelled'
-            : 'booking_updated',
+          : 'booking_updated',
         booking._id.toString(),
         message,
         {
@@ -260,22 +263,86 @@ export class BookingService {
     }
 
     // Send notification for cancelled booking
+    // The createBookingNotification method now has permanent deduplication,
+    // so it won't create duplicate notifications even if cancel() is called multiple times
     const destinationName =
       booking.trip_details?.destination ||
       booking.trip_details?.origin ||
       'votre destination';
-    await this.notificationsService.createBookingNotification(
-      userId,
-      'booking_cancelled',
-      booking._id.toString(),
-      `Votre réservation pour ${destinationName} a été annulée. Numéro de confirmation: ${booking.confirmation_number}`,
-      {
-        confirmationNumber: booking.confirmation_number,
-        totalPrice: booking.total_price,
-        tripDetails: booking.trip_details,
-      },
-    );
+    
+    // CRITICAL: Check if notification already exists before attempting to create
+    // This prevents unnecessary calls to createNotification
+    try {
+      const existingNotification = await this.notificationsService.findExistingNotification(
+        userId,
+        'booking_cancelled',
+        booking._id.toString(),
+      );
+      
+      if (existingNotification) {
+        console.log(
+          `[BookingService] ⚠️ Cancellation notification already exists for booking ${booking._id.toString()}. Skipping creation.`,
+        );
+        return booking;
+      }
+    } catch (error: any) {
+      // If check fails, continue with creation attempt
+      console.log(
+        `[BookingService] Could not check for existing notification, proceeding with creation: ${error.message}`,
+      );
+    }
+    
+    try {
+      await this.notificationsService.createBookingNotification(
+        userId,
+        'booking_cancelled',
+        booking._id.toString(),
+        `Votre réservation pour ${destinationName} a été annulée. Numéro de confirmation: ${booking.confirmation_number}`,
+        {
+          confirmationNumber: booking.confirmation_number,
+          totalPrice: booking.total_price,
+          tripDetails: booking.trip_details,
+        },
+      );
+    } catch (error: any) {
+      // If notification creation fails (e.g., booking doesn't exist or duplicate),
+      // log but don't fail the cancellation
+      console.error(
+        `[BookingService] ⚠️ Error creating cancellation notification: ${error.message}`,
+      );
+    }
 
     return booking;
+  }
+
+  async delete(userId: string, bookingId: string): Promise<void> {
+    const booking = await this.bookingModel
+      .findOneAndDelete({
+        _id: this.toObjectId(bookingId, 'booking id'),
+        user_id: this.toObjectId(userId, 'user id'),
+      })
+      .exec();
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+    
+    // CRITICAL: Delete all notifications related to this booking to prevent infinite loops
+    // This ensures that deleted bookings don't trigger notifications anymore
+    try {
+      await this.notificationsService.deleteNotificationsByBookingId(
+        userId,
+        bookingId,
+      );
+      console.log(
+        `[BookingService] ✅ Deleted all notifications for booking ${bookingId}`,
+      );
+    } catch (error: any) {
+      // Log error but don't fail the deletion
+      console.error(
+        `[BookingService] ⚠️ Error deleting notifications for booking ${bookingId}:`,
+        error.message,
+      );
+    }
+    // No notification sent for deletion (different from cancellation)
   }
 }

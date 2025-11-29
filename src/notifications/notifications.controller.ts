@@ -96,4 +96,21 @@ export class NotificationsController {
     await this.notificationsService.deleteNotification(req.user.sub, id);
     return { message: 'Notification deleted successfully' };
   }
+
+  @Delete()
+  async deleteAllNotifications(@Req() req: any) {
+    await this.notificationsService.deleteAllNotifications(req.user.sub);
+    return { message: 'All notifications deleted successfully' };
+  }
+
+  @Post('cleanup-duplicates')
+  async cleanupDuplicates(@Req() req: any) {
+    const deletedCount = await this.notificationsService.cleanupDuplicateBookingNotifications(
+      req.user.sub,
+    );
+    return {
+      message: `Cleaned up ${deletedCount} duplicate notification(s)`,
+      deletedCount,
+    };
+  }
 }
