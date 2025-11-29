@@ -263,21 +263,31 @@ export class BookingService {
     }
 
     // Send notification for cancelled booking
+    // The createBookingNotification method now has permanent deduplication,
+    // so it won't create duplicate notifications even if cancel() is called multiple times
     const destinationName =
       booking.trip_details?.destination ||
       booking.trip_details?.origin ||
       'votre destination';
-    await this.notificationsService.createBookingNotification(
-      userId,
-      'booking_cancelled',
-      booking._id.toString(),
-      `Votre réservation pour ${destinationName} a été annulée. Numéro de confirmation: ${booking.confirmation_number}`,
-      {
-        confirmationNumber: booking.confirmation_number,
-        totalPrice: booking.total_price,
-        tripDetails: booking.trip_details,
-      },
-    );
+    try {
+      await this.notificationsService.createBookingNotification(
+        userId,
+        'booking_cancelled',
+        booking._id.toString(),
+        `Votre réservation pour ${destinationName} a été annulée. Numéro de confirmation: ${booking.confirmation_number}`,
+        {
+          confirmationNumber: booking.confirmation_number,
+          totalPrice: booking.total_price,
+          tripDetails: booking.trip_details,
+        },
+      );
+    } catch (error: any) {
+      // If notification creation fails (e.g., booking doesn't exist or duplicate),
+      // log but don't fail the cancellation
+      console.error(
+        `[BookingService] ⚠️ Error creating cancellation notification: ${error.message}`,
+      );
+    }
 
     return booking;
   }
@@ -291,6 +301,24 @@ export class BookingService {
       .exec();
     if (!booking) {
       throw new NotFoundException('Booking not found');
+    }
+    
+    // CRITICAL: Delete all notifications related to this booking to prevent infinite loops
+    // This ensures that deleted bookings don't trigger notifications anymore
+    try {
+      await this.notificationsService.deleteNotificationsByBookingId(
+        userId,
+        bookingId,
+      );
+      console.log(
+        `[BookingService] ✅ Deleted all notifications for booking ${bookingId}`,
+      );
+    } catch (error: any) {
+      // Log error but don't fail the deletion
+      console.error(
+        `[BookingService] ⚠️ Error deleting notifications for booking ${bookingId}:`,
+        error.message,
+      );
     }
     // No notification sent for deletion (different from cancellation)
   }

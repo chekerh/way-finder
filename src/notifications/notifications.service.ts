@@ -1,16 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument } from './notifications.schema';
 import { CreateNotificationDto } from './notifications.dto';
 import { FcmService } from './fcm.service';
 import { UserService } from '../user/user.service';
+import { Booking, BookingDocument } from '../booking/booking.schema';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<NotificationDocument>,
+    @InjectModel(Booking.name)
+    private readonly bookingModel: Model<BookingDocument>,
     private readonly fcmService: FcmService,
     private readonly userService: UserService,
   ) {}
@@ -19,14 +22,61 @@ export class NotificationsService {
     userId: string,
     createNotificationDto: CreateNotificationDto,
   ): Promise<NotificationDocument> {
-    // For booking cancellation, prevent duplicates within 10 minutes for the same bookingId
-    // This prevents multiple notifications when both cancel() and update() are called
-    const isBookingCancellation =
-      createNotificationDto.type === 'booking_cancelled';
+    // CRITICAL: For booking-related notifications, verify the booking still exists
+    // This prevents notifications for deleted/cancelled bookings from being sent repeatedly
+    const isBookingNotification =
+      createNotificationDto.type === 'booking_confirmed' ||
+      createNotificationDto.type === 'booking_cancelled' ||
+      createNotificationDto.type === 'booking_updated';
+
+    if (isBookingNotification && createNotificationDto.data?.bookingId) {
+      const bookingId = createNotificationDto.data.bookingId;
+      
+      // Verify booking exists before creating notification
+      const booking = await this.bookingModel
+        .findById(new Types.ObjectId(bookingId))
+        .exec();
+
+      if (!booking) {
+        console.log(
+          `[NotificationsService] ⚠️ Booking ${bookingId} does not exist. Skipping notification creation to prevent infinite loop.`,
+        );
+        // Return a dummy notification document to avoid breaking the flow
+        // but don't save it or send FCM
+        throw new NotFoundException(
+          `Cannot create notification: Booking ${bookingId} does not exist`,
+        );
+      }
+
+      // PERMANENT deduplication: Check if we already sent this exact notification type for this booking
+      // This prevents infinite loops even if the booking exists
+      const existingNotification = await this.notificationModel
+        .findOne({
+          userId: new Types.ObjectId(userId),
+          type: createNotificationDto.type,
+          'data.bookingId': bookingId,
+        })
+        .sort({ createdAt: -1 })
+        .exec();
+
+      if (existingNotification) {
+        console.log(
+          `[NotificationsService] ⚠️ PERMANENT DEDUPLICATION: Notification of type "${createNotificationDto.type}" already exists for booking ${bookingId} (user ${userId})`,
+        );
+        console.log(
+          `[NotificationsService] Existing notification ID: ${existingNotification._id}, created at: ${existingNotification.createdAt}`,
+        );
+        console.log(
+          `[NotificationsService] Skipping notification creation to prevent infinite loop`,
+        );
+        // Return existing notification without creating a new one or sending FCM
+        return existingNotification;
+      }
+    }
 
     // For likes/comments, prevent duplicates within 5 minutes to avoid spam
     const shouldPreventDuplicates =
-      !isBookingCancellation &&
+      !isBookingNotification &&
       (createNotificationDto.type === 'post_liked' ||
         createNotificationDto.type === 'post_commented' ||
         createNotificationDto.type === 'journey_liked' ||
@@ -34,37 +84,11 @@ export class NotificationsService {
 
     let existingNotification: NotificationDocument | null = null;
 
-    // Special handling for booking cancellations: prevent duplicates for same bookingId
-    if (isBookingCancellation && createNotificationDto.data?.bookingId) {
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-      existingNotification = await this.notificationModel
-        .findOne({
-          userId,
-          type: 'booking_cancelled',
-          'data.bookingId': createNotificationDto.data.bookingId,
-          createdAt: { $gte: tenMinutesAgo },
-        })
-        .sort({ createdAt: -1 }) // Get the most recent one
-        .exec();
-
-      if (existingNotification) {
-        console.log(
-          `[NotificationsService] ⚠️ Duplicate cancellation notification prevented for user ${userId}, bookingId ${createNotificationDto.data.bookingId}`,
-        );
-        console.log(
-          `[NotificationsService] Existing notification ID: ${existingNotification._id}, created at: ${existingNotification.createdAt}`,
-        );
-        console.log(
-          `[NotificationsService] Skipping notification creation to prevent duplicate cancellation notifications`,
-        );
-        // Return existing notification without creating a new one
-        return existingNotification;
-      }
-    } else if (shouldPreventDuplicates) {
+    if (shouldPreventDuplicates) {
       // Only prevent duplicates for likes/comments within the last 5 minutes
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const existingNotificationQuery: any = {
-        userId,
+        userId: new Types.ObjectId(userId),
         type: createNotificationDto.type,
         createdAt: { $gte: fiveMinutesAgo },
       };
@@ -103,10 +127,10 @@ export class NotificationsService {
       notificationToReturn = existingNotification;
       shouldSendFCM = false; // DO NOT send FCM for duplicate likes/comments
     } else {
-      // For booking notifications (except cancellations which are handled above): Always create new notification and send push
+      // For booking notifications: Create new notification only if booking exists and no duplicate exists
       // For likes/comments: No recent duplicate found - create new one
       const notification = new this.notificationModel({
-        userId,
+        userId: new Types.ObjectId(userId),
         ...createNotificationDto,
       });
       notificationToReturn = await notification.save();
@@ -199,7 +223,7 @@ export class NotificationsService {
     userId: string,
     unreadOnly: boolean = false,
   ): Promise<NotificationDocument[]> {
-    const query: any = { userId };
+    const query: any = { userId: new Types.ObjectId(userId) };
     if (unreadOnly) {
       query.isRead = false;
     }
@@ -217,7 +241,7 @@ export class NotificationsService {
     // Mark all notifications with matching actionUrl as read when user navigates to that screen
     const result = await this.notificationModel
       .updateMany(
-        { userId, actionUrl, isRead: false },
+        { userId: new Types.ObjectId(userId), actionUrl, isRead: false },
         { isRead: true, readAt: new Date() },
       )
       .exec();
@@ -226,7 +250,7 @@ export class NotificationsService {
 
   async getUnreadCount(userId: string): Promise<number> {
     return this.notificationModel
-      .countDocuments({ userId, isRead: false })
+      .countDocuments({ userId: new Types.ObjectId(userId), isRead: false })
       .exec();
   }
 
@@ -235,7 +259,7 @@ export class NotificationsService {
     notificationId: string,
   ): Promise<NotificationDocument> {
     const notification = await this.notificationModel
-      .findOne({ _id: notificationId, userId })
+      .findOne({ _id: notificationId, userId: new Types.ObjectId(userId) })
       .exec();
     if (!notification) {
       throw new NotFoundException('Notification not found');
@@ -249,7 +273,7 @@ export class NotificationsService {
   async markAllAsRead(userId: string): Promise<void> {
     await this.notificationModel
       .updateMany(
-        { userId, isRead: false },
+        { userId: new Types.ObjectId(userId), isRead: false },
         { isRead: true, readAt: new Date() },
       )
       .exec();
@@ -260,12 +284,31 @@ export class NotificationsService {
     notificationId: string,
   ): Promise<void> {
     await this.notificationModel
-      .deleteOne({ _id: notificationId, userId })
+      .deleteOne({ _id: notificationId, userId: new Types.ObjectId(userId) })
       .exec();
   }
 
   async deleteAllNotifications(userId: string): Promise<void> {
-    await this.notificationModel.deleteMany({ userId }).exec();
+    await this.notificationModel.deleteMany({ userId: new Types.ObjectId(userId) }).exec();
+  }
+
+  /**
+   * Delete all notifications related to a specific booking
+   * This is called when a booking is permanently deleted to prevent infinite notification loops
+   */
+  async deleteNotificationsByBookingId(
+    userId: string,
+    bookingId: string,
+  ): Promise<void> {
+    const result = await this.notificationModel
+      .deleteMany({
+        userId: new Types.ObjectId(userId),
+        'data.bookingId': bookingId,
+      })
+      .exec();
+    console.log(
+      `[NotificationsService] ✅ Deleted ${result.deletedCount} notification(s) for booking ${bookingId}`,
+    );
   }
 
   // Helper methods for creating specific notification types
