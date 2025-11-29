@@ -121,14 +121,14 @@ export class NotificationsService {
           console.log(
             `[NotificationsService] ⚠️ Unique index violation - notification already exists. Fetching existing notification.`,
           );
-          atomicNotification = await this.notificationModel
+          const existingAtomicNotification = await this.notificationModel
             .findOne(deduplicationKey)
             .exec();
-          if (!atomicNotification) {
+          if (!existingAtomicNotification) {
             throw new Error('Failed to find existing notification after duplicate key error');
           }
           // Return existing notification without sending FCM
-          return atomicNotification;
+          return existingAtomicNotification;
         }
         throw error;
       }
