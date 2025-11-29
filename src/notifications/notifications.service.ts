@@ -180,6 +180,34 @@ export class NotificationsService {
         );
         return atomicNotification;
       }
+      
+      // CRITICAL: Final check - query again to make absolutely sure this notification is unique
+      // This catches cases where the index unique didn't work or wasn't applied
+      // Only do this check if the notification was created very recently (within 1 second)
+      if (timeDiff <= 1000) {
+        const finalCheck = await this.notificationModel
+          .find(deduplicationKey)
+          .sort({ createdAt: -1 })
+          .limit(2)
+          .exec();
+        
+        if (finalCheck.length > 1) {
+          // Multiple notifications with the same key exist - this is a duplicate
+          // Return the oldest one (first in sorted order)
+          console.log(
+            `[NotificationsService] ⚠️ Multiple notifications with same key exist (${finalCheck.length} found). This is a duplicate. Skipping FCM and returning oldest.`,
+          );
+          return finalCheck[finalCheck.length - 1]; // Return the oldest one
+        }
+        
+        // If we got the notification we just created, make sure it's the only one
+        if (finalCheck.length === 1 && finalCheck[0]._id.toString() !== atomicNotification._id.toString()) {
+          console.log(
+            `[NotificationsService] ⚠️ Another notification with same key exists (ID: ${finalCheck[0]._id}). This is a duplicate. Skipping FCM.`,
+          );
+          return finalCheck[0]; // Return the existing one
+        }
+      }
 
       console.log(
         `[NotificationsService] ✅ Atomically created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${atomicNotification._id}`,
@@ -444,7 +472,72 @@ export class NotificationsService {
     
     return await this.notificationModel
       .findOne(deduplicationKey)
+      .sort({ createdAt: -1 }) // Get the most recent one
       .exec();
+  }
+  
+  /**
+   * Clean up duplicate notifications for booking-related events
+   * This removes all but the most recent notification for each bookingId+type combination
+   */
+  async cleanupDuplicateBookingNotifications(userId: string): Promise<number> {
+    const bookingTypes: Array<'booking_confirmed' | 'booking_cancelled' | 'booking_updated'> = [
+      'booking_confirmed',
+      'booking_cancelled',
+      'booking_updated',
+    ];
+    
+    let totalDeleted = 0;
+    
+    for (const type of bookingTypes) {
+      // Find all notifications of this type for this user
+      const allNotifications = await this.notificationModel
+        .find({
+          userId: new Types.ObjectId(userId),
+          type: type,
+          'data.bookingId': { $exists: true },
+        })
+        .sort({ createdAt: -1 })
+        .exec();
+      
+      // Group by bookingId
+      const notificationsByBookingId = new Map<string, NotificationDocument[]>();
+      for (const notification of allNotifications) {
+        const bookingId = String(notification.data?.bookingId || '');
+        if (bookingId) {
+          if (!notificationsByBookingId.has(bookingId)) {
+            notificationsByBookingId.set(bookingId, []);
+          }
+          notificationsByBookingId.get(bookingId)!.push(notification);
+        }
+      }
+      
+      // For each bookingId, keep only the most recent notification and delete the rest
+      for (const [bookingId, notifications] of notificationsByBookingId.entries()) {
+        if (notifications.length > 1) {
+          // Keep the first one (most recent), delete the rest
+          const toDelete = notifications.slice(1);
+          const idsToDelete = toDelete.map((n) => n._id);
+          
+          const result = await this.notificationModel
+            .deleteMany({ _id: { $in: idsToDelete } })
+            .exec();
+          
+          totalDeleted += result.deletedCount;
+          console.log(
+            `[NotificationsService] 🧹 Cleaned up ${result.deletedCount} duplicate ${type} notification(s) for booking ${bookingId}`,
+          );
+        }
+      }
+    }
+    
+    if (totalDeleted > 0) {
+      console.log(
+        `[NotificationsService] ✅ Cleaned up ${totalDeleted} total duplicate booking notifications`,
+      );
+    }
+    
+    return totalDeleted;
   }
 
   // Helper methods for creating specific notification types
