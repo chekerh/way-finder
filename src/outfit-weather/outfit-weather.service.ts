@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import * as path from 'path';
+import * as fs from 'fs';
 import { Outfit, OutfitDocument } from './outfit.schema';
 import { WeatherService } from './weather.service';
 import { ImageAnalysisService } from './image-analysis.service';
@@ -33,7 +35,7 @@ export class OutfitWeatherService {
     }
 
     // Upload to ImgBB using existing service
-    const filePath = require('path').join(file.destination, file.filename);
+    const filePath = path.join(file.destination, file.filename);
     const imageUrl = await this.imgbbService.uploadImage(
       filePath,
       `outfit-${Date.now()}.jpg`,
@@ -41,7 +43,6 @@ export class OutfitWeatherService {
 
     // Clean up local file
     try {
-      const fs = require('fs');
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }

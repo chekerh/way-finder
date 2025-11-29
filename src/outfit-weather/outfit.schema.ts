@@ -3,7 +3,7 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type OutfitDocument = HydratedDocument<Outfit>;
 
-@Schema({ timestamps: true })
+@Schema({ timestamps: true, collection: 'outfits' })
 export class Outfit {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user_id: Types.ObjectId;
