@@ -269,6 +269,29 @@ export class BookingService {
       booking.trip_details?.destination ||
       booking.trip_details?.origin ||
       'votre destination';
+    
+    // CRITICAL: Check if notification already exists before attempting to create
+    // This prevents unnecessary calls to createNotification
+    try {
+      const existingNotification = await this.notificationsService.findExistingNotification(
+        userId,
+        'booking_cancelled',
+        booking._id.toString(),
+      );
+      
+      if (existingNotification) {
+        console.log(
+          `[BookingService] ⚠️ Cancellation notification already exists for booking ${booking._id.toString()}. Skipping creation.`,
+        );
+        return booking;
+      }
+    } catch (error: any) {
+      // If check fails, continue with creation attempt
+      console.log(
+        `[BookingService] Could not check for existing notification, proceeding with creation: ${error.message}`,
+      );
+    }
+    
     try {
       await this.notificationsService.createBookingNotification(
         userId,

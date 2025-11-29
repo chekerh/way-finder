@@ -34,7 +34,8 @@ export class NotificationsService {
     let shouldSendFCM = false;
 
     if (isBookingNotification && createNotificationDto.data?.bookingId) {
-      const bookingId = createNotificationDto.data.bookingId;
+      // Ensure bookingId is a string (not ObjectId) for consistent indexing
+      const bookingId = String(createNotificationDto.data.bookingId);
       
       // Verify booking exists before creating notification
       const booking = await this.bookingModel
@@ -54,10 +55,11 @@ export class NotificationsService {
 
       // PERMANENT deduplication: Use atomic findOneAndUpdate to prevent race conditions
       // This prevents multiple notifications from being created simultaneously
+      // CRITICAL: Ensure bookingId is always a string for consistent indexing
       const deduplicationKey = {
         userId: new Types.ObjectId(userId),
         type: createNotificationDto.type,
-        'data.bookingId': bookingId,
+        'data.bookingId': String(bookingId), // Always use string for consistent indexing
       };
 
       // Try to find existing notification atomically
@@ -88,15 +90,25 @@ export class NotificationsService {
 
       // CRITICAL: Use findOneAndUpdate with upsert to atomically create or return existing
       // This prevents race conditions where multiple requests try to create the same notification
-      const notificationData = {
+      // Ensure bookingId is stored as string in data for consistent indexing
+      const notificationData: any = {
         userId: new Types.ObjectId(userId),
         type: createNotificationDto.type,
         title: createNotificationDto.title,
         message: createNotificationDto.message,
-        data: createNotificationDto.data || {},
         actionUrl: createNotificationDto.actionUrl,
         isRead: false,
       };
+      
+      // Ensure data.bookingId is a string for consistent indexing
+      if (createNotificationDto.data) {
+        notificationData.data = { ...createNotificationDto.data };
+        if (notificationData.data.bookingId) {
+          notificationData.data.bookingId = String(notificationData.data.bookingId);
+        }
+      } else {
+        notificationData.data = {};
+      }
 
       // Try to atomically create the notification or get existing one
       // $setOnInsert ensures we only set values when creating, not when updating existing
@@ -133,10 +145,8 @@ export class NotificationsService {
         throw error;
       }
 
-      // Check if this was a newly created notification
+      // CRITICAL: Check if this notification was already existing before we tried to create it
       // If we found an existing notification before the upsert, this is definitely not new
-      // If createdAt is very recent (within last 1 second), it might be newly created
-      // But if we found existingNotification earlier, we know it's not new
       if (existingNotification) {
         console.log(
           `[NotificationsService] ⚠️ RACE CONDITION PREVENTED: Another request created the notification first. Using existing notification.`,
@@ -145,13 +155,28 @@ export class NotificationsService {
         return atomicNotification;
       }
       
-      // Double-check: if createdAt is older than 1 second, it's definitely not new
+      // CRITICAL: Double-check if the notification was already existing by checking createdAt
+      // If createdAt is older than 2 seconds, it was definitely already existing
       const now = new Date();
       const createdAt = atomicNotification.createdAt || now;
       const timeDiff = now.getTime() - createdAt.getTime();
-      if (timeDiff > 1000) {
+      
+      // If the notification was created more than 2 seconds ago, it was already existing
+      // This handles race conditions where two requests both don't find existingNotification
+      // but one creates it before the other, and the second one gets the existing one
+      if (timeDiff > 2000) {
         console.log(
-          `[NotificationsService] ⚠️ Notification appears to be existing (created ${timeDiff}ms ago). Skipping FCM.`,
+          `[NotificationsService] ⚠️ Notification was already existing (created ${timeDiff}ms ago). Skipping FCM.`,
+        );
+        // Return existing notification without sending FCM
+        return atomicNotification;
+      }
+
+      // Additional check: if updatedAt is different from createdAt, the notification was updated (not newly created)
+      if (atomicNotification.updatedAt && atomicNotification.createdAt && 
+          atomicNotification.updatedAt.getTime() !== atomicNotification.createdAt.getTime()) {
+        console.log(
+          `[NotificationsService] ⚠️ Notification was updated (not newly created). Skipping FCM.`,
         );
         return atomicNotification;
       }
@@ -394,12 +419,32 @@ export class NotificationsService {
     const result = await this.notificationModel
       .deleteMany({
         userId: new Types.ObjectId(userId),
-        'data.bookingId': bookingId,
+        'data.bookingId': String(bookingId), // Ensure bookingId is string for consistent querying
       })
       .exec();
     console.log(
       `[NotificationsService] ✅ Deleted ${result.deletedCount} notification(s) for booking ${bookingId}`,
     );
+  }
+
+  /**
+   * Check if a notification already exists for a booking
+   * This is used to prevent unnecessary calls to createNotification
+   */
+  async findExistingNotification(
+    userId: string,
+    type: 'booking_confirmed' | 'booking_cancelled' | 'booking_updated',
+    bookingId: string,
+  ): Promise<NotificationDocument | null> {
+    const deduplicationKey = {
+      userId: new Types.ObjectId(userId),
+      type: type,
+      'data.bookingId': String(bookingId), // Ensure bookingId is string for consistent querying
+    };
+    
+    return await this.notificationModel
+      .findOne(deduplicationKey)
+      .exec();
   }
 
   // Helper methods for creating specific notification types
