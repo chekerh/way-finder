@@ -67,16 +67,22 @@ export class NotificationsService {
         .exec();
 
       if (existingNotification) {
-        console.log(
-          `[NotificationsService] ⚠️ PERMANENT DEDUPLICATION: Notification of type "${createNotificationDto.type}" already exists for booking ${bookingId} (user ${userId})`,
-        );
-        console.log(
-          `[NotificationsService] Existing notification ID: ${existingNotification._id}, created at: ${existingNotification.createdAt}`,
-        );
-        console.log(
-          `[NotificationsService] Skipping notification creation to prevent infinite loop`,
-        );
+        // Reduced logging - only log once per minute to avoid spam
+        const shouldLog = !existingNotification.createdAt || 
+          (Date.now() - existingNotification.createdAt.getTime()) > 60000; // Only log if notification is older than 1 minute
+        
+        if (shouldLog) {
+          console.log(
+            `[NotificationsService] ⚠️ PERMANENT DEDUPLICATION: Notification of type "${createNotificationDto.type}" already exists for booking ${bookingId} (user ${userId})`,
+          );
+          // Log call stack to identify what's calling this repeatedly (only occasionally)
+          const stack = new Error().stack;
+          console.log(
+            `[NotificationsService] ⚠️ DUPLICATE CALL DETECTED - Call stack: ${stack?.split('\n').slice(1, 6).join('\n')}`,
+          );
+        }
         // Return existing notification without creating a new one or sending FCM
+        // CRITICAL: Early return prevents any FCM sending
         return existingNotification;
       }
 
@@ -404,6 +410,9 @@ export class NotificationsService {
     message: string,
     data?: Record<string, any>,
   ): Promise<NotificationDocument> {
+    // Log only for new notifications (not duplicates) to reduce spam
+    // The createNotification method will handle deduplication and logging
+
     const titles = {
       booking_confirmed: 'Réservation confirmée',
       booking_cancelled: 'Réservation annulée',
