@@ -28,6 +28,7 @@ import { VideoProcessingModule } from './video-processing/video-processing.modul
 import { DestinationVideoModule } from './video-generation/destination-video.module';
 import { ChatModule } from './chat/chat.module';
 import { RewardsModule } from './rewards/rewards.module';
+import { OutfitWeatherModule } from './outfit-weather/outfit-weather.module';
 
 const mongoUri = (() => {
   if (process.env.MONGODB_URI) {
@@ -140,6 +141,7 @@ const createRedisOptions = (): RedisOptions => {
     VideoProcessingModule,
     DestinationVideoModule,
     ChatModule,
+    OutfitWeatherModule,
   ],
   controllers: [AppController],
   providers: [
