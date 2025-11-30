@@ -38,7 +38,7 @@ RUN apk add --no-cache \
 
 # Copy package files first (for better caching)
 COPY package*.json ./
-RUN npm ci --silent
+RUN npm ci --silent --legacy-peer-deps
 
 # Copy all application files (including Python scripts)
 COPY . .
