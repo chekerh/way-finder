@@ -17,9 +17,9 @@ import { UpdateUserDto } from './user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ImgBBService } from '../journey/imgbb.service';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
-import * as path from 'path';
-import * as fs from 'fs';
+import { extname } from 'node:path';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 @Controller('user')
 export class UserController {

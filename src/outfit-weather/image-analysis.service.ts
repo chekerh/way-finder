@@ -2,6 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'node:fs';
 
 @Injectable()
 export class ImageAnalysisService {
@@ -20,32 +21,149 @@ export class ImageAnalysisService {
   /**
    * Analyze an outfit image and detect clothing items
    * @param imageUrl URL of the outfit image
+   * @param imageFile Optional file buffer for base64 encoding (more reliable than URL)
    * @returns Array of detected clothing items
    */
-  async analyzeOutfit(imageUrl: string): Promise<string[]> {
+  async analyzeOutfit(imageUrl: string, imageFile?: Express.Multer.File): Promise<string[]> {
+    // Check if API key is properly configured
+    const hasValidApiKey = this.apiKey && 
+                           this.apiKey.trim().length > 0 && 
+                           this.apiKey !== 'your_openai_api_key_here' &&
+                           !this.apiKey.startsWith('sk-') === false || this.apiKey.startsWith('sk-');
+    
+    console.log('OpenAI API key check:', {
+      hasKey: !!this.apiKey,
+      keyLength: this.apiKey?.length || 0,
+      keyPrefix: this.apiKey?.substring(0, 5) || 'none',
+      hasValidApiKey,
+    });
+
     // Option 1: Use OpenAI Vision API (if available)
-    if (this.apiKey && this.apiKey !== 'your_openai_api_key_here') {
+    if (hasValidApiKey) {
       try {
         console.log('Using OpenAI Vision API for image analysis');
-        const result = await this.analyzeWithOpenAI(imageUrl);
+        console.log('Image URL:', imageUrl);
+        console.log('Has image file buffer:', !!imageFile);
+        
+        // Prefer base64 if file is available (more reliable)
+        const result = imageFile 
+          ? await this.analyzeWithOpenAIBase64(imageFile)
+          : await this.analyzeWithOpenAI(imageUrl);
+        
         console.log('OpenAI analysis result:', result);
         return result;
-      } catch (error) {
+      } catch (error: any) {
         console.error('OpenAI analysis failed, using fallback:', error);
-        console.error('Error details:', error.response?.data || error.message);
+        const errorData = error.response?.data || {};
+        console.error('Error details:', {
+          message: error.message,
+          response: errorData,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          errorType: errorData.error?.type,
+          errorCode: errorData.error?.code,
+        });
+        
+        // Log specific quota error
+        if (errorData.error?.code === 'insufficient_quota' || errorData.error?.type === 'insufficient_quota') {
+          console.error('❌ OpenAI API quota exceeded. Please check your billing and plan details.');
+          console.error('📝 For more info: https://platform.openai.com/docs/guides/error-codes/api-errors');
+        }
+        // Continue to fallback
       }
     } else {
-      console.warn('OpenAI API key not configured, using fallback analysis');
+      console.warn('OpenAI API key not configured or invalid, using fallback analysis');
+      console.warn('To enable AI analysis, configure OPENAI_API_KEY environment variable');
     }
 
     // Option 2: Use Google Vision API (alternative)
     // Option 3: Fallback to keyword-based detection
     console.log('Using fallback analysis (generic items)');
-    return this.analyzeWithFallback(imageUrl);
+    const fallbackResult = await this.analyzeWithFallback(imageUrl);
+    console.log('Fallback analysis result:', fallbackResult);
+    return fallbackResult;
   }
 
   /**
-   * Analyze using OpenAI Vision API
+   * Analyze using OpenAI Vision API with base64 image (more reliable)
+   */
+  private async analyzeWithOpenAIBase64(imageFile: Express.Multer.File): Promise<string[]> {
+    try {
+      // Try to get buffer from file object first (in-memory), otherwise read from disk
+      let imageBuffer: Buffer;
+      let filePath: string | null = null;
+      
+      if (imageFile.buffer) {
+        // File is in memory (memoryStorage)
+        imageBuffer = imageFile.buffer;
+        console.log('Using in-memory file buffer');
+      } else {
+        // File is on disk (diskStorage)
+        filePath = imageFile.path || (imageFile.destination ? 
+          `${imageFile.destination}/${imageFile.filename}` : null);
+        
+        if (!filePath || !fs.existsSync(filePath)) {
+          throw new Error('Image file not found for base64 encoding');
+        }
+        
+        imageBuffer = fs.readFileSync(filePath);
+        console.log('Read file from disk:', filePath);
+      }
+      
+      const base64Image = imageBuffer.toString('base64');
+      const mimeType = imageFile.mimetype || 'image/jpeg';
+      
+      console.log('Calling OpenAI Vision API with base64 image (size:', imageBuffer.length, 'bytes, type:', mimeType, ')');
+      
+      const response = await firstValueFrom(
+        this.httpService.post<any>(
+          `${this.baseUrl}/chat/completions`,
+          {
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Analyze this outfit image carefully and list ALL visible clothing items. Be specific and accurate. Return ONLY a comma-separated list of items in English (e.g., "coat, sweater, skirt, boots, handbag"). Include: tops, bottoms, shoes, outerwear (jackets, coats), and accessories. Do not include generic items if you cannot see them clearly.',
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: { 
+                      url: `data:${mimeType};base64,${base64Image}` 
+                    },
+                  },
+                ],
+              },
+            ],
+            max_tokens: 300,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
+      );
+
+      const itemsText = response.data.choices[0].message.content;
+      console.log('OpenAI raw response:', itemsText);
+      const parsed = this.parseClothingItems(itemsText);
+      console.log('Parsed clothing items:', parsed);
+      return parsed;
+    } catch (error: any) {
+      console.error('OpenAI API error (base64):', error.response?.data || error.message);
+      throw new HttpException(
+        `Failed to analyze image with AI: ${error.message || 'Unknown error'}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Analyze using OpenAI Vision API with URL (fallback if base64 not available)
    */
   private async analyzeWithOpenAI(imageUrl: string): Promise<string[]> {
     try {
@@ -106,15 +224,19 @@ export class ImageAnalysisService {
     // 3. Ask the user to tag items manually
 
     // For now, return a generic set that the user can verify
-    return [
+    // Return in French to match the app language
+    console.warn('⚠️ Using fallback detection - configure OPENAI_API_KEY for accurate analysis');
+    const fallbackItems = [
       't-shirt',
-      'jeans',
-      'sneakers',
+      'jean',
+      'baskets',
     ];
+    console.log('Fallback returning items:', fallbackItems);
+    return fallbackItems;
   }
 
   /**
-   * Parse clothing items from text response
+   * Parse clothing items from text response and translate to French
    */
   private parseClothingItems(text: string): string[] {
     // Clean and parse the response
@@ -124,7 +246,7 @@ export class ImageAnalysisService {
       .map((item) => item.trim())
       .filter((item) => item.length > 0)
       .map((item) => {
-        // Normalize item names
+        // Normalize item names to English first
         const normalized: Record<string, string> = {
           't-shirt': 't-shirt',
           'tshirt': 't-shirt',
@@ -154,7 +276,27 @@ export class ImageAnalysisService {
           'purse': 'handbag',
         };
 
-        return normalized[item] || item;
+        const englishName = normalized[item] || item;
+        
+        // Translate to French
+        const frenchTranslations: Record<string, string> = {
+          't-shirt': 't-shirt',
+          'shirt': 'chemise',
+          'pants': 'pantalon',
+          'jeans': 'jean',
+          'shorts': 'short',
+          'jacket': 'veste',
+          'coat': 'manteau',
+          'sweater': 'pull',
+          'sneakers': 'baskets',
+          'boots': 'bottes',
+          'sandals': 'sandales',
+          'dress': 'robe',
+          'skirt': 'jupe',
+          'handbag': 'sac à main',
+        };
+
+        return frenchTranslations[englishName] || englishName;
       });
 
     return [...new Set(items)]; // Remove duplicates
