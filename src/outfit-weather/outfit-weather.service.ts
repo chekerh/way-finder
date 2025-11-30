@@ -201,9 +201,12 @@ export class OutfitWeatherService {
   /**
    * Helper method to convert string to ObjectId with validation
    */
-  private toObjectId(id: string, label: string) {
-    if (!Types.ObjectId.isValid(id)) {
+  private toObjectId(id: string, label: string): Types.ObjectId {
+    if (!id || typeof id !== 'string') {
       throw new BadRequestException(`Invalid ${label} provided`);
+    }
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(`Invalid ${label} format`);
     }
     return new Types.ObjectId(id);
   }

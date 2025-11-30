@@ -49,11 +49,14 @@ export class JourneyService {
     private readonly userService: UserService,
   ) {}
 
-  private toObjectId(id: string, label: string) {
+  private toObjectId(id: string, label: string): Types.ObjectId {
     if (!id || typeof id !== 'string') {
       throw new BadRequestException(`Invalid ${label}`);
     }
-    return id as any;
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(`Invalid ${label} format`);
+    }
+    return new Types.ObjectId(id);
   }
 
   /**
