@@ -244,20 +244,35 @@ export class AuthService {
     }
 
     // Verify Google ID token
+    console.log(
+      `[GoogleSignIn] Verifying token for client_type: ${clientType}, email from token: ${dto.id_token.substring(0, 20)}...`,
+    );
     const googleUser = await this.googleAuthService.verifyIdToken(
       dto.id_token,
       clientType,
     );
+    console.log(
+      `[GoogleSignIn] Token verified - email: ${googleUser.email}, googleId: ${googleUser.googleId}, name: ${googleUser.name}`,
+    );
 
     // Check if user exists with this Google ID
     let user = await this.userService.findByGoogleId(googleUser.googleId);
+    console.log(
+      `[GoogleSignIn] User lookup by Google ID: ${user ? 'FOUND' : 'NOT FOUND'}`,
+    );
 
     if (!user) {
       // Check if user exists with this email
+      console.log(
+        `[GoogleSignIn] Checking for existing user with email: ${googleUser.email}`,
+      );
       user = await this.userService.findByEmail(googleUser.email);
 
       if (user) {
         // User exists with email but not Google ID - link Google account
+        console.log(
+          `[GoogleSignIn] User found by email, linking Google ID. Existing username: ${user.username}`,
+        );
         user = await this.userService.updateGoogleId(
           (user as any)._id.toString(),
           googleUser.googleId,
@@ -274,6 +289,9 @@ export class AuthService {
           username = `${usernameBase}${counter}`;
           counter++;
         }
+        console.log(
+          `[GoogleSignIn] Creating new user - email: ${googleUser.email}, generated username: ${username}`,
+        );
 
         // Generate email verification token (even though Google verified it)
         const emailVerificationToken =
