@@ -1,16 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RewardsController } from './rewards.controller';
 import { RewardsService } from './rewards.service';
 import { RecalculatePointsService } from './recalculate-points.service';
 import { PointsTransaction, PointsTransactionSchema } from './rewards.schema';
 import { UserModule } from '../user/user.module';
-import { BookingModule } from '../booking/booking.module';
-import { JourneyModule } from '../journey/journey.module';
-import { OutfitWeatherModule } from '../outfit-weather/outfit-weather.module';
-import { DiscussionModule } from '../discussion/discussion.module';
-import { ReviewsModule } from '../reviews/reviews.module';
-import { OnboardingModule } from '../onboarding/onboarding.module';
 import { Booking, BookingSchema } from '../booking/booking.schema';
 import { Journey, JourneySchema } from '../journey/journey.schema';
 import { Outfit, OutfitSchema } from '../outfit-weather/outfit.schema';
@@ -32,12 +26,8 @@ import { User, UserSchema } from '../user/user.schema';
       { name: OnboardingSession.name, schema: OnboardingSessionSchema },
     ]),
     UserModule,
-    BookingModule,
-    JourneyModule,
-    OutfitWeatherModule,
-    DiscussionModule,
-    ReviewsModule,
-    OnboardingModule,
+    // Don't import other modules to avoid circular dependencies
+    // They import RewardsModule, so we can't import them back
   ],
   controllers: [RewardsController],
   providers: [RewardsService, RecalculatePointsService],
