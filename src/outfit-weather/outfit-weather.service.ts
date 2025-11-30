@@ -42,14 +42,9 @@ export class OutfitWeatherService {
       `outfit-${Date.now()}.jpg`,
     );
 
-    // Clean up local file
-    try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (error) {
-      // Ignore cleanup errors
-    }
+    // Note: We keep the file temporarily for OpenAI analysis
+    // It will be cleaned up after analysis in the controller or service
+    // Don't delete here to allow base64 encoding
 
     return imageUrl;
   }
@@ -61,6 +56,7 @@ export class OutfitWeatherService {
     userId: string,
     bookingId: string,
     imageUrl: string,
+    imageFile?: Express.Multer.File,
   ): Promise<OutfitDocument> {
     // Get booking details
     const booking = await this.bookingService.findOne(userId, bookingId);
@@ -88,9 +84,10 @@ export class OutfitWeatherService {
       departureDate,
     );
 
-    // Analyze outfit image
+    // Analyze outfit image - use file buffer if available for better accuracy
     const detectedItems = await this.imageAnalysisService.analyzeOutfit(
       imageUrl,
+      imageFile,
     );
 
     // Get clothing recommendations

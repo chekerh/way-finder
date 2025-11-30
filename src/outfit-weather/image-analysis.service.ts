@@ -20,9 +20,10 @@ export class ImageAnalysisService {
   /**
    * Analyze an outfit image and detect clothing items
    * @param imageUrl URL of the outfit image
+   * @param imageFile Optional file buffer for base64 encoding (more reliable than URL)
    * @returns Array of detected clothing items
    */
-  async analyzeOutfit(imageUrl: string): Promise<string[]> {
+  async analyzeOutfit(imageUrl: string, imageFile?: Express.Multer.File): Promise<string[]> {
     // Check if API key is properly configured
     const hasValidApiKey = this.apiKey && 
                            this.apiKey.trim().length > 0 && 
@@ -41,7 +42,13 @@ export class ImageAnalysisService {
       try {
         console.log('Using OpenAI Vision API for image analysis');
         console.log('Image URL:', imageUrl);
-        const result = await this.analyzeWithOpenAI(imageUrl);
+        console.log('Has image file buffer:', !!imageFile);
+        
+        // Prefer base64 if file is available (more reliable)
+        const result = imageFile 
+          ? await this.analyzeWithOpenAIBase64(imageFile)
+          : await this.analyzeWithOpenAI(imageUrl);
+        
         console.log('OpenAI analysis result:', result);
         return result;
       } catch (error: any) {
@@ -66,7 +73,85 @@ export class ImageAnalysisService {
   }
 
   /**
-   * Analyze using OpenAI Vision API
+   * Analyze using OpenAI Vision API with base64 image (more reliable)
+   */
+  private async analyzeWithOpenAIBase64(imageFile: Express.Multer.File): Promise<string[]> {
+    try {
+      // Try to get buffer from file object first (in-memory), otherwise read from disk
+      let imageBuffer: Buffer;
+      let filePath: string | null = null;
+      
+      if (imageFile.buffer) {
+        // File is in memory (memoryStorage)
+        imageBuffer = imageBuffer = imageFile.buffer;
+        console.log('Using in-memory file buffer');
+      } else {
+        // File is on disk (diskStorage)
+        filePath = imageFile.path || (imageFile.destination ? 
+          `${imageFile.destination}/${imageFile.filename}` : null);
+        
+        if (!filePath || !fs.existsSync(filePath)) {
+          throw new Error('Image file not found for base64 encoding');
+        }
+        
+        imageBuffer = fs.readFileSync(filePath);
+        console.log('Read file from disk:', filePath);
+      }
+      
+      const base64Image = imageBuffer.toString('base64');
+      const mimeType = imageFile.mimetype || 'image/jpeg';
+      
+      console.log('Calling OpenAI Vision API with base64 image (size:', imageBuffer.length, 'bytes, type:', mimeType, ')');
+      
+      const response = await firstValueFrom(
+        this.httpService.post<any>(
+          `${this.baseUrl}/chat/completions`,
+          {
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Analyze this outfit image carefully and list ALL visible clothing items. Be specific and accurate. Return ONLY a comma-separated list of items in English (e.g., "coat, sweater, skirt, boots, handbag"). Include: tops, bottoms, shoes, outerwear (jackets, coats), and accessories. Do not include generic items if you cannot see them clearly.',
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: { 
+                      url: `data:${mimeType};base64,${base64Image}` 
+                    },
+                  },
+                ],
+              },
+            ],
+            max_tokens: 300,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
+      );
+
+      const itemsText = response.data.choices[0].message.content;
+      console.log('OpenAI raw response:', itemsText);
+      const parsed = this.parseClothingItems(itemsText);
+      console.log('Parsed clothing items:', parsed);
+      return parsed;
+    } catch (error: any) {
+      console.error('OpenAI API error (base64):', error.response?.data || error.message);
+      throw new HttpException(
+        `Failed to analyze image with AI: ${error.message || 'Unknown error'}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Analyze using OpenAI Vision API with URL (fallback if base64 not available)
    */
   private async analyzeWithOpenAI(imageUrl: string): Promise<string[]> {
     try {

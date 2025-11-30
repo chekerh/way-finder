@@ -16,7 +16,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OutfitWeatherService } from './outfit-weather.service';
 import { AnalyzeOutfitDto, ApproveOutfitDto, UploadOutfitDto } from './outfit-weather.dto';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extname, join } from 'path';
+import * as fs from 'fs';
 
 @Controller('outfit-weather')
 @UseGuards(JwtAuthGuard)
@@ -66,11 +67,12 @@ export class OutfitWeatherController {
     // Upload image to ImgBB
     const imageUrl = await this.outfitWeatherService.uploadOutfitImage(file);
 
-    // Analyze outfit automatically after upload
+    // Analyze outfit automatically after upload - pass file for base64 encoding
     const analysis = await this.outfitWeatherService.analyzeOutfit(
       req.user.sub,
       dto.booking_id,
       imageUrl,
+      file, // Pass file for better OpenAI API compatibility
     );
 
     return {
