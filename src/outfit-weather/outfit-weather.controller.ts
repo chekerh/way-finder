@@ -68,12 +68,27 @@ export class OutfitWeatherController {
     const imageUrl = await this.outfitWeatherService.uploadOutfitImage(file);
 
     // Analyze outfit automatically after upload - pass file for base64 encoding
-    const analysis = await this.outfitWeatherService.analyzeOutfit(
-      req.user.sub,
-      dto.booking_id,
-      imageUrl,
-      file, // Pass file for better OpenAI API compatibility
-    );
+    let analysis;
+    try {
+      analysis = await this.outfitWeatherService.analyzeOutfit(
+        req.user.sub,
+        dto.booking_id,
+        imageUrl,
+        file, // Pass file for better OpenAI API compatibility
+      );
+    } finally {
+      // Clean up local file after analysis
+      try {
+        const filePath = join(file.destination, file.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log('Cleaned up temporary file:', filePath);
+        }
+      } catch (error) {
+        console.error('Error cleaning up file:', error);
+        // Ignore cleanup errors
+      }
+    }
 
     return {
       message: 'Outfit image uploaded and analyzed successfully',
