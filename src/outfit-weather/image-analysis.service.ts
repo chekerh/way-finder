@@ -24,16 +24,23 @@ export class ImageAnalysisService {
    */
   async analyzeOutfit(imageUrl: string): Promise<string[]> {
     // Option 1: Use OpenAI Vision API (if available)
-    if (this.apiKey) {
+    if (this.apiKey && this.apiKey !== 'your_openai_api_key_here') {
       try {
-        return await this.analyzeWithOpenAI(imageUrl);
+        console.log('Using OpenAI Vision API for image analysis');
+        const result = await this.analyzeWithOpenAI(imageUrl);
+        console.log('OpenAI analysis result:', result);
+        return result;
       } catch (error) {
         console.error('OpenAI analysis failed, using fallback:', error);
+        console.error('Error details:', error.response?.data || error.message);
       }
+    } else {
+      console.warn('OpenAI API key not configured, using fallback analysis');
     }
 
     // Option 2: Use Google Vision API (alternative)
     // Option 3: Fallback to keyword-based detection
+    console.log('Using fallback analysis (generic items)');
     return this.analyzeWithFallback(imageUrl);
   }
 
@@ -42,18 +49,19 @@ export class ImageAnalysisService {
    */
   private async analyzeWithOpenAI(imageUrl: string): Promise<string[]> {
     try {
+      console.log('Calling OpenAI Vision API with image URL:', imageUrl);
       const response = await firstValueFrom(
         this.httpService.post<any>(
           `${this.baseUrl}/chat/completions`,
           {
-            model: 'gpt-4-vision-preview',
+            model: 'gpt-4o', // Updated to use gpt-4o instead of deprecated gpt-4-vision-preview
             messages: [
               {
                 role: 'user',
                 content: [
                   {
                     type: 'text',
-                    text: 'Analyze this outfit image and list all clothing items you can see. Return only a comma-separated list of items in English (e.g., "t-shirt, jeans, sneakers, jacket"). Focus on: tops, bottoms, shoes, outerwear, accessories.',
+                    text: 'Analyze this outfit image carefully and list ALL visible clothing items. Be specific and accurate. Return ONLY a comma-separated list of items in English (e.g., "coat, sweater, skirt, boots, handbag"). Include: tops, bottoms, shoes, outerwear (jackets, coats), and accessories. Do not include generic items if you cannot see them clearly.',
                   },
                   {
                     type: 'image_url',
@@ -74,10 +82,14 @@ export class ImageAnalysisService {
       );
 
       const itemsText = response.data.choices[0].message.content;
-      return this.parseClothingItems(itemsText);
-    } catch (error) {
+      console.log('OpenAI raw response:', itemsText);
+      const parsed = this.parseClothingItems(itemsText);
+      console.log('Parsed clothing items:', parsed);
+      return parsed;
+    } catch (error: any) {
+      console.error('OpenAI API error:', error.response?.data || error.message);
       throw new HttpException(
-        'Failed to analyze image with AI',
+        `Failed to analyze image with AI: ${error.message || 'Unknown error'}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
