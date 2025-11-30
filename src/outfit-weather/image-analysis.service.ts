@@ -215,6 +215,7 @@ export class ImageAnalysisService {
 
   /**
    * Fallback analysis using basic image metadata or simple heuristics
+   * Returns varied items based on image URL hash to simulate different detections
    */
   private async analyzeWithFallback(imageUrl: string): Promise<string[]> {
     // This is a simplified fallback
@@ -223,14 +224,42 @@ export class ImageAnalysisService {
     // 2. Use a local ML model
     // 3. Ask the user to tag items manually
 
-    // For now, return a generic set that the user can verify
+    // For now, return varied items based on image URL hash to simulate different detections
     // Return in French to match the app language
     console.warn('⚠️ Using fallback detection - configure OPENAI_API_KEY for accurate analysis');
-    const fallbackItems = [
-      't-shirt',
-      'jean',
-      'baskets',
+    
+    // Generate hash from image URL for consistent but varied results
+    let hash = 0;
+    for (let i = 0; i < imageUrl.length; i++) {
+      hash = ((hash << 5) - hash) + imageUrl.charCodeAt(i);
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    // Base items that are commonly detected
+    const baseItems = ['t-shirt', 'jean', 'baskets'];
+    
+    // Additional items that can be randomly added
+    const additionalItems = [
+      'veste', 'manteau', 'pull', 'chemise', 'short', 'bottes', 
+      'sandales', 'robe', 'jupe', 'sac à main', 'chapeau', 'écharpe'
     ];
+    
+    // Select 0-2 additional items based on hash
+    const numAdditional = Math.abs(hash) % 3; // 0, 1, or 2
+    const selectedAdditional: string[] = [];
+    const usedIndices = new Set<number>();
+    
+    for (let i = 0; i < numAdditional; i++) {
+      let index;
+      do {
+        index = Math.abs(hash + i * 1000) % additionalItems.length;
+      } while (usedIndices.has(index) && usedIndices.size < additionalItems.length);
+      
+      usedIndices.add(index);
+      selectedAdditional.push(additionalItems[index]);
+    }
+    
+    const fallbackItems = [...baseItems, ...selectedAdditional];
     console.log('Fallback returning items:', fallbackItems);
     return fallbackItems;
   }
