@@ -54,12 +54,21 @@ export class ImageAnalysisService {
         return result;
       } catch (error: any) {
         console.error('OpenAI analysis failed, using fallback:', error);
+        const errorData = error.response?.data || {};
         console.error('Error details:', {
           message: error.message,
-          response: error.response?.data,
+          response: errorData,
           status: error.response?.status,
           statusText: error.response?.statusText,
+          errorType: errorData.error?.type,
+          errorCode: errorData.error?.code,
         });
+        
+        // Log specific quota error
+        if (errorData.error?.code === 'insufficient_quota' || errorData.error?.type === 'insufficient_quota') {
+          console.error('❌ OpenAI API quota exceeded. Please check your billing and plan details.');
+          console.error('📝 For more info: https://platform.openai.com/docs/guides/error-codes/api-errors');
+        }
         // Continue to fallback
       }
     } else {
@@ -70,7 +79,9 @@ export class ImageAnalysisService {
     // Option 2: Use Google Vision API (alternative)
     // Option 3: Fallback to keyword-based detection
     console.log('Using fallback analysis (generic items)');
-    return this.analyzeWithFallback(imageUrl);
+    const fallbackResult = await this.analyzeWithFallback(imageUrl);
+    console.log('Fallback analysis result:', fallbackResult);
+    return fallbackResult;
   }
 
   /**
@@ -215,11 +226,13 @@ export class ImageAnalysisService {
     // For now, return a generic set that the user can verify
     // Return in French to match the app language
     console.warn('⚠️ Using fallback detection - configure OPENAI_API_KEY for accurate analysis');
-    return [
+    const fallbackItems = [
       't-shirt',
       'jean',
       'baskets',
     ];
+    console.log('Fallback returning items:', fallbackItems);
+    return fallbackItems;
   }
 
   /**

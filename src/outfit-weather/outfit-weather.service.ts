@@ -89,6 +89,9 @@ export class OutfitWeatherService {
       imageUrl,
       imageFile,
     );
+    
+    console.log('Detected items from analysis service:', detectedItems);
+    console.log('Detected items type:', typeof detectedItems, 'is array:', Array.isArray(detectedItems));
 
     // Get clothing recommendations
     const recommendations = this.weatherService.getClothingRecommendations(
@@ -103,6 +106,7 @@ export class OutfitWeatherService {
     );
 
     // Create outfit record
+    console.log('Creating outfit record with detected_items:', detectedItems);
     const outfit = new this.outfitModel({
       user_id: this.toObjectId(userId, 'user id') as any,
       booking_id: this.toObjectId(bookingId, 'booking id') as any,
@@ -125,7 +129,10 @@ export class OutfitWeatherService {
       },
     });
 
-    return outfit.save();
+    const savedOutfit = await outfit.save();
+    console.log('Saved outfit detected_items:', savedOutfit.detected_items);
+    console.log('Saved outfit ID:', savedOutfit._id);
+    return savedOutfit;
   }
 
   /**
