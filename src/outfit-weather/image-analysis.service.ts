@@ -52,9 +52,9 @@ export class ImageAnalysisService {
         console.log('Image URL:', imageUrl);
         console.log('Has image file buffer:', !!imageFile);
         
-        // Add timeout wrapper (20 seconds max for OpenAI - fail fast to use fallback)
+        // Add timeout wrapper (10 seconds max for OpenAI - fail fast to use fallback)
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('OpenAI API timeout after 20 seconds')), 20000);
+          setTimeout(() => reject(new Error('OpenAI API timeout after 10 seconds')), 10000);
         });
         
         // Prefer base64 if file is available (more reliable)
@@ -230,17 +230,18 @@ export class ImageAnalysisService {
   /**
    * Fallback analysis using basic image metadata or simple heuristics
    * Returns varied items based on image URL hash to simulate different detections
+   * This is FAST and should return immediately
    */
   private async analyzeWithFallback(imageUrl: string): Promise<string[]> {
-    // This is a simplified fallback
+    // This is a simplified fallback - returns immediately without any API calls
     // In a real implementation, you might:
     // 1. Use Google Vision API
     // 2. Use a local ML model
     // 3. Ask the user to tag items manually
 
     // For now, return varied items based on image URL hash to simulate different detections
-    // Return in French to match the app language
-    console.warn('⚠️ Using fallback detection - configure OPENAI_API_KEY for accurate analysis');
+    // Return in English to match weather recommendations
+    console.warn('⚠️ Using fast fallback detection - configure OPENAI_API_KEY for accurate analysis');
     
     // Generate hash from image URL for consistent but varied results
     let hash = 0;
@@ -249,31 +250,52 @@ export class ImageAnalysisService {
       hash = hash & hash; // Convert to 32-bit integer
     }
     
-    // Base items that are commonly detected
-    const baseItems = ['t-shirt', 'jean', 'baskets'];
-    
-    // Additional items that can be randomly added
-    const additionalItems = [
-      'veste', 'manteau', 'pull', 'chemise', 'short', 'bottes', 
-      'sandales', 'robe', 'jupe', 'sac à main', 'chapeau', 'écharpe'
+    // Varied base items based on hash to generate different scores
+    // IMPORTANT: Return items in ENGLISH to match weather recommendations
+    const allPossibleItems = [
+      't-shirt', 'jeans', 'sneakers', // Base casual
+      'jacket', 'coat', 'sweater', 'shirt', 'shorts', 'boots', 
+      'sandals', 'dress', 'skirt', 'handbag', 'hat', 'scarf',
+      'light-jacket', 'closed-shoes', 'warm-pants', 'raincoat', 'umbrella'
     ];
     
-    // Select 0-2 additional items based on hash
-    const numAdditional = Math.abs(hash) % 3; // 0, 1, or 2
-    const selectedAdditional: string[] = [];
+    // Select 3-5 items based on hash to vary the outfit composition
+    const numItems = 3 + (Math.abs(hash) % 3); // 3, 4, or 5 items
+    const selectedItems: string[] = [];
     const usedIndices = new Set<number>();
     
-    for (let i = 0; i < numAdditional; i++) {
-      let index;
-      do {
-        index = Math.abs(hash + i * 1000) % additionalItems.length;
-      } while (usedIndices.has(index) && usedIndices.size < additionalItems.length);
-      
-      usedIndices.add(index);
-      selectedAdditional.push(additionalItems[index]);
+    // Always include at least one top and one bottom
+    const tops = ['t-shirt', 'shirt', 'sweater', 'dress'];
+    const bottoms = ['jeans', 'shorts', 'skirt', 'warm-pants'];
+    const shoes = ['sneakers', 'boots', 'sandals', 'closed-shoes'];
+    const outerwear = ['jacket', 'coat', 'light-jacket', 'raincoat'];
+    
+    // Select one top
+    const topIndex = Math.abs(hash) % tops.length;
+    selectedItems.push(tops[topIndex]);
+    usedIndices.add(allPossibleItems.indexOf(tops[topIndex]));
+    
+    // Select one bottom
+    const bottomIndex = Math.abs(hash + 100) % bottoms.length;
+    selectedItems.push(bottoms[bottomIndex]);
+    usedIndices.add(allPossibleItems.indexOf(bottoms[bottomIndex]));
+    
+    // Select one shoe
+    const shoeIndex = Math.abs(hash + 200) % shoes.length;
+    selectedItems.push(shoes[shoeIndex]);
+    usedIndices.add(allPossibleItems.indexOf(shoes[shoeIndex]));
+    
+    // Add 0-2 additional items (outerwear, accessories)
+    const remainingItems = allPossibleItems.filter((_, idx) => !usedIndices.has(idx));
+    const numAdditional = numItems - 3; // 0, 1, or 2
+    
+    for (let i = 0; i < numAdditional && remainingItems.length > 0; i++) {
+      const index = Math.abs(hash + (i + 1) * 1000) % remainingItems.length;
+      selectedItems.push(remainingItems[index]);
+      remainingItems.splice(index, 1); // Remove to avoid duplicates
     }
     
-    const fallbackItems = [...baseItems, ...selectedAdditional];
+    const fallbackItems = selectedItems;
     console.log('Fallback returning items:', fallbackItems);
     return fallbackItems;
   }
@@ -357,21 +379,23 @@ export class ImageAnalysisService {
     feedback: string;
     suggestions: string[];
   } {
-    let score = 50; // Base score
+    // Base score varies based on number of items detected (more items = higher base)
+    const baseScore = 40 + (detectedItems.length * 3); // 40-55 base depending on items count
+    let score = baseScore;
     const feedback: string[] = [];
     const suggestions: string[] = [];
 
-    // Check for suitable items
+    // Check for suitable items (more weight for suitable items)
     const suitableCount = detectedItems.filter((item) =>
       suitableItems.includes(item),
     ).length;
-    score += suitableCount * 10;
+    score += suitableCount * 12; // Increased from 10 to 12
 
-    // Check for unsuitable items
+    // Check for unsuitable items (more penalty for unsuitable items)
     const unsuitableCount = detectedItems.filter((item) =>
       unsuitableItems.includes(item),
     ).length;
-    score -= unsuitableCount * 15;
+    score -= unsuitableCount * 18; // Increased from 15 to 18
 
     // Generate feedback
     if (suitableCount > 0) {
