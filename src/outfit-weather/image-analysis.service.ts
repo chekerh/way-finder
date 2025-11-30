@@ -83,7 +83,7 @@ export class ImageAnalysisService {
       
       if (imageFile.buffer) {
         // File is in memory (memoryStorage)
-        imageBuffer = imageBuffer = imageFile.buffer;
+        imageBuffer = imageFile.buffer;
         console.log('Using in-memory file buffer');
       } else {
         // File is on disk (diskStorage)
