@@ -64,55 +64,18 @@ export class OutfitWeatherController {
       throw new BadRequestException('booking_id is required');
     }
 
-    // Analyze outfit FIRST with file (fast, no ImgBB upload needed for analysis)
-    // Upload to ImgBB AFTER analysis for storage (non-blocking)
-    let imageUrl: string;
+    // Upload image to ImgBB
+    const imageUrl = await this.outfitWeatherService.uploadOutfitImage(file);
+
+    // Analyze outfit automatically after upload - pass file for base64 encoding
     let analysis;
-    
     try {
-      // Use file path as temporary URL for analysis (file is used directly anyway)
-      const filePath = join(file.destination, file.filename);
-      const tempImageUrl = `file://${filePath}`;
-      
-      console.log('Starting outfit analysis immediately with file (no ImgBB wait)...');
-      
-      // Analyze outfit immediately - this is fast with fallback
       analysis = await this.outfitWeatherService.analyzeOutfit(
         req.user.sub,
         dto.booking_id,
-        tempImageUrl, // Temporary URL, file will be used directly
-        file, // Pass file for better OpenAI API compatibility and fallback
-        dto.outfit_date, // Pass outfit date if provided
+        imageUrl,
+        file, // Pass file for better OpenAI API compatibility
       );
-      
-      console.log('Outfit analysis completed, uploading to ImgBB for storage...');
-      
-      // Upload to ImgBB AFTER analysis (non-blocking, but we wait for it to update the URL)
-      try {
-        imageUrl = await Promise.race([
-          this.outfitWeatherService.uploadOutfitImage(file),
-          new Promise<string>((_, reject) => 
-            setTimeout(() => reject(new Error('ImgBB upload timeout')), 15000)
-          )
-        ]);
-        
-        // Update the outfit with the final image URL
-        if (analysis && analysis._id) {
-          analysis.image_url = imageUrl;
-          await analysis.save();
-          console.log('Updated outfit with ImgBB URL:', imageUrl);
-        }
-      } catch (imgbbError) {
-        console.warn('ImgBB upload failed or timed out, using local file path:', imgbbError);
-        // Use local file path as fallback
-        imageUrl = `/uploads/outfits/${file.filename}`;
-        
-        // Update the outfit with fallback URL
-        if (analysis && analysis._id) {
-          analysis.image_url = imageUrl;
-          await analysis.save();
-        }
-      }
     } finally {
       // Clean up local file after analysis
       try {
@@ -151,19 +114,6 @@ export class OutfitWeatherController {
     return this.outfitWeatherService.getOutfitsForBooking(
       req.user.sub,
       bookingId,
-    );
-  }
-
-  @Get('booking/:bookingId/date/:date')
-  async getOutfitByDate(
-    @Request() req,
-    @Param('bookingId') bookingId: string,
-    @Param('date') date: string, // Format: YYYY-MM-DD
-  ) {
-    return this.outfitWeatherService.getOutfitByDate(
-      req.user.sub,
-      bookingId,
-      date,
     );
   }
 

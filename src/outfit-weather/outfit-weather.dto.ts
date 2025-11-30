@@ -17,9 +17,5 @@ export class ApproveOutfitDto {
 export class UploadOutfitDto {
   @IsString()
   booking_id: string;
-
-  @IsString()
-  @IsOptional()
-  outfit_date?: string; // Date in format YYYY-MM-DD (e.g., "2025-11-30")
 }
 

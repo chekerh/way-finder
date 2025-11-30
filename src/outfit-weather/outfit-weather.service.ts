@@ -57,7 +57,6 @@ export class OutfitWeatherService {
     bookingId: string,
     imageUrl: string,
     imageFile?: Express.Multer.File,
-    outfitDate?: string, // Optional date in format YYYY-MM-DD
   ): Promise<OutfitDocument> {
     // Get booking details
     const booking = await this.bookingService.findOne(userId, bookingId);
@@ -117,17 +116,13 @@ export class OutfitWeatherService {
       recommendations.unsuitable_items,
     );
 
-    // Translate detected items to French for display (items are in English for comparison)
-    const detectedItemsFrench = this.translateItemsToFrench(detectedItems);
-
     // Create outfit record
     console.log('Creating outfit record with detected_items:', detectedItems);
-    console.log('Translated to French:', detectedItemsFrench);
-    const outfitData: any = {
+    const outfit = new this.outfitModel({
       user_id: this.toObjectId(userId, 'user id') as any,
       booking_id: this.toObjectId(bookingId, 'booking id') as any,
       image_url: imageUrl,
-      detected_items: detectedItemsFrench, // Store in French for display
+      detected_items: detectedItems,
       weather_data: {
         temperature: weather.temperature,
         condition: weather.condition,
@@ -143,38 +138,7 @@ export class OutfitWeatherService {
           ...recommendations.suggestions,
         ],
       },
-    };
-
-    // Add outfit_date if provided
-    if (outfitDate) {
-      outfitData.outfit_date = new Date(outfitDate);
-      console.log('Outfit date set to:', outfitData.outfit_date);
-      
-      // If a date is provided, check if there's already an outfit for this date
-      // and remove it to replace with the new one
-      const outfitDateObj = new Date(outfitDate);
-      outfitDateObj.setHours(0, 0, 0, 0);
-      const nextDay = new Date(outfitDateObj);
-      nextDay.setDate(nextDay.getDate() + 1);
-      
-      const existingOutfit = await this.outfitModel
-        .findOne({
-          user_id: this.toObjectId(userId, 'user id') as any,
-          booking_id: this.toObjectId(bookingId, 'booking id') as any,
-          outfit_date: {
-            $gte: outfitDateObj,
-            $lt: nextDay,
-          },
-        })
-        .exec();
-      
-      if (existingOutfit) {
-        console.log('Removing existing outfit for date:', outfitDate, 'ID:', existingOutfit._id);
-        await this.outfitModel.deleteOne({ _id: existingOutfit._id }).exec();
-      }
-    }
-
-    const outfit = new this.outfitModel(outfitData);
+    });
 
     const savedOutfit = await outfit.save();
     console.log('Saved outfit detected_items:', savedOutfit.detected_items);
@@ -196,35 +160,6 @@ export class OutfitWeatherService {
       })
       .sort({ createdAt: -1 })
       .exec();
-  }
-
-  /**
-   * Get outfit by date for a booking
-   */
-  async getOutfitByDate(
-    userId: string,
-    bookingId: string,
-    date: string, // Format: YYYY-MM-DD
-  ): Promise<OutfitDocument | null> {
-    const outfitDate = new Date(date);
-    // Set time to start of day for comparison
-    outfitDate.setHours(0, 0, 0, 0);
-    const nextDay = new Date(outfitDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    const outfit = await this.outfitModel
-      .findOne({
-        user_id: this.toObjectId(userId, 'user id') as any,
-        booking_id: this.toObjectId(bookingId, 'booking id') as any,
-        outfit_date: {
-          $gte: outfitDate,
-          $lt: nextDay,
-        },
-      })
-      .sort({ createdAt: -1 }) // Get most recent if multiple
-      .exec();
-
-    return outfit;
   }
 
   /**
@@ -257,32 +192,6 @@ export class OutfitWeatherService {
   ): Promise<OutfitDocument> {
     const outfit = await this.getOutfit(userId, outfitId);
     outfit.is_approved = true;
-    
-    // If outfit has a date, mark it as the validated outfit for that date
-    // This ensures only one validated outfit per date
-    if (outfit.outfit_date) {
-      const outfitDate = new Date(outfit.outfit_date);
-      outfitDate.setHours(0, 0, 0, 0);
-      const nextDay = new Date(outfitDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      
-      // Unapprove other outfits for the same date
-      await this.outfitModel
-        .updateMany(
-          {
-            user_id: this.toObjectId(userId, 'user id') as any,
-            booking_id: outfit.booking_id,
-            outfit_date: {
-              $gte: outfitDate,
-              $lt: nextDay,
-            },
-            _id: { $ne: outfit._id },
-          },
-          { $set: { is_approved: false } }
-        )
-        .exec();
-    }
-    
     return outfit.save();
   }
 
@@ -316,41 +225,6 @@ export class OutfitWeatherService {
       throw new BadRequestException(`Invalid ${label} format`);
     }
     return new Types.ObjectId(id);
-  }
-
-  /**
-   * Translate English item names to French for display
-   */
-  private translateItemsToFrench(items: string[]): string[] {
-    const translations: Record<string, string> = {
-      't-shirt': 't-shirt',
-      'shirt': 'chemise',
-      'sweater': 'pull',
-      'jacket': 'veste',
-      'coat': 'manteau',
-      'light-jacket': 'veste légère',
-      'raincoat': 'imperméable',
-      'jeans': 'jean',
-      'shorts': 'short',
-      'skirt': 'jupe',
-      'dress': 'robe',
-      'warm-pants': 'pantalon chaud',
-      'sneakers': 'baskets',
-      'boots': 'bottes',
-      'sandals': 'sandales',
-      'closed-shoes': 'chaussures fermées',
-      'waterproof-shoes': 'chaussures imperméables',
-      'winter-boots': 'bottes d\'hiver',
-      'handbag': 'sac à main',
-      'hat': 'chapeau',
-      'scarf': 'écharpe',
-      'gloves': 'gants',
-      'sunglasses': 'lunettes de soleil',
-      'umbrella': 'parapluie',
-      'sunscreen': 'crème solaire',
-    };
-
-    return items.map(item => translations[item.toLowerCase()] || item);
   }
 }
 

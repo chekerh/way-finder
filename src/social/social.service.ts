@@ -416,8 +416,14 @@ export class SocialService {
       miami: 'United States',
       // UAE
       dubai: 'United Arab Emirates',
+      'dubai, uae': 'United Arab Emirates',
+      'dubai uae': 'United Arab Emirates',
+      'dubai, united arab emirates': 'United Arab Emirates',
+      uae: 'United Arab Emirates',
       // United Kingdom
       london: 'United Kingdom',
+      'london, united kingdom': 'United Kingdom',
+      'london united kingdom': 'United Kingdom',
       manchester: 'United Kingdom',
       edinburgh: 'United Kingdom',
       // Germany
@@ -433,9 +439,26 @@ export class SocialService {
       'seoul, south korea': 'South Korea',
       'seoul south korea': 'South Korea',
       bangkok: 'Thailand',
+      'bangkok, thailand': 'Thailand',
+      'bangkok thailand': 'Thailand',
       singapore: 'Singapore',
+      'singapore, singapore': 'Singapore',
+      'singapore singapore': 'Singapore',
       sydney: 'Australia',
       melbourne: 'Australia',
+      // Additional cities from reservations
+      'new york, united states': 'United States',
+      'new york united states': 'United States',
+      'new york, usa': 'United States',
+      'new york usa': 'United States',
+      'madrid, spain': 'Spain',
+      'madrid spain': 'Spain',
+      'dubai, uae': 'United Arab Emirates',
+      'dubai uae': 'United Arab Emirates',
+      'dubai, united arab emirates': 'United Arab Emirates',
+      uae: 'United Arab Emirates',
+      'london, united kingdom': 'United Kingdom',
+      'london united kingdom': 'United Kingdom',
     };
 
     // Country coordinates mapping (capital city coordinates)
@@ -492,22 +515,27 @@ export class SocialService {
       if (!text) return null;
       const lowerText = text.toLowerCase().trim();
       
-      // First, try to find country name directly (check for exact matches first)
-      for (const [countryName, _] of Object.entries(countryCoordinates)) {
-        const lowerCountryName = countryName.toLowerCase();
-        // Check for exact match or contains match
-        if (lowerText === lowerCountryName || lowerText.includes(lowerCountryName)) {
-          return countryName;
-        }
-      }
-      
-      // Then, try to find city and map to country
-      for (const [city, country] of Object.entries(cityToCountry)) {
+      // First, try to find city and map to country (more specific, check this first)
+      // Sort by length (longest first) to match "paris, france" before just "paris"
+      const sortedCities = Object.entries(cityToCountry).sort((a, b) => b[0].length - a[0].length);
+      for (const [city, country] of sortedCities) {
         if (lowerText.includes(city)) {
+          console.log(`[getMapMemories] City "${city}" found in "${lowerText}" -> ${country}`);
           return country;
         }
       }
       
+      // Then, try to find country name directly
+      for (const [countryName, _] of Object.entries(countryCoordinates)) {
+        const lowerCountryName = countryName.toLowerCase();
+        // Check for exact match or contains match
+        if (lowerText === lowerCountryName || lowerText.includes(lowerCountryName)) {
+          console.log(`[getMapMemories] Country "${countryName}" found in "${lowerText}"`);
+          return countryName;
+        }
+      }
+      
+      console.log(`[getMapMemories] No country found in "${lowerText}"`);
       return null;
     };
 

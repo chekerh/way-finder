@@ -35,9 +35,6 @@ export class Outfit {
 
   @Prop({ default: false })
   is_approved: boolean; // User approved this outfit
-
-  @Prop({ type: Date })
-  outfit_date?: Date; // Date for which this outfit is intended (e.g., 2025-11-30)
 }
 
 export const OutfitSchema = SchemaFactory.createForClass(Outfit);
