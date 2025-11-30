@@ -288,4 +288,128 @@ export class SocialService {
 
     return { message: 'Trip liked successfully', likesCount: trip.likesCount };
   }
+
+  async getMapMemories(userId: string): Promise<any> {
+    // Get all shared trips for the user
+    const trips = await this.sharedTripModel
+      .find({ userId, isVisible: true })
+      .populate('userId', 'username first_name last_name profile_image_url')
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // Country coordinates mapping (capital city coordinates)
+    const countryCoordinates: Record<string, { lat: number; lng: number }> = {
+      France: { lat: 48.8566, lng: 2.3522 }, // Paris
+      Spain: { lat: 40.4168, lng: -3.7038 }, // Madrid
+      Italy: { lat: 41.9028, lng: 12.4964 }, // Rome
+      Germany: { lat: 52.52, lng: 13.405 }, // Berlin
+      'United Kingdom': { lat: 51.5074, lng: -0.1278 }, // London
+      Portugal: { lat: 38.7223, lng: -9.1393 }, // Lisbon
+      Greece: { lat: 37.9838, lng: 23.7275 }, // Athens
+      Netherlands: { lat: 52.3676, lng: 4.9041 }, // Amsterdam
+      Belgium: { lat: 50.8503, lng: 4.3517 }, // Brussels
+      Switzerland: { lat: 46.2044, lng: 6.1432 }, // Geneva
+      Austria: { lat: 48.2082, lng: 16.3738 }, // Vienna
+      'Czech Republic': { lat: 50.0755, lng: 14.4378 }, // Prague
+      Poland: { lat: 52.2297, lng: 21.0122 }, // Warsaw
+      Hungary: { lat: 47.4979, lng: 19.0402 }, // Budapest
+      Croatia: { lat: 45.815, lng: 15.9819 }, // Zagreb
+      Tunisia: { lat: 36.8065, lng: 10.1815 }, // Tunis
+      Morocco: { lat: 33.9716, lng: -6.8498 }, // Rabat
+      Algeria: { lat: 36.7538, lng: 3.0588 }, // Algiers
+      Egypt: { lat: 30.0444, lng: 31.2357 }, // Cairo
+      Turkey: { lat: 41.0082, lng: 28.9784 }, // Istanbul
+      'United States': { lat: 38.9072, lng: -77.0369 }, // Washington DC
+      Canada: { lat: 45.5017, lng: -75.5673 }, // Ottawa
+      Mexico: { lat: 19.4326, lng: -99.1332 }, // Mexico City
+      Brazil: { lat: -15.7942, lng: -47.8822 }, // Brasília
+      Argentina: { lat: -34.6037, lng: -58.3816 }, // Buenos Aires
+      Japan: { lat: 35.6762, lng: 139.6503 }, // Tokyo
+      China: { lat: 39.9042, lng: 116.4074 }, // Beijing
+      India: { lat: 28.6139, lng: 77.209 }, // New Delhi
+      Thailand: { lat: 13.7563, lng: 100.5018 }, // Bangkok
+      'South Korea': { lat: 37.5665, lng: 126.978 }, // Seoul
+      Australia: { lat: -35.2809, lng: 149.13 }, // Canberra
+      'New Zealand': { lat: -41.2865, lng: 174.7762 }, // Wellington
+    };
+
+    // Group trips by country
+    const countryMap = new Map<
+      string,
+      {
+        country: string;
+        lat: number;
+        lng: number;
+        trips: any[];
+        count: number;
+      }
+    >();
+
+    trips.forEach((trip: any) => {
+      const tripObj = trip.toObject ? trip.toObject() : trip;
+      
+      // Extract country from metadata
+      let country: string | null = null;
+      
+      if (tripObj.metadata?.country) {
+        country = tripObj.metadata.country;
+      } else if (tripObj.metadata?.destination) {
+        // Try to extract country from destination string
+        const dest = tripObj.metadata.destination;
+        // Simple matching - could be improved
+        for (const [key, _] of Object.entries(countryCoordinates)) {
+          if (dest.includes(key)) {
+            country = key;
+            break;
+          }
+        }
+      } else if (tripObj.tags && tripObj.tags.length > 0) {
+        // Try to find country in tags
+        for (const tag of tripObj.tags) {
+          for (const [key, _] of Object.entries(countryCoordinates)) {
+            if (tag.toLowerCase().includes(key.toLowerCase())) {
+              country = key;
+              break;
+            }
+          }
+          if (country) break;
+        }
+      }
+
+      // If no country found, skip this trip
+      if (!country) {
+        return;
+      }
+
+      // Get coordinates for country
+      const coords = countryCoordinates[country];
+      if (!coords) {
+        return; // Skip if country not in our mapping
+      }
+
+      // Add to country map
+      if (!countryMap.has(country)) {
+        countryMap.set(country, {
+          country,
+          lat: coords.lat,
+          lng: coords.lng,
+          trips: [],
+          count: 0,
+        });
+      }
+
+      const countryData = countryMap.get(country)!;
+      countryData.trips.push(tripObj);
+      countryData.count = countryData.trips.length;
+    });
+
+    // Convert map to array
+    const result = Array.from(countryMap.values());
+
+    return {
+      countries: result,
+      totalCountries: result.length,
+      totalMemories: trips.length,
+    };
+  }
 }

@@ -9,4 +9,9 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
+
+  @Get('config/google-maps-api-key')
+  getGoogleMapsApiKey() {
+    return this.appService.getGoogleMapsApiKey();
+  }
 }

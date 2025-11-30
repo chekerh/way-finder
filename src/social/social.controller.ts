@@ -174,4 +174,10 @@ export class SocialController {
   async likeSharedTrip(@Req() req: any, @Param('id') tripId: string) {
     return this.socialService.likeSharedTrip(req.user.sub, tripId);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('map-memories')
+  async getMapMemories(@Req() req: any) {
+    return this.socialService.getMapMemories(req.user.sub);
+  }
 }
