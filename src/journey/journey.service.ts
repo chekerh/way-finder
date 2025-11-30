@@ -357,7 +357,7 @@ export class JourneyService {
       // Include user's own journeys even if private
       query.$or = [
         { is_public: true, is_visible: true },
-        { user_id: this.toObjectId(userId, 'user id'), is_visible: true },
+        { user_id: this.toObjectId(userId, 'user id') as any, is_visible: true },
       ];
     }
 
@@ -459,7 +459,7 @@ export class JourneyService {
     const isLiked = userId
       ? await this.journeyLikeModel.exists({
           journey_id: journey._id,
-          user_id: this.toObjectId(userId, 'user id'),
+          user_id: this.toObjectId(userId, 'user id') as any,
         })
       : false;
 
@@ -543,7 +543,7 @@ export class JourneyService {
 
   async getUserJourneys(userId: string, limit: number = 20, skip: number = 0) {
     const journeys = await this.journeyModel
-      .find({ user_id: this.toObjectId(userId, 'user id'), is_visible: true })
+      .find({ user_id: this.toObjectId(userId, 'user id') as any, is_visible: true })
       .populate('user_id', 'username firstName lastName profile_image_url')
       .populate('booking_id')
       .sort({ createdAt: -1 })
@@ -650,7 +650,7 @@ export class JourneyService {
     const existingLike = await this.journeyLikeModel
       .findOne({
         journey_id: journey._id,
-        user_id: this.toObjectId(userId, 'user id'),
+        user_id: this.toObjectId(userId, 'user id') as any,
       })
       .exec();
 
@@ -756,7 +756,7 @@ export class JourneyService {
 
   async getComments(journeyId: string, limit: number = 50, skip: number = 0) {
     const comments = await this.journeyCommentModel
-      .find({ journey_id: this.toObjectId(journeyId, 'journey id') })
+      .find({ journey_id: this.toObjectId(journeyId, 'journey id') as any })
       .populate('user_id', 'username firstName lastName profile_image_url')
       .populate('parent_comment_id')
       .sort({ createdAt: -1 })
