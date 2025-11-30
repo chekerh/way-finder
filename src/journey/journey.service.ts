@@ -666,7 +666,8 @@ export class JourneyService {
     let journeyOwnerId: string | undefined;
     
     if (journey.user_id) {
-      const journeyObj = journey.toObject ? journey.toObject() : journey;
+      // Use toObject() if available, otherwise use the journey directly
+      const journeyObj = (journey as any).toObject ? (journey as any).toObject() : journey;
       const populatedUserId = journeyObj.user_id as any;
       const isPopulatedUser =
         populatedUserId &&
