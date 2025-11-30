@@ -421,6 +421,11 @@ export class SocialService {
       // Other
       istanbul: 'Turkey',
       tokyo: 'Japan',
+      'tokyo, japan': 'Japan',
+      'tokyo japan': 'Japan',
+      seoul: 'South Korea',
+      'seoul, south korea': 'South Korea',
+      'seoul south korea': 'South Korea',
       bangkok: 'Thailand',
       singapore: 'Singapore',
       sydney: 'Australia',
@@ -479,11 +484,13 @@ export class SocialService {
     // Helper function to extract country from text
     const extractCountryFromText = (text: string): string | null => {
       if (!text) return null;
-      const lowerText = text.toLowerCase();
+      const lowerText = text.toLowerCase().trim();
       
-      // First, try to find country name directly
+      // First, try to find country name directly (check for exact matches first)
       for (const [countryName, _] of Object.entries(countryCoordinates)) {
-        if (lowerText.includes(countryName.toLowerCase())) {
+        const lowerCountryName = countryName.toLowerCase();
+        // Check for exact match or contains match
+        if (lowerText === lowerCountryName || lowerText.includes(lowerCountryName)) {
           return countryName;
         }
       }
@@ -534,8 +541,22 @@ export class SocialService {
 
       // If no country found, skip this trip
       if (!country) {
+        // Log for debugging
+        console.log(`[getMapMemories] No country found for trip:`, {
+          id: tripObj._id,
+          destination: tripObj.destination,
+          title: tripObj.title,
+          description: tripObj.description,
+          metadata: tripObj.metadata,
+        });
         return;
       }
+      
+      // Log successful country detection for debugging
+      console.log(`[getMapMemories] Country detected: ${country} for trip:`, {
+        id: tripObj._id,
+        destination: tripObj.destination || tripObj.title,
+      });
 
       // Get coordinates for country
       const coords = countryCoordinates[country];
