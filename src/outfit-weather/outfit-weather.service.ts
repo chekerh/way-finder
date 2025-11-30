@@ -117,13 +117,17 @@ export class OutfitWeatherService {
       recommendations.unsuitable_items,
     );
 
+    // Translate detected items to French for display (items are in English for comparison)
+    const detectedItemsFrench = this.translateItemsToFrench(detectedItems);
+
     // Create outfit record
     console.log('Creating outfit record with detected_items:', detectedItems);
+    console.log('Translated to French:', detectedItemsFrench);
     const outfitData: any = {
       user_id: this.toObjectId(userId, 'user id') as any,
       booking_id: this.toObjectId(bookingId, 'booking id') as any,
       image_url: imageUrl,
-      detected_items: detectedItems,
+      detected_items: detectedItemsFrench, // Store in French for display
       weather_data: {
         temperature: weather.temperature,
         condition: weather.condition,
@@ -312,6 +316,41 @@ export class OutfitWeatherService {
       throw new BadRequestException(`Invalid ${label} format`);
     }
     return new Types.ObjectId(id);
+  }
+
+  /**
+   * Translate English item names to French for display
+   */
+  private translateItemsToFrench(items: string[]): string[] {
+    const translations: Record<string, string> = {
+      't-shirt': 't-shirt',
+      'shirt': 'chemise',
+      'sweater': 'pull',
+      'jacket': 'veste',
+      'coat': 'manteau',
+      'light-jacket': 'veste légère',
+      'raincoat': 'imperméable',
+      'jeans': 'jean',
+      'shorts': 'short',
+      'skirt': 'jupe',
+      'dress': 'robe',
+      'warm-pants': 'pantalon chaud',
+      'sneakers': 'baskets',
+      'boots': 'bottes',
+      'sandals': 'sandales',
+      'closed-shoes': 'chaussures fermées',
+      'waterproof-shoes': 'chaussures imperméables',
+      'winter-boots': 'bottes d\'hiver',
+      'handbag': 'sac à main',
+      'hat': 'chapeau',
+      'scarf': 'écharpe',
+      'gloves': 'gants',
+      'sunglasses': 'lunettes de soleil',
+      'umbrella': 'parapluie',
+      'sunscreen': 'crème solaire',
+    };
+
+    return items.map(item => translations[item.toLowerCase()] || item);
   }
 }
 

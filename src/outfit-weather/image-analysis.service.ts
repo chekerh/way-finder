@@ -249,31 +249,52 @@ export class ImageAnalysisService {
       hash = hash & hash; // Convert to 32-bit integer
     }
     
-    // Base items that are commonly detected
-    const baseItems = ['t-shirt', 'jean', 'baskets'];
-    
-    // Additional items that can be randomly added
-    const additionalItems = [
-      'veste', 'manteau', 'pull', 'chemise', 'short', 'bottes', 
-      'sandales', 'robe', 'jupe', 'sac à main', 'chapeau', 'écharpe'
+    // Varied base items based on hash to generate different scores
+    // IMPORTANT: Return items in ENGLISH to match weather recommendations
+    const allPossibleItems = [
+      't-shirt', 'jeans', 'sneakers', // Base casual
+      'jacket', 'coat', 'sweater', 'shirt', 'shorts', 'boots', 
+      'sandals', 'dress', 'skirt', 'handbag', 'hat', 'scarf',
+      'light-jacket', 'closed-shoes', 'warm-pants', 'raincoat', 'umbrella'
     ];
     
-    // Select 0-2 additional items based on hash
-    const numAdditional = Math.abs(hash) % 3; // 0, 1, or 2
-    const selectedAdditional: string[] = [];
+    // Select 3-5 items based on hash to vary the outfit composition
+    const numItems = 3 + (Math.abs(hash) % 3); // 3, 4, or 5 items
+    const selectedItems: string[] = [];
     const usedIndices = new Set<number>();
     
-    for (let i = 0; i < numAdditional; i++) {
-      let index;
-      do {
-        index = Math.abs(hash + i * 1000) % additionalItems.length;
-      } while (usedIndices.has(index) && usedIndices.size < additionalItems.length);
-      
-      usedIndices.add(index);
-      selectedAdditional.push(additionalItems[index]);
+    // Always include at least one top and one bottom
+    const tops = ['t-shirt', 'shirt', 'sweater', 'dress'];
+    const bottoms = ['jeans', 'shorts', 'skirt', 'warm-pants'];
+    const shoes = ['sneakers', 'boots', 'sandals', 'closed-shoes'];
+    const outerwear = ['jacket', 'coat', 'light-jacket', 'raincoat'];
+    
+    // Select one top
+    const topIndex = Math.abs(hash) % tops.length;
+    selectedItems.push(tops[topIndex]);
+    usedIndices.add(allPossibleItems.indexOf(tops[topIndex]));
+    
+    // Select one bottom
+    const bottomIndex = Math.abs(hash + 100) % bottoms.length;
+    selectedItems.push(bottoms[bottomIndex]);
+    usedIndices.add(allPossibleItems.indexOf(bottoms[bottomIndex]));
+    
+    // Select one shoe
+    const shoeIndex = Math.abs(hash + 200) % shoes.length;
+    selectedItems.push(shoes[shoeIndex]);
+    usedIndices.add(allPossibleItems.indexOf(shoes[shoeIndex]));
+    
+    // Add 0-2 additional items (outerwear, accessories)
+    const remainingItems = allPossibleItems.filter((_, idx) => !usedIndices.has(idx));
+    const numAdditional = numItems - 3; // 0, 1, or 2
+    
+    for (let i = 0; i < numAdditional && remainingItems.length > 0; i++) {
+      const index = Math.abs(hash + (i + 1) * 1000) % remainingItems.length;
+      selectedItems.push(remainingItems[index]);
+      remainingItems.splice(index, 1); // Remove to avoid duplicates
     }
     
-    const fallbackItems = [...baseItems, ...selectedAdditional];
+    const fallbackItems = selectedItems;
     console.log('Fallback returning items:', fallbackItems);
     return fallbackItems;
   }
@@ -357,21 +378,23 @@ export class ImageAnalysisService {
     feedback: string;
     suggestions: string[];
   } {
-    let score = 50; // Base score
+    // Base score varies based on number of items detected (more items = higher base)
+    const baseScore = 40 + (detectedItems.length * 3); // 40-55 base depending on items count
+    let score = baseScore;
     const feedback: string[] = [];
     const suggestions: string[] = [];
 
-    // Check for suitable items
+    // Check for suitable items (more weight for suitable items)
     const suitableCount = detectedItems.filter((item) =>
       suitableItems.includes(item),
     ).length;
-    score += suitableCount * 10;
+    score += suitableCount * 12; // Increased from 10 to 12
 
-    // Check for unsuitable items
+    // Check for unsuitable items (more penalty for unsuitable items)
     const unsuitableCount = detectedItems.filter((item) =>
       unsuitableItems.includes(item),
     ).length;
-    score -= unsuitableCount * 15;
+    score -= unsuitableCount * 18; // Increased from 15 to 18
 
     // Generate feedback
     if (suitableCount > 0) {
