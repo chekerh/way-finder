@@ -88,31 +88,44 @@ export class OnboardingAIService {
     const systemPrompt = `You are an expert travel consultant helping a new user set up their WayFinder travel app preferences. 
 You have ONLY 5 questions total to understand the user's complete travel profile. Each question must be strategic and extract maximum value.
 
-CRITICAL STRATEGY - Question Priority Order:
+CRITICAL STRATEGY - Question Priority Order (NEVER ask about budget directly):
 1. First question: Travel style/personality (solo, couple, family, group) OR primary travel motivation (adventure, relaxation, culture, business)
-2. Second question: Budget range OR preferred destinations/regions
-3. Third question: Activities/interests (multiple choice to capture many preferences at once)
-4. Fourth question: Travel frequency/timing OR accommodation preferences
-5. Fifth question: Climate preference OR trip duration OR group size
+2. Second question: Preferred destinations/regions OR activities/interests (multiple choice to capture many preferences at once)
+3. Third question: Activities/interests OR destination preferences (whichever wasn't asked in Q2) - use multiple_choice to gather maximum data
+4. Fourth question: Travel frequency/timing OR accommodation preferences OR climate preference
+5. Fifth question: Trip duration OR group size OR travel timing (fill remaining gaps)
+
+SMART BUDGET INFERENCE - DO NOT ASK ABOUT BUDGET DIRECTLY:
+- Budget can be INFERRED from activities and destinations the user selects
+- Luxury activities (spa, fine dining, private tours) = high budget
+- Adventure activities (hiking, camping, backpacking) = mid to low budget
+- Popular expensive destinations (Paris, Tokyo, Dubai) = mid to high budget
+- Budget destinations (Southeast Asia, Eastern Europe) = low to mid budget
+- Family travel often indicates mid-range budget
+- Solo travel can vary but often mid-range
+- Business travel = high budget
+- The system will automatically infer budget from these selections, so NEVER waste a question asking about budget directly
 
 GUIDELINES FOR MAXIMUM VALUE:
 - Each question should reveal MULTIPLE insights about the user
-- Use multiple_choice when possible to gather more data per question
-- Make questions comprehensive but not overwhelming (4-6 options max for multiple choice)
-- Ask questions that help predict: destinations they'll love, activities they'll enjoy, budget they'll need, when they'll travel
+- Use multiple_choice when possible to gather more data per question (preferred for activities, interests, destinations)
+- Make questions comprehensive but not overwhelming (4-8 options for multiple_choice, 4-6 for single_choice)
+- Ask questions that help predict: destinations they'll love, activities they'll enjoy, when they'll travel, who they travel with
 - Build on previous answers to create a cohesive profile
 - Make questions conversational, engaging, and easy to answer
-- Each answer should help us understand: WHERE they want to go, WHAT they want to do, WHEN they travel, HOW MUCH they spend, WHO they travel with
+- Each answer should help us understand: WHERE they want to go, WHAT they want to do, WHEN they travel, WHO they travel with
+- Budget will be automatically inferred from their activity and destination choices
 
 QUESTION QUALITY REQUIREMENTS:
 - Questions must be specific enough to generate actionable recommendations
 - Options should cover the full spectrum of possibilities
 - Use clear, concise language (max 20 words for question text)
 - Make sure each question adds unique value not covered by previous questions
+- Prioritize questions that reveal multiple preferences at once (e.g., "What activities interest you?" reveals both interests AND budget level)
 
 Question types you can use:
-- single_choice: For mutually exclusive options (e.g., travel style, budget tier)
-- multiple_choice: For gathering multiple preferences at once (e.g., activities, interests, regions) - PREFERRED when possible
+- single_choice: For mutually exclusive options (e.g., travel style, accommodation type)
+- multiple_choice: For gathering multiple preferences at once (e.g., activities, interests, regions, destinations) - STRONGLY PREFERRED
 - text: Only for truly open-ended questions (use sparingly, max 1 text question)
 
 Return a JSON object with this structure:
@@ -255,24 +268,8 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
       };
     }
 
-    // Question 2: Budget range
-    if (!answeredIds.includes('budget')) {
-      return {
-        id: 'budget',
-        type: 'single_choice',
-        text: 'What is your typical travel budget per person?',
-        options: [
-          { value: 'low', label: 'Budget ($500-$1,500)' },
-          { value: 'mid_range', label: 'Mid-range ($1,500-$3,500)' },
-          { value: 'high', label: 'High-end ($3,500-$7,000)' },
-          { value: 'luxury', label: 'Luxury ($7,000+)' },
-        ],
-        required: true,
-        priority: 2,
-      };
-    }
-
-    // Question 3: Activities & Interests (multiple choice to gather maximum data)
+    // Question 2: Activities & Interests (multiple choice to gather maximum data)
+    // This helps infer budget - luxury activities = high budget, budget activities = low budget
     if (!answeredIds.includes('interests')) {
       return {
         id: 'interests',
@@ -289,15 +286,18 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
           { value: 'shopping', label: 'Shopping' },
           { value: 'beaches', label: 'Beaches & Water Activities' },
           { value: 'mountains', label: 'Mountains & Hiking' },
+          { value: 'backpacking', label: 'Backpacking & Budget Travel' },
+          { value: 'luxury', label: 'Luxury Experiences & Fine Dining' },
         ],
         required: true,
-        priority: 3,
-        min_selections: 2,
+        priority: 2,
+        min_selections: 1,
         max_selections: 6, // Allow more selections to gather comprehensive data
       };
     }
 
-    // Question 4: Destination preferences (multiple choice for regions)
+    // Question 3: Destination preferences (multiple choice for regions)
+    // This also helps infer budget - expensive destinations = high budget, budget destinations = low budget
     if (!answeredIds.includes('destination_preferences')) {
       return {
         id: 'destination_preferences',
@@ -315,13 +315,13 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
           { value: 'rural', label: 'Countryside & Nature' },
         ],
         required: true,
-        priority: 4,
+        priority: 3,
         min_selections: 1,
         max_selections: 5,
       };
     }
 
-    // Question 5: Travel frequency or accommodation preference
+    // Question 4: Travel frequency or accommodation preference
     if (
       !answeredIds.includes('travel_frequency') &&
       !answeredIds.includes('accommodation_preference')
@@ -339,6 +339,26 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
             value: 'very_frequently',
             label: 'Very Frequently (7+ times a year)',
           },
+        ],
+        required: true,
+        priority: 4,
+      };
+    }
+
+    // Question 5: Climate preference or trip duration (final question)
+    if (
+      !answeredIds.includes('climate_preference') &&
+      !answeredIds.includes('duration_preference')
+    ) {
+      return {
+        id: 'climate_preference',
+        type: 'single_choice',
+        text: 'What climate do you prefer for travel?',
+        options: [
+          { value: 'tropical', label: 'Tropical & Warm' },
+          { value: 'temperate', label: 'Temperate & Mild' },
+          { value: 'cold', label: 'Cold & Snowy' },
+          { value: 'any', label: 'Any Climate' },
         ],
         required: true,
         priority: 5,
@@ -496,9 +516,18 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     if (answers.travel_type) {
       preferences.travel_type = answers.travel_type;
     }
+    
+    // Smart budget inference - infer from activities and destinations if not explicitly provided
     if (answers.budget) {
       preferences.budget = answers.budget;
+    } else {
+      const inferredBudget = this.inferBudgetFromPreferences(answers);
+      if (inferredBudget) {
+        preferences.budget = inferredBudget;
+        this.logger.log(`Inferred budget: ${inferredBudget} from user preferences`);
+      }
     }
+    
     if (answers.interests) {
       preferences.interests = Array.isArray(answers.interests)
         ? answers.interests
@@ -506,5 +535,73 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     }
 
     return preferences;
+  }
+
+  /**
+   * Infers budget level from user's activity and destination preferences
+   * This allows us to avoid asking about budget directly
+   */
+  private inferBudgetFromPreferences(answers: Record<string, any>): string | null {
+    const activities = Array.isArray(answers.interests) 
+      ? answers.interests 
+      : answers.interests ? [answers.interests] : [];
+    
+    const destinations = Array.isArray(answers.destination_preferences)
+      ? answers.destination_preferences
+      : answers.destination_preferences ? [answers.destination_preferences] : [];
+    
+    const travelType = answers.travel_type;
+
+    // Luxury indicators (high budget)
+    const luxuryActivities = [
+      'spa', 'relaxation', 'fine_dining', 'luxury', 'shopping', 
+      'private_tours', 'cruise', 'resort', 'beach_resort'
+    ];
+    const luxuryDestinations = [
+      'dubai', 'monaco', 'switzerland', 'paris', 'tokyo', 'singapore',
+      'maldives', 'seychelles', 'bora_bora', 'saint_tropez', 'monte_carlo'
+    ];
+
+    // Budget indicators (low budget)
+    const budgetActivities = [
+      'backpacking', 'camping', 'hostel', 'hiking', 'budget_travel',
+      'street_food', 'local_experiences', 'public_transport'
+    ];
+    const budgetDestinations = [
+      'southeast_asia', 'eastern_europe', 'central_america', 'india',
+      'nepal', 'vietnam', 'thailand', 'cambodia', 'laos', 'myanmar'
+    ];
+
+    // Check for luxury indicators
+    const hasLuxuryActivity = activities.some(a => 
+      luxuryActivities.some(la => String(a).toLowerCase().includes(la))
+    );
+    const hasLuxuryDestination = destinations.some(d =>
+      luxuryDestinations.some(ld => String(d).toLowerCase().includes(ld))
+    );
+    const isBusinessTravel = travelType === 'business';
+
+    // Check for budget indicators
+    const hasBudgetActivity = activities.some(a =>
+      budgetActivities.some(ba => String(a).toLowerCase().includes(ba))
+    );
+    const hasBudgetDestination = destinations.some(d =>
+      budgetDestinations.some(bd => String(d).toLowerCase().includes(bd))
+    );
+
+    // Infer budget level
+    if (hasLuxuryActivity || hasLuxuryDestination || isBusinessTravel) {
+      return 'high'; // or 'luxury' if multiple luxury indicators
+    }
+    if (hasBudgetActivity || hasBudgetDestination) {
+      return 'low';
+    }
+    
+    // Default to mid-range if we have some preferences but no clear indicators
+    if (activities.length > 0 || destinations.length > 0) {
+      return 'mid_range';
+    }
+
+    return null; // Can't infer without enough data
   }
 }

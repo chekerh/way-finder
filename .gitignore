@@ -75,23 +75,13 @@ docker_data/
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# Documentation files that shouldn't be in git
-CURSOR_BACKEND_MASTER_PROMPT.md
-ANDROID_MASTER_PROMPT.md
-FIX_*.md
-*_SETUP.md
-*_GUIDE.md
-*_CHECKLIST.md
-*_SUMMARY.md
-*_COMPLETE.md
-*_MIGRATION.md
-QUICK_*.md
-NEXT_STEPS_*.md
-INSTALL_*.md
-VERIFY_*.md
-
-# Keep only essential README files
+# Documentation files - ignore ALL .md files except README.md
+*.md
 !README.md
+
+# Also ignore markdown files in subdirectories
+**/*.md
+!**/README.md
 
 # Migration and fix scripts (temporary)
 scripts/fix-*.js
@@ -126,3 +116,43 @@ coverage/
 *.swp
 *.swo
 *~
+
+# Additional unnecessary files
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.cache
+.cache/
+
+# Progress and analysis files
+*_progress.md
+*_ANALYSIS.md
+*_ANALYSIS.txt
+*_progress.txt
+
+# Agent-generated documentation
+ANDROID_*.md
+IOS_*.md
+*_UPDATE.md
+*_IMPROVEMENTS.md
+*_FIXES.md
+*_INTEGRATION.md
+*_TOKEN_*.md
+*_SETUP_*.md
+*_GUIDE_*.md
+*_CHECKLIST_*.md
+*_VERIFICATION_*.md
+*_MIGRATION_*.md
+*_COMPLETE_*.md
+*_SUMMARY_*.md
+*_STEPS_*.md
+*_INSTALL_*.md
+*_QUICK_*.md
+*_HOW_TO_*.md
+*_FIX_*.md
+*_SOLUTION_*.md
+*_VERIFY_*.md
+*_PROGRESS.md
+*_PROGRESS.txt
