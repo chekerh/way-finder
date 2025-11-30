@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UserFollow, UserFollowSchema } from './social.schema';
 import { SharedTrip, SharedTripSchema } from './social.schema';
+import { Journey, JourneySchema } from '../journey/journey.schema';
 import { SocialService } from './social.service';
 import { SocialController } from './social.controller';
 import { JourneyModule } from '../journey/journey.module';
@@ -11,6 +12,7 @@ import { JourneyModule } from '../journey/journey.module';
     MongooseModule.forFeature([
       { name: UserFollow.name, schema: UserFollowSchema },
       { name: SharedTrip.name, schema: SharedTripSchema },
+      { name: Journey.name, schema: JourneySchema },
     ]),
     JourneyModule, // Import JourneyModule to access ImgBBService
   ],

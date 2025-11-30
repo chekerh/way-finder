@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserFollow, UserFollowDocument } from './social.schema';
 import { SharedTrip, SharedTripDocument } from './social.schema';
+import { Journey, JourneyDocument } from '../journey/journey.schema';
 import { FollowUserDto, ShareTripDto, UpdateSharedTripDto } from './social.dto';
 
 @Injectable()
@@ -17,6 +18,8 @@ export class SocialService {
     private readonly userFollowModel: Model<UserFollowDocument>,
     @InjectModel(SharedTrip.name)
     private readonly sharedTripModel: Model<SharedTripDocument>,
+    @InjectModel(Journey.name)
+    private readonly journeyModel: Model<JourneyDocument>,
   ) {}
 
   // ========== FOLLOW/UNFOLLOW ==========
@@ -290,12 +293,97 @@ export class SocialService {
   }
 
   async getMapMemories(userId: string): Promise<any> {
+    const publicBaseUrl = (
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
+
     // Get all shared trips for the user
-    const trips = await this.sharedTripModel
+    const sharedTripsRaw = await this.sharedTripModel
       .find({ userId, isVisible: true })
       .populate('userId', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
+
+    // Format shared trips with full image URLs
+    const sharedTrips = sharedTripsRaw.map((trip: any) => {
+      const tripObj = trip.toObject ? trip.toObject() : trip;
+      return {
+        ...tripObj,
+        images: (tripObj.images || []).map((url: string) => {
+          return url.startsWith('http') 
+            ? url 
+            : `${publicBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+        }),
+      };
+    });
+
+    // Get all journeys for the user (these are the shared journeys)
+    const journeys = await this.journeyModel
+      .find({ user_id: userId, is_visible: true })
+      .populate('user_id', 'username first_name last_name profile_image_url')
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // Convert journeys to shared trip format for processing
+    const publicBaseUrl = (
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
+
+    const journeyAsTrips = journeys.map((journey: any) => {
+      const journeyObj = journey.toObject ? journey.toObject() : journey;
+      // Get images from slides or image_urls and ensure full URLs
+      let images: string[] = [];
+      if (journeyObj.slides && journeyObj.slides.length > 0) {
+        images = journeyObj.slides.map((slide: any) => {
+          const imageUrl = slide.imageUrl || slide.image_url || '';
+          return imageUrl.startsWith('http') 
+            ? imageUrl 
+            : `${publicBaseUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        });
+      } else if (journeyObj.image_urls && journeyObj.image_urls.length > 0) {
+        images = journeyObj.image_urls.map((url: string) => {
+          return url.startsWith('http') 
+            ? url 
+            : `${publicBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+        });
+      }
+      
+      // Get user info from populated user_id
+      const userIdObj = journeyObj.user_id && typeof journeyObj.user_id === 'object'
+        ? journeyObj.user_id
+        : { _id: journeyObj.user_id, username: '', first_name: '', last_name: '', profile_image_url: '' };
+      
+      return {
+        _id: journeyObj._id,
+        userId: userIdObj,
+        title: journeyObj.destination || journeyObj.caption_text || 'My Journey',
+        description: journeyObj.description || journeyObj.caption_text || null,
+        tripType: 'custom',
+        tripId: journeyObj.booking_id ? journeyObj.booking_id.toString() : null,
+        images: images,
+        tags: journeyObj.tags || [],
+        destination: journeyObj.destination, // Add destination field directly for easier detection
+        metadata: {
+          ...journeyObj.metadata,
+          destination: journeyObj.destination,
+          country: journeyObj.metadata?.country || null,
+        },
+        likesCount: journeyObj.likes_count || 0,
+        commentsCount: journeyObj.comments_count || 0,
+        sharesCount: 0,
+        isPublic: journeyObj.is_public !== false,
+        isVisible: journeyObj.is_visible !== false,
+        createdAt: journeyObj.createdAt ? new Date(journeyObj.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: journeyObj.updatedAt ? new Date(journeyObj.updatedAt).toISOString() : new Date().toISOString(),
+      };
+    });
+
+    // Combine shared trips and journeys
+    const trips = [...sharedTrips, ...journeyAsTrips];
 
     // City to Country mapping (popular cities)
     const cityToCountry: Record<string, string> = {
@@ -426,19 +514,23 @@ export class SocialService {
       if (tripObj.metadata?.country) {
         country = tripObj.metadata.country;
       }
-      // 2. Check metadata.destination
+      // 2. Check destination field directly (for Journey objects)
+      else if (tripObj.destination) {
+        country = extractCountryFromText(tripObj.destination);
+      }
+      // 3. Check metadata.destination
       else if (tripObj.metadata?.destination) {
         country = extractCountryFromText(tripObj.metadata.destination);
       }
-      // 3. Check title
+      // 4. Check title
       else if (tripObj.title) {
         country = extractCountryFromText(tripObj.title);
       }
-      // 4. Check description
+      // 5. Check description
       else if (tripObj.description) {
         country = extractCountryFromText(tripObj.description);
       }
-      // 5. Check tags
+      // 6. Check tags
       else if (tripObj.tags && tripObj.tags.length > 0) {
         for (const tag of tripObj.tags) {
           country = extractCountryFromText(tag);
