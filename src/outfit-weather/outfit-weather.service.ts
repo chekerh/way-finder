@@ -106,8 +106,8 @@ export class OutfitWeatherService {
 
     // Create outfit record
     const outfit = new this.outfitModel({
-      user_id: new Types.ObjectId(userId),
-      booking_id: new Types.ObjectId(bookingId),
+      user_id: this.toObjectId(userId, 'user id'),
+      booking_id: this.toObjectId(bookingId, 'booking id'),
       image_url: imageUrl,
       detected_items: detectedItems,
       weather_data: {
@@ -139,8 +139,8 @@ export class OutfitWeatherService {
   ): Promise<OutfitDocument[]> {
     return this.outfitModel
       .find({
-        user_id: new Types.ObjectId(userId),
-        booking_id: new Types.ObjectId(bookingId),
+        user_id: this.toObjectId(userId, 'user id'),
+        booking_id: this.toObjectId(bookingId, 'booking id'),
       })
       .sort({ createdAt: -1 })
       .exec();
@@ -155,8 +155,8 @@ export class OutfitWeatherService {
   ): Promise<OutfitDocument> {
     const outfit = await this.outfitModel
       .findOne({
-        _id: new Types.ObjectId(outfitId),
-        user_id: new Types.ObjectId(userId),
+        _id: this.toObjectId(outfitId, 'outfit id'),
+        user_id: this.toObjectId(userId, 'user id'),
       })
       .exec();
 
@@ -188,14 +188,24 @@ export class OutfitWeatherService {
   ): Promise<void> {
     const result = await this.outfitModel
       .deleteOne({
-        _id: new Types.ObjectId(outfitId),
-        user_id: new Types.ObjectId(userId),
+        _id: this.toObjectId(outfitId, 'outfit id'),
+        user_id: this.toObjectId(userId, 'user id'),
       })
       .exec();
 
     if (result.deletedCount === 0) {
       throw new NotFoundException('Outfit not found');
     }
+  }
+
+  /**
+   * Helper method to convert string to ObjectId with validation
+   */
+  private toObjectId(id: string, label: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(`Invalid ${label} provided`);
+    }
+    return new Types.ObjectId(id);
   }
 }
 
