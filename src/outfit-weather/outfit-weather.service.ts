@@ -12,6 +12,7 @@ import { WeatherService } from './weather.service';
 import { ImageAnalysisService } from './image-analysis.service';
 import { BookingService } from '../booking/booking.service';
 import { ImgBBService } from '../journey/imgbb.service';
+import { BookingStatus } from '../common/enums/booking-status.enum';
 
 @Injectable()
 export class OutfitWeatherService {
@@ -68,7 +69,7 @@ export class OutfitWeatherService {
       throw new NotFoundException('Booking not found');
     }
 
-    if (booking.status !== 'CONFIRMED') {
+    if (booking.status !== BookingStatus.CONFIRMED) {
       throw new BadRequestException('Booking must be confirmed to analyze outfit');
     }
 
