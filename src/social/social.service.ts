@@ -325,6 +325,8 @@ export class SocialService {
       .populate('user_id', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
+    
+    console.log(`[getMapMemories] Found ${journeys.length} journeys for user ${userId}`);
 
     // Convert journeys to shared trip format for processing
     const journeyAsTrips = journeys.map((journey: any) => {
@@ -378,11 +380,15 @@ export class SocialService {
 
     // Combine shared trips and journeys
     const trips = [...sharedTrips, ...journeyAsTrips];
+    
+    console.log(`[getMapMemories] Total trips found: ${trips.length} (${sharedTrips.length} shared trips + ${journeyAsTrips.length} journeys)`);
 
     // City to Country mapping (popular cities)
     const cityToCountry: Record<string, string> = {
       // France
       paris: 'France',
+      'paris, france': 'France',
+      'paris france': 'France',
       lyon: 'France',
       marseille: 'France',
       nice: 'France',
@@ -508,52 +514,85 @@ export class SocialService {
     trips.forEach((trip: any) => {
       const tripObj = trip.toObject ? trip.toObject() : trip;
       
+      // Log trip data for debugging
+      console.log(`[getMapMemories] Processing trip:`, {
+        id: tripObj._id,
+        destination: tripObj.destination,
+        title: tripObj.title,
+        description: tripObj.description,
+        metadata: tripObj.metadata,
+        tags: tripObj.tags,
+        images: tripObj.images?.length || 0,
+      });
+      
       // Extract country from multiple sources
       let country: string | null = null;
       
       // 1. Check metadata.country
       if (tripObj.metadata?.country) {
         country = tripObj.metadata.country;
+        console.log(`[getMapMemories] Country found in metadata.country: ${country}`);
       }
       // 2. Check destination field directly (for Journey objects)
       else if (tripObj.destination) {
+        console.log(`[getMapMemories] Checking destination: "${tripObj.destination}"`);
         country = extractCountryFromText(tripObj.destination);
+        if (country) {
+          console.log(`[getMapMemories] Country detected from destination: ${country}`);
+        }
       }
       // 3. Check metadata.destination
       else if (tripObj.metadata?.destination) {
+        console.log(`[getMapMemories] Checking metadata.destination: "${tripObj.metadata.destination}"`);
         country = extractCountryFromText(tripObj.metadata.destination);
+        if (country) {
+          console.log(`[getMapMemories] Country detected from metadata.destination: ${country}`);
+        }
       }
       // 4. Check title
       else if (tripObj.title) {
+        console.log(`[getMapMemories] Checking title: "${tripObj.title}"`);
         country = extractCountryFromText(tripObj.title);
+        if (country) {
+          console.log(`[getMapMemories] Country detected from title: ${country}`);
+        }
       }
       // 5. Check description
       else if (tripObj.description) {
+        console.log(`[getMapMemories] Checking description: "${tripObj.description}"`);
         country = extractCountryFromText(tripObj.description);
+        if (country) {
+          console.log(`[getMapMemories] Country detected from description: ${country}`);
+        }
       }
       // 6. Check tags
       else if (tripObj.tags && tripObj.tags.length > 0) {
+        console.log(`[getMapMemories] Checking tags:`, tripObj.tags);
         for (const tag of tripObj.tags) {
           country = extractCountryFromText(tag);
-          if (country) break;
+          if (country) {
+            console.log(`[getMapMemories] Country detected from tag "${tag}": ${country}`);
+            break;
+          }
         }
       }
 
       // If no country found, skip this trip
       if (!country) {
         // Log for debugging
-        console.log(`[getMapMemories] No country found for trip:`, {
+        console.warn(`[getMapMemories] ⚠️ No country found for trip:`, {
           id: tripObj._id,
           destination: tripObj.destination,
           title: tripObj.title,
           description: tripObj.description,
           metadata: tripObj.metadata,
+          tags: tripObj.tags,
         });
         return;
       }
       
       // Log successful country detection for debugging
-      console.log(`[getMapMemories] Country detected: ${country} for trip:`, {
+      console.log(`[getMapMemories] ✅ Country detected: ${country} for trip:`, {
         id: tripObj._id,
         destination: tripObj.destination || tripObj.title,
       });
