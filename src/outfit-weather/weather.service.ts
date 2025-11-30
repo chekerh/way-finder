@@ -30,16 +30,23 @@ export class WeatherService {
 
     try {
       const targetDate = date || new Date();
-      const timestamp = Math.floor(targetDate.getTime() / 1000);
+      
+      // Extract city name from "City, Country" format for better API matching
+      const cityOnly = cityName.split(',')[0].trim();
+      console.log(`Fetching weather for: ${cityName} (using city: ${cityOnly})`);
 
       // Get current weather (for immediate trips)
-      const currentWeatherUrl = `${this.baseUrl}/weather?q=${encodeURIComponent(cityName)}&appid=${this.apiKey}&units=metric&lang=fr`;
+      const currentWeatherUrl = `${this.baseUrl}/weather?q=${encodeURIComponent(cityOnly)}&appid=${this.apiKey}&units=metric&lang=fr`;
       
       const response = await firstValueFrom(
         this.httpService.get<any>(currentWeatherUrl),
       );
 
       const weather = response.data;
+      console.log(`Weather API response for ${cityOnly}:`, {
+        temp: weather.main.temp,
+        condition: weather.weather[0].main,
+      });
       
       return {
         temperature: Math.round(weather.main.temp),
@@ -51,8 +58,9 @@ export class WeatherService {
         city: weather.name,
         country: weather.sys.country,
       };
-    } catch (error) {
-      console.error('Error fetching weather:', error);
+    } catch (error: any) {
+      console.error('Error fetching weather from API:', error.response?.data || error.message);
+      console.log('Falling back to mock data');
       // Return mock data on error
       return this.getMockWeatherData(cityName);
     }
@@ -138,16 +146,24 @@ export class WeatherService {
    */
   private getMockWeatherData(cityName: string): any {
     // Simple mock based on city name
+    // Extract city name from "City, Country" format
+    const cityOnly = cityName.split(',')[0].trim().toLowerCase();
+    
     const mockData: Record<string, any> = {
       paris: { temperature: 15, condition: 'cloudy', humidity: 70, wind_speed: 10 },
       london: { temperature: 12, condition: 'rainy', humidity: 80, wind_speed: 15 },
       dubai: { temperature: 35, condition: 'sunny', humidity: 50, wind_speed: 5 },
+      'new york': { temperature: 20, condition: 'sunny', humidity: 60, wind_speed: 12 },
       newyork: { temperature: 20, condition: 'sunny', humidity: 60, wind_speed: 12 },
       tokyo: { temperature: 18, condition: 'cloudy', humidity: 65, wind_speed: 8 },
+      seoul: { temperature: 10, condition: 'cold', humidity: 60, wind_speed: 8 },
     };
 
-    const cityKey = cityName.toLowerCase().replace(/\s+/g, '');
-    const data = mockData[cityKey] || { temperature: 20, condition: 'moderate', humidity: 60, wind_speed: 10 };
+    // Try exact match first, then try without spaces
+    const cityKey = cityOnly.replace(/\s+/g, '');
+    const data = mockData[cityOnly] || mockData[cityKey] || { temperature: 20, condition: 'moderate', humidity: 60, wind_speed: 10 };
+
+    console.log(`Using mock weather data for ${cityName} (normalized: ${cityOnly}):`, data);
 
     return {
       ...data,
