@@ -75,6 +75,7 @@ export class OutfitWeatherController {
         dto.booking_id,
         imageUrl,
         file, // Pass file for better OpenAI API compatibility
+        dto.outfit_date, // Pass outfit date if provided
       );
     } finally {
       // Clean up local file after analysis
@@ -114,6 +115,19 @@ export class OutfitWeatherController {
     return this.outfitWeatherService.getOutfitsForBooking(
       req.user.sub,
       bookingId,
+    );
+  }
+
+  @Get('booking/:bookingId/date/:date')
+  async getOutfitByDate(
+    @Request() req,
+    @Param('bookingId') bookingId: string,
+    @Param('date') date: string, // Format: YYYY-MM-DD
+  ) {
+    return this.outfitWeatherService.getOutfitByDate(
+      req.user.sub,
+      bookingId,
+      date,
     );
   }
 

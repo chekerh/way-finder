@@ -57,6 +57,7 @@ export class OutfitWeatherService {
     bookingId: string,
     imageUrl: string,
     imageFile?: Express.Multer.File,
+    outfitDate?: string, // Optional date in format YYYY-MM-DD
   ): Promise<OutfitDocument> {
     // Get booking details
     const booking = await this.bookingService.findOne(userId, bookingId);
@@ -107,7 +108,7 @@ export class OutfitWeatherService {
 
     // Create outfit record
     console.log('Creating outfit record with detected_items:', detectedItems);
-    const outfit = new this.outfitModel({
+    const outfitData: any = {
       user_id: this.toObjectId(userId, 'user id') as any,
       booking_id: this.toObjectId(bookingId, 'booking id') as any,
       image_url: imageUrl,
@@ -127,7 +128,15 @@ export class OutfitWeatherService {
           ...recommendations.suggestions,
         ],
       },
-    });
+    };
+
+    // Add outfit_date if provided
+    if (outfitDate) {
+      outfitData.outfit_date = new Date(outfitDate);
+      console.log('Outfit date set to:', outfitData.outfit_date);
+    }
+
+    const outfit = new this.outfitModel(outfitData);
 
     const savedOutfit = await outfit.save();
     console.log('Saved outfit detected_items:', savedOutfit.detected_items);
@@ -149,6 +158,35 @@ export class OutfitWeatherService {
       })
       .sort({ createdAt: -1 })
       .exec();
+  }
+
+  /**
+   * Get outfit by date for a booking
+   */
+  async getOutfitByDate(
+    userId: string,
+    bookingId: string,
+    date: string, // Format: YYYY-MM-DD
+  ): Promise<OutfitDocument | null> {
+    const outfitDate = new Date(date);
+    // Set time to start of day for comparison
+    outfitDate.setHours(0, 0, 0, 0);
+    const nextDay = new Date(outfitDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const outfit = await this.outfitModel
+      .findOne({
+        user_id: this.toObjectId(userId, 'user id') as any,
+        booking_id: this.toObjectId(bookingId, 'booking id') as any,
+        outfit_date: {
+          $gte: outfitDate,
+          $lt: nextDay,
+        },
+      })
+      .sort({ createdAt: -1 }) // Get most recent if multiple
+      .exec();
+
+    return outfit;
   }
 
   /**
