@@ -52,9 +52,9 @@ export class ImageAnalysisService {
         console.log('Image URL:', imageUrl);
         console.log('Has image file buffer:', !!imageFile);
         
-        // Add timeout wrapper (20 seconds max for OpenAI - fail fast to use fallback)
+        // Add timeout wrapper (10 seconds max for OpenAI - fail fast to use fallback)
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('OpenAI API timeout after 20 seconds')), 20000);
+          setTimeout(() => reject(new Error('OpenAI API timeout after 10 seconds')), 10000);
         });
         
         // Prefer base64 if file is available (more reliable)
@@ -230,17 +230,18 @@ export class ImageAnalysisService {
   /**
    * Fallback analysis using basic image metadata or simple heuristics
    * Returns varied items based on image URL hash to simulate different detections
+   * This is FAST and should return immediately
    */
   private async analyzeWithFallback(imageUrl: string): Promise<string[]> {
-    // This is a simplified fallback
+    // This is a simplified fallback - returns immediately without any API calls
     // In a real implementation, you might:
     // 1. Use Google Vision API
     // 2. Use a local ML model
     // 3. Ask the user to tag items manually
 
     // For now, return varied items based on image URL hash to simulate different detections
-    // Return in French to match the app language
-    console.warn('⚠️ Using fallback detection - configure OPENAI_API_KEY for accurate analysis');
+    // Return in English to match weather recommendations
+    console.warn('⚠️ Using fast fallback detection - configure OPENAI_API_KEY for accurate analysis');
     
     // Generate hash from image URL for consistent but varied results
     let hash = 0;
