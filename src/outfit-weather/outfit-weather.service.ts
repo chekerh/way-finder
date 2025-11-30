@@ -134,6 +134,29 @@ export class OutfitWeatherService {
     if (outfitDate) {
       outfitData.outfit_date = new Date(outfitDate);
       console.log('Outfit date set to:', outfitData.outfit_date);
+      
+      // If a date is provided, check if there's already an outfit for this date
+      // and remove it to replace with the new one
+      const outfitDateObj = new Date(outfitDate);
+      outfitDateObj.setHours(0, 0, 0, 0);
+      const nextDay = new Date(outfitDateObj);
+      nextDay.setDate(nextDay.getDate() + 1);
+      
+      const existingOutfit = await this.outfitModel
+        .findOne({
+          user_id: this.toObjectId(userId, 'user id') as any,
+          booking_id: this.toObjectId(bookingId, 'booking id') as any,
+          outfit_date: {
+            $gte: outfitDateObj,
+            $lt: nextDay,
+          },
+        })
+        .exec();
+      
+      if (existingOutfit) {
+        console.log('Removing existing outfit for date:', outfitDate, 'ID:', existingOutfit._id);
+        await this.outfitModel.deleteOne({ _id: existingOutfit._id }).exec();
+      }
     }
 
     const outfit = new this.outfitModel(outfitData);
@@ -219,6 +242,32 @@ export class OutfitWeatherService {
   ): Promise<OutfitDocument> {
     const outfit = await this.getOutfit(userId, outfitId);
     outfit.is_approved = true;
+    
+    // If outfit has a date, mark it as the validated outfit for that date
+    // This ensures only one validated outfit per date
+    if (outfit.outfit_date) {
+      const outfitDate = new Date(outfit.outfit_date);
+      outfitDate.setHours(0, 0, 0, 0);
+      const nextDay = new Date(outfitDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      
+      // Unapprove other outfits for the same date
+      await this.outfitModel
+        .updateMany(
+          {
+            user_id: this.toObjectId(userId, 'user id') as any,
+            booking_id: outfit.booking_id,
+            outfit_date: {
+              $gte: outfitDate,
+              $lt: nextDay,
+            },
+            _id: { $ne: outfit._id },
+          },
+          { $set: { is_approved: false } }
+        )
+        .exec();
+    }
+    
     return outfit.save();
   }
 
