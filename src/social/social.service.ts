@@ -337,7 +337,6 @@ export class SocialService {
       munich: 'Germany',
       hamburg: 'Germany',
       // Other
-      dubai: 'United Arab Emirates',
       istanbul: 'Turkey',
       tokyo: 'Japan',
       bangkok: 'Thailand',
