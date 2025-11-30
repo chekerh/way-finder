@@ -23,19 +23,40 @@ export class ImageAnalysisService {
    * @returns Array of detected clothing items
    */
   async analyzeOutfit(imageUrl: string): Promise<string[]> {
+    // Check if API key is properly configured
+    const hasValidApiKey = this.apiKey && 
+                           this.apiKey.trim().length > 0 && 
+                           this.apiKey !== 'your_openai_api_key_here' &&
+                           !this.apiKey.startsWith('sk-') === false || this.apiKey.startsWith('sk-');
+    
+    console.log('OpenAI API key check:', {
+      hasKey: !!this.apiKey,
+      keyLength: this.apiKey?.length || 0,
+      keyPrefix: this.apiKey?.substring(0, 5) || 'none',
+      hasValidApiKey,
+    });
+
     // Option 1: Use OpenAI Vision API (if available)
-    if (this.apiKey && this.apiKey !== 'your_openai_api_key_here') {
+    if (hasValidApiKey) {
       try {
         console.log('Using OpenAI Vision API for image analysis');
+        console.log('Image URL:', imageUrl);
         const result = await this.analyzeWithOpenAI(imageUrl);
         console.log('OpenAI analysis result:', result);
         return result;
-      } catch (error) {
+      } catch (error: any) {
         console.error('OpenAI analysis failed, using fallback:', error);
-        console.error('Error details:', error.response?.data || error.message);
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+        });
+        // Continue to fallback
       }
     } else {
-      console.warn('OpenAI API key not configured, using fallback analysis');
+      console.warn('OpenAI API key not configured or invalid, using fallback analysis');
+      console.warn('To enable AI analysis, configure OPENAI_API_KEY environment variable');
     }
 
     // Option 2: Use Google Vision API (alternative)
@@ -106,15 +127,17 @@ export class ImageAnalysisService {
     // 3. Ask the user to tag items manually
 
     // For now, return a generic set that the user can verify
+    // Return in French to match the app language
+    console.warn('⚠️ Using fallback detection - configure OPENAI_API_KEY for accurate analysis');
     return [
       't-shirt',
-      'jeans',
-      'sneakers',
+      'jean',
+      'baskets',
     ];
   }
 
   /**
-   * Parse clothing items from text response
+   * Parse clothing items from text response and translate to French
    */
   private parseClothingItems(text: string): string[] {
     // Clean and parse the response
@@ -124,7 +147,7 @@ export class ImageAnalysisService {
       .map((item) => item.trim())
       .filter((item) => item.length > 0)
       .map((item) => {
-        // Normalize item names
+        // Normalize item names to English first
         const normalized: Record<string, string> = {
           't-shirt': 't-shirt',
           'tshirt': 't-shirt',
@@ -154,7 +177,27 @@ export class ImageAnalysisService {
           'purse': 'handbag',
         };
 
-        return normalized[item] || item;
+        const englishName = normalized[item] || item;
+        
+        // Translate to French
+        const frenchTranslations: Record<string, string> = {
+          't-shirt': 't-shirt',
+          'shirt': 'chemise',
+          'pants': 'pantalon',
+          'jeans': 'jean',
+          'shorts': 'short',
+          'jacket': 'veste',
+          'coat': 'manteau',
+          'sweater': 'pull',
+          'sneakers': 'baskets',
+          'boots': 'bottes',
+          'sandals': 'sandales',
+          'dress': 'robe',
+          'skirt': 'jupe',
+          'handbag': 'sac à main',
+        };
+
+        return frenchTranslations[englishName] || englishName;
       });
 
     return [...new Set(items)]; // Remove duplicates
