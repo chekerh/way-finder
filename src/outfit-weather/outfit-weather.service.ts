@@ -106,8 +106,8 @@ export class OutfitWeatherService {
 
     // Create outfit record
     const outfit = new this.outfitModel({
-      user_id: this.toObjectId(userId, 'user id'),
-      booking_id: this.toObjectId(bookingId, 'booking id'),
+      user_id: this.toObjectId(userId, 'user id') as any,
+      booking_id: this.toObjectId(bookingId, 'booking id') as any,
       image_url: imageUrl,
       detected_items: detectedItems,
       weather_data: {

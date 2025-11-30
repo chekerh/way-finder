@@ -289,8 +289,8 @@ export class JourneyService {
     });
 
     const journey = new this.journeyModel({
-      user_id: this.toObjectId(userId, 'user id'),
-      booking_id: this.toObjectId(bookingId, 'booking id'), // Now always required
+      user_id: this.toObjectId(userId, 'user id') as any,
+      booking_id: this.toObjectId(bookingId, 'booking id') as any, // Now always required
       destination,
       image_urls: imageUrls,
       slides,
@@ -661,7 +661,7 @@ export class JourneyService {
 
     await this.journeyLikeModel.create({
       journey_id: journey._id,
-      user_id: this.toObjectId(userId, 'user id'),
+      user_id: this.toObjectId(userId, 'user id') as any,
     });
 
     // Send notification to journey owner if it's not the same user
@@ -718,10 +718,10 @@ export class JourneyService {
 
     const comment = new this.journeyCommentModel({
       journey_id: journey._id,
-      user_id: this.toObjectId(userId, 'user id'),
+      user_id: this.toObjectId(userId, 'user id') as any,
       content: dto.content,
       parent_comment_id: dto.parent_comment_id
-        ? this.toObjectId(dto.parent_comment_id, 'parent comment id')
+        ? (this.toObjectId(dto.parent_comment_id, 'parent comment id') as any)
         : undefined,
     });
 
