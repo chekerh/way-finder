@@ -327,12 +327,6 @@ export class SocialService {
       .exec();
 
     // Convert journeys to shared trip format for processing
-    const publicBaseUrl = (
-      process.env.PUBLIC_BASE_URL ||
-      process.env.BASE_URL ||
-      'http://localhost:3000'
-    ).replace(/\/$/, '');
-
     const journeyAsTrips = journeys.map((journey: any) => {
       const journeyObj = journey.toObject ? journey.toObject() : journey;
       // Get images from slides or image_urls and ensure full URLs
