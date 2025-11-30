@@ -297,6 +297,53 @@ export class SocialService {
       .sort({ createdAt: -1 })
       .exec();
 
+    // City to Country mapping (popular cities)
+    const cityToCountry: Record<string, string> = {
+      // France
+      paris: 'France',
+      lyon: 'France',
+      marseille: 'France',
+      nice: 'France',
+      // Italy
+      rome: 'Italy',
+      milan: 'Italy',
+      venice: 'Italy',
+      florence: 'Italy',
+      naples: 'Italy',
+      // Spain
+      madrid: 'Spain',
+      barcelona: 'Spain',
+      seville: 'Spain',
+      valencia: 'Spain',
+      // Brazil
+      'rio de janeiro': 'Brazil',
+      'rio': 'Brazil',
+      sao paulo: 'Brazil',
+      brasilia: 'Brazil',
+      salvador: 'Brazil',
+      // United States
+      'new york': 'United States',
+      'los angeles': 'United States',
+      chicago: 'United States',
+      miami: 'United States',
+      // United Kingdom
+      london: 'United Kingdom',
+      manchester: 'United Kingdom',
+      edinburgh: 'United Kingdom',
+      // Germany
+      berlin: 'Germany',
+      munich: 'Germany',
+      hamburg: 'Germany',
+      // Other
+      dubai: 'United Arab Emirates',
+      istanbul: 'Turkey',
+      tokyo: 'Japan',
+      bangkok: 'Thailand',
+      singapore: 'Singapore',
+      sydney: 'Australia',
+      melbourne: 'Australia',
+    };
+
     // Country coordinates mapping (capital city coordinates)
     const countryCoordinates: Record<string, { lat: number; lng: number }> = {
       France: { lat: 48.8566, lng: 2.3522 }, // Paris
@@ -331,6 +378,7 @@ export class SocialService {
       'South Korea': { lat: 37.5665, lng: 126.978 }, // Seoul
       Australia: { lat: -35.2809, lng: 149.13 }, // Canberra
       'New Zealand': { lat: -41.2865, lng: 174.7762 }, // Wellington
+      'United Arab Emirates': { lat: 24.4539, lng: 54.3773 }, // Abu Dhabi
     };
 
     // Group trips by country
@@ -345,33 +393,54 @@ export class SocialService {
       }
     >();
 
+    // Helper function to extract country from text
+    const extractCountryFromText = (text: string): string | null => {
+      if (!text) return null;
+      const lowerText = text.toLowerCase();
+      
+      // First, try to find country name directly
+      for (const [countryName, _] of Object.entries(countryCoordinates)) {
+        if (lowerText.includes(countryName.toLowerCase())) {
+          return countryName;
+        }
+      }
+      
+      // Then, try to find city and map to country
+      for (const [city, country] of Object.entries(cityToCountry)) {
+        if (lowerText.includes(city)) {
+          return country;
+        }
+      }
+      
+      return null;
+    };
+
     trips.forEach((trip: any) => {
       const tripObj = trip.toObject ? trip.toObject() : trip;
       
-      // Extract country from metadata
+      // Extract country from multiple sources
       let country: string | null = null;
       
+      // 1. Check metadata.country
       if (tripObj.metadata?.country) {
         country = tripObj.metadata.country;
-      } else if (tripObj.metadata?.destination) {
-        // Try to extract country from destination string
-        const dest = tripObj.metadata.destination;
-        // Simple matching - could be improved
-        for (const [key, _] of Object.entries(countryCoordinates)) {
-          if (dest.includes(key)) {
-            country = key;
-            break;
-          }
-        }
-      } else if (tripObj.tags && tripObj.tags.length > 0) {
-        // Try to find country in tags
+      }
+      // 2. Check metadata.destination
+      else if (tripObj.metadata?.destination) {
+        country = extractCountryFromText(tripObj.metadata.destination);
+      }
+      // 3. Check title
+      else if (tripObj.title) {
+        country = extractCountryFromText(tripObj.title);
+      }
+      // 4. Check description
+      else if (tripObj.description) {
+        country = extractCountryFromText(tripObj.description);
+      }
+      // 5. Check tags
+      else if (tripObj.tags && tripObj.tags.length > 0) {
         for (const tag of tripObj.tags) {
-          for (const [key, _] of Object.entries(countryCoordinates)) {
-            if (tag.toLowerCase().includes(key.toLowerCase())) {
-              country = key;
-              break;
-            }
-          }
+          country = extractCountryFromText(tag);
           if (country) break;
         }
       }
