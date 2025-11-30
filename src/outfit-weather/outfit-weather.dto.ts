@@ -14,3 +14,8 @@ export class ApproveOutfitDto {
   is_approved?: boolean;
 }
 
+export class UploadOutfitDto {
+  @IsString()
+  booking_id: string;
+}
+

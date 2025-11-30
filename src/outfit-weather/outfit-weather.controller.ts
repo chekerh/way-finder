@@ -14,7 +14,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OutfitWeatherService } from './outfit-weather.service';
-import { AnalyzeOutfitDto, ApproveOutfitDto } from './outfit-weather.dto';
+import { AnalyzeOutfitDto, ApproveOutfitDto, UploadOutfitDto } from './outfit-weather.dto';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 
@@ -53,13 +53,13 @@ export class OutfitWeatherController {
   async uploadOutfitImage(
     @Request() req,
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { booking_id: string },
+    @Body() dto: UploadOutfitDto,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    if (!body.booking_id) {
+    if (!dto.booking_id) {
       throw new BadRequestException('booking_id is required');
     }
 
@@ -69,7 +69,7 @@ export class OutfitWeatherController {
     // Analyze outfit automatically after upload
     const analysis = await this.outfitWeatherService.analyzeOutfit(
       req.user.sub,
-      body.booking_id,
+      dto.booking_id,
       imageUrl,
     );
 
