@@ -10,6 +10,7 @@ import {
 } from './discussion.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UserModule } from '../user/user.module';
+import { RewardsModule } from '../rewards/rewards.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { UserModule } from '../user/user.module';
     ]),
     NotificationsModule,
     UserModule,
+    RewardsModule,
   ],
   controllers: [DiscussionController],
   providers: [DiscussionService],

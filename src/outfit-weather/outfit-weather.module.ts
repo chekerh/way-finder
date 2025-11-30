@@ -9,6 +9,8 @@ import { ImageAnalysisService } from './image-analysis.service';
 import { HttpModule } from '@nestjs/axios';
 import { BookingModule } from '../booking/booking.module';
 import { JourneyModule } from '../journey/journey.module';
+import { RewardsModule } from '../rewards/rewards.module';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { JourneyModule } from '../journey/journey.module';
     ConfigModule,
     BookingModule,
     JourneyModule, // Pour accéder à ImgBBService
+    RewardsModule,
+    UserModule,
   ],
   controllers: [OutfitWeatherController],
   providers: [OutfitWeatherService, WeatherService, ImageAnalysisService],

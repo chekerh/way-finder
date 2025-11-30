@@ -16,6 +16,7 @@ import { BookingModule } from '../booking/booking.module';
 import { VideoProcessingModule } from '../video-processing/video-processing.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UserModule } from '../user/user.module';
+import { RewardsModule } from '../rewards/rewards.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { UserModule } from '../user/user.module';
     VideoProcessingModule,
     NotificationsModule,
     UserModule,
+    RewardsModule,
     HttpModule,
   ],
   controllers: [JourneyController],

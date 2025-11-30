@@ -206,6 +206,14 @@ export class AuthService {
       );
     }
 
+    // Update day streak on login
+    try {
+      await this.userService.updateDayStreak(user._id.toString());
+    } catch (error) {
+      console.warn(`Failed to update day streak: ${error.message}`);
+      // Don't fail login if streak update fails
+    }
+
     const payload = {
       sub: user._id.toString(),
       username: user.username,
@@ -323,6 +331,14 @@ export class AuthService {
           }
         }
       }
+    }
+
+    // Update day streak on login
+    try {
+      await this.userService.updateDayStreak((user as any)._id.toString());
+    } catch (error) {
+      console.warn(`Failed to update day streak: ${error.message}`);
+      // Don't fail login if streak update fails
     }
 
     // Generate JWT token
@@ -611,6 +627,14 @@ export class AuthService {
     console.log(
       `[Verify OTP] User found for email: ${email}, user ID: ${(user as any)._id}`,
     );
+
+    // Update day streak on login
+    try {
+      await this.userService.updateDayStreak((user as any)._id.toString());
+    } catch (error) {
+      console.warn(`Failed to update day streak: ${error.message}`);
+      // Don't fail login if streak update fails
+    }
 
     // Generate JWT token
     const payload = {

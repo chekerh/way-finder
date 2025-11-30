@@ -94,6 +94,28 @@ export class User {
 
   @Prop({ type: Date, default: null })
   last_login_date?: Date; // For streak calculation
+
+  // Lifetime metrics
+  @Prop({ type: Number, default: 0 })
+  total_bookings: number; // Total number of trips booked
+
+  @Prop({ type: Number, default: 0 })
+  total_destinations: number; // Total number of unique destinations visited
+
+  @Prop({ type: Number, default: 0 })
+  total_travel_days: number; // Total number of days traveled
+
+  @Prop({ type: Number, default: 0 })
+  total_distance_km: number; // Total distance traveled in kilometers
+
+  @Prop({ type: Number, default: 0 })
+  total_countries: number; // Total number of countries visited
+
+  @Prop({ type: Number, default: 0 })
+  total_outfits_analyzed: number; // Total number of outfits analyzed
+
+  @Prop({ type: Number, default: 0 })
+  total_posts_shared: number; // Total number of posts/journeys shared
 }
 
 export type UserDocument = HydratedDocument<User>;

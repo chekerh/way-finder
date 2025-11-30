@@ -27,6 +27,8 @@ import type { VideoJobPayload } from '../video-processing/interfaces/video-job-p
 import { ImgBBService } from './imgbb.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserService } from '../user/user.service';
+import { RewardsService } from '../rewards/rewards.service';
+import { PointsSource } from '../rewards/rewards.dto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -47,6 +49,7 @@ export class JourneyService {
     private readonly imgbbService: ImgBBService,
     private readonly notificationsService: NotificationsService,
     private readonly userService: UserService,
+    private readonly rewardsService: RewardsService,
   ) {}
 
   private toObjectId(id: string, label: string): Types.ObjectId {
@@ -303,6 +306,29 @@ export class JourneyService {
     });
 
     const savedJourney = await journey.save();
+
+    // Award points for sharing a journey (+30 points)
+    try {
+      const points = this.rewardsService.getPointsForAction(PointsSource.SHARE);
+      await this.rewardsService.awardPoints({
+        userId,
+        points,
+        source: PointsSource.SHARE,
+        description: 'Shared a journey',
+        metadata: {
+          journey_id: savedJourney._id.toString(),
+          destination,
+        },
+      });
+      
+      // Increment lifetime metrics
+      await this.userService.incrementLifetimeMetric(userId, 'total_posts_shared');
+      
+      this.logger.log(`Awarded ${points} points to user ${userId} for sharing journey`);
+    } catch (error) {
+      this.logger.warn(`Failed to award points for journey share: ${error.message}`);
+      // Don't fail journey creation if points fail
+    }
 
     // Enqueue video generation job (async - doesn't block journey creation)
     // If queue fails, we'll process it directly as fallback

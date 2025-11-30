@@ -17,6 +17,8 @@ import {
 } from './discussion.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserService } from '../user/user.service';
+import { RewardsService } from '../rewards/rewards.service';
+import { PointsSource } from '../rewards/rewards.dto';
 
 @Injectable()
 export class DiscussionService {
@@ -27,6 +29,7 @@ export class DiscussionService {
     private readonly commentModel: Model<DiscussionCommentDocument>,
     private readonly notificationsService: NotificationsService,
     private readonly userService: UserService,
+    private readonly rewardsService: RewardsService,
   ) {}
 
   async createPost(userId: string, dto: CreatePostDto) {
@@ -224,6 +227,25 @@ export class DiscussionService {
     });
 
     const savedComment = await comment.save();
+
+    // Award points for publishing a comment (+10 points)
+    try {
+      const points = this.rewardsService.getPointsForAction(PointsSource.COMMENT);
+      await this.rewardsService.awardPoints({
+        userId,
+        points,
+        source: PointsSource.COMMENT,
+        description: 'Published a comment',
+        metadata: {
+          comment_id: savedComment._id.toString(),
+          post_id: postId,
+        },
+      });
+      console.log(`Awarded ${points} points to user ${userId} for comment`);
+    } catch (error) {
+      console.warn(`Failed to award points for comment: ${error.message}`);
+      // Don't fail comment creation if points fail
+    }
 
     // Update post comment count
     post.comments_count += 1;

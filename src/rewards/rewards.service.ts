@@ -158,6 +158,10 @@ export class RewardsService {
       [PointsSource.ACHIEVEMENT]: 'Unlocked achievement',
       [PointsSource.REFERRAL]: 'Referred a friend',
       [PointsSource.BONUS]: 'Bonus points',
+      [PointsSource.OUTFIT]: 'Analyzed an outfit',
+      [PointsSource.COMMENT]: 'Published a comment',
+      [PointsSource.RATING]: 'Rated a destination',
+      [PointsSource.FILTERS]: 'Used advanced filters',
     };
     return descriptions[source] || 'Points awarded';
   }
@@ -171,13 +175,17 @@ export class RewardsService {
   ): number {
     const pointsMap: Record<PointsSource, number> = {
       [PointsSource.ONBOARDING]: 100, // Complete onboarding
-      [PointsSource.BOOKING]: 50, // Per booking
-      [PointsSource.REVIEW]: 25, // Per review
-      [PointsSource.SHARE]: 30, // Per share
+      [PointsSource.BOOKING]: 50, // Book a flight
+      [PointsSource.REVIEW]: 15, // Rate a destination (updated from 25)
+      [PointsSource.SHARE]: 30, // Share a journey
       [PointsSource.STREAK]: 10, // Daily streak bonus
       [PointsSource.ACHIEVEMENT]: 50, // Per achievement
       [PointsSource.REFERRAL]: 100, // Per referral
       [PointsSource.BONUS]: metadata?.points || 0, // Custom bonus
+      [PointsSource.OUTFIT]: 20, // Analyze an outfit
+      [PointsSource.COMMENT]: 10, // Publish a comment
+      [PointsSource.RATING]: 15, // Rate a destination (same as review)
+      [PointsSource.FILTERS]: 5, // Use advanced filters
     };
 
     // Special cases
