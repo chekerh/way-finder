@@ -84,13 +84,16 @@ export class OutfitWeatherService {
     }
 
     // Get weather forecast for destination
-    const departureDate = booking.trip_details?.departure_date
+    // If outfitDate is provided, use it; otherwise use departure_date or current date
+    const targetDate = outfitDate 
+      ? new Date(outfitDate)
+      : booking.trip_details?.departure_date
       ? new Date(booking.trip_details.departure_date)
       : new Date();
     
     const weather = await this.weatherService.getWeatherForecast(
       destination,
-      departureDate,
+      targetDate,
     );
 
     // Analyze outfit image - use file buffer if available for better accuracy
