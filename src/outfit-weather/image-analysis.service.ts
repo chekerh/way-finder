@@ -29,7 +29,7 @@ export class ImageAnalysisService {
     const hasValidApiKey = this.apiKey && 
                            this.apiKey.trim().length > 0 && 
                            this.apiKey !== 'your_openai_api_key_here' &&
-                           !this.apiKey.startsWith('sk-') === false || this.apiKey.startsWith('sk-');
+                           (this.apiKey.startsWith('sk-') || this.apiKey.startsWith('sk-proj-'));
     
     console.log('OpenAI API key check:', {
       hasKey: !!this.apiKey,
@@ -37,23 +37,37 @@ export class ImageAnalysisService {
       keyPrefix: this.apiKey?.substring(0, 5) || 'none',
       hasValidApiKey,
     });
+    
+    // If no valid API key, skip OpenAI and use fallback immediately
+    if (!hasValidApiKey) {
+      console.warn('⚠️ OpenAI API key not configured or invalid, using fast fallback analysis');
+      console.warn('To enable AI analysis, configure OPENAI_API_KEY environment variable');
+      return this.analyzeWithFallback(imageUrl);
+    }
 
-    // Option 1: Use OpenAI Vision API (if available)
+    // Option 1: Use OpenAI Vision API (if available) with timeout
     if (hasValidApiKey) {
       try {
         console.log('Using OpenAI Vision API for image analysis');
         console.log('Image URL:', imageUrl);
         console.log('Has image file buffer:', !!imageFile);
         
+        // Add timeout wrapper (20 seconds max for OpenAI - fail fast to use fallback)
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('OpenAI API timeout after 20 seconds')), 20000);
+        });
+        
         // Prefer base64 if file is available (more reliable)
-        const result = imageFile 
-          ? await this.analyzeWithOpenAIBase64(imageFile)
-          : await this.analyzeWithOpenAI(imageUrl);
+        const analysisPromise = imageFile 
+          ? this.analyzeWithOpenAIBase64(imageFile)
+          : this.analyzeWithOpenAI(imageUrl);
+        
+        const result = await Promise.race([analysisPromise, timeoutPromise]);
         
         console.log('OpenAI analysis result:', result);
         return result;
       } catch (error: any) {
-        console.error('OpenAI analysis failed, using fallback:', error);
+        console.error('OpenAI analysis failed or timed out, using fallback:', error.message || error);
         const errorData = error.response?.data || {};
         console.error('Error details:', {
           message: error.message,
@@ -77,7 +91,7 @@ export class ImageAnalysisService {
     }
 
     // Option 2: Use Google Vision API (alternative)
-    // Option 3: Fallback to keyword-based detection
+    // Option 3: Fallback to keyword-based detection (fast and reliable)
     console.log('Using fallback analysis (generic items)');
     const fallbackResult = await this.analyzeWithFallback(imageUrl);
     console.log('Fallback analysis result:', fallbackResult);
