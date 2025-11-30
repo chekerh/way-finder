@@ -68,7 +68,7 @@ export class OutfitWeatherController {
 
     // Analyze outfit automatically after upload
     const analysis = await this.outfitWeatherService.analyzeOutfit(
-      req.user.userId,
+      req.user.sub,
       body.booking_id,
       imageUrl,
     );
@@ -83,7 +83,7 @@ export class OutfitWeatherController {
   @Post('analyze')
   async analyzeOutfit(@Request() req, @Body() dto: AnalyzeOutfitDto) {
     return this.outfitWeatherService.analyzeOutfit(
-      req.user.userId,
+      req.user.sub,
       dto.booking_id,
       dto.image_url,
     );
@@ -95,14 +95,14 @@ export class OutfitWeatherController {
     @Param('bookingId') bookingId: string,
   ) {
     return this.outfitWeatherService.getOutfitsForBooking(
-      req.user.userId,
+      req.user.sub,
       bookingId,
     );
   }
 
   @Get(':outfitId')
   async getOutfit(@Request() req, @Param('outfitId') outfitId: string) {
-    return this.outfitWeatherService.getOutfit(req.user.userId, outfitId);
+    return this.outfitWeatherService.getOutfit(req.user.sub, outfitId);
   }
 
   @Post(':outfitId/approve')
@@ -111,12 +111,12 @@ export class OutfitWeatherController {
     @Param('outfitId') outfitId: string,
     @Body() dto: ApproveOutfitDto,
   ) {
-    return this.outfitWeatherService.approveOutfit(req.user.userId, outfitId);
+    return this.outfitWeatherService.approveOutfit(req.user.sub, outfitId);
   }
 
   @Delete(':outfitId')
   async deleteOutfit(@Request() req, @Param('outfitId') outfitId: string) {
-    await this.outfitWeatherService.deleteOutfit(req.user.userId, outfitId);
+    await this.outfitWeatherService.deleteOutfit(req.user.sub, outfitId);
     return { message: 'Outfit deleted successfully' };
   }
 }
