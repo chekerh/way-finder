@@ -3,8 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { join } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
 import { AppModule } from './app.module';
 
 async function bootstrap() {

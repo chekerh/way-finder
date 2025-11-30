@@ -27,8 +27,8 @@ import type { VideoJobPayload } from '../video-processing/interfaces/video-job-p
 import { ImgBBService } from './imgbb.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserService } from '../user/user.service';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 @Injectable()
 export class JourneyService {

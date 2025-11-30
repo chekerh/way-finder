@@ -16,8 +16,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OutfitWeatherService } from './outfit-weather.service';
 import { AnalyzeOutfitDto, ApproveOutfitDto, UploadOutfitDto } from './outfit-weather.dto';
 import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import * as fs from 'fs';
+import { extname, join } from 'node:path';
+import * as fs from 'node:fs';
 
 @Controller('outfit-weather')
 @UseGuards(JwtAuthGuard)

@@ -5,8 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { Outfit, OutfitDocument } from './outfit.schema';
 import { WeatherService } from './weather.service';
 import { ImageAnalysisService } from './image-analysis.service';
