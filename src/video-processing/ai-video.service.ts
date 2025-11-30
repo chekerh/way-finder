@@ -96,6 +96,20 @@ export class AiVideoService {
       `Generating video for journey ${payload.journeyId} with ${payload.slides.length} slides`,
     );
 
+    // Validate that we have images
+    if (!payload.slides || payload.slides.length === 0) {
+      throw new Error('No images provided for video generation');
+    }
+
+    // Log image URLs for debugging (first 3 only to avoid log spam)
+    const imagePreview = payload.slides
+      .slice(0, 3)
+      .map((s) => s.imageUrl)
+      .join(', ');
+    this.logger.log(
+      `Image URLs (first 3): ${imagePreview}${payload.slides.length > 3 ? '...' : ''}`,
+    );
+
     // Priority 1: Shotstack API (best for video montages from multiple images)
     if (this.shotstackApiKey) {
       try {
@@ -210,22 +224,39 @@ export class AiVideoService {
         `Generating video montage with Shotstack for ${payload.slides.length} images`,
       );
 
+      // Step 1: Validate all image URLs are accessible
+      this.logger.log('Validating image URLs...');
+      const validatedSlides = await this.validateImageUrls(payload.slides);
+      
+      if (validatedSlides.length === 0) {
+        throw new Error('No valid/accessible images found for video generation');
+      }
+
+      if (validatedSlides.length < payload.slides.length) {
+        this.logger.warn(
+          `Only ${validatedSlides.length} out of ${payload.slides.length} images are accessible. Proceeding with available images.`,
+        );
+      }
+
       // Calculate timing: 3 seconds per image, minimum 10 seconds, maximum 60 seconds
       const durationPerImage = 3;
       const totalDuration = Math.min(
-        Math.max(payload.slides.length * durationPerImage, 10),
+        Math.max(validatedSlides.length * durationPerImage, 10),
         60,
       );
 
-      // Create timeline with all images
-      const timeline = {
-        soundtrack: {
-          src: 'https://shotstack-assets.s3.amazonaws.com/music/freepd/ambient_acoustic_guitar.mp3',
-          effect: 'fadeOut',
-        },
+      this.logger.log(
+        `Creating video montage with ${validatedSlides.length} images, total duration: ${totalDuration}s`,
+      );
+
+      // Create timeline with all validated images
+      // Note: Making soundtrack optional since the default music URL may not be accessible
+      // Users can add music later via SHOTSTACK_MUSIC_URL environment variable
+      const soundtrackUrl = process.env.SHOTSTACK_MUSIC_URL;
+      const timeline: any = {
         tracks: [
           {
-            clips: payload.slides.map((slide, index) => ({
+            clips: validatedSlides.map((slide, index) => ({
               asset: {
                 type: 'image',
                 src: slide.imageUrl,
@@ -242,6 +273,17 @@ export class AiVideoService {
           },
         ],
       };
+
+      // Only add soundtrack if a valid URL is provided
+      if (soundtrackUrl && soundtrackUrl.trim().length > 0) {
+        timeline.soundtrack = {
+          src: soundtrackUrl,
+          effect: 'fadeOut',
+        };
+        this.logger.log(`Using custom music URL: ${soundtrackUrl}`);
+      } else {
+        this.logger.log('No music URL provided, generating video without soundtrack');
+      }
 
       // Create render request
       const renderRequest = {
@@ -357,8 +399,22 @@ export class AiVideoService {
         `Generating video montage with Cloudinary for ${payload.slides.length} images`,
       );
 
-      // Step 1: Upload images to Cloudinary in parallel (much faster!)
-      const uploadPromises = payload.slides.map(async (slide) => {
+      // Step 1: Validate image URLs first
+      this.logger.log('Validating image URLs for Cloudinary...');
+      const validatedSlides = await this.validateImageUrls(payload.slides);
+      
+      if (validatedSlides.length === 0) {
+        throw new Error('No valid/accessible images found for video generation');
+      }
+
+      if (validatedSlides.length < payload.slides.length) {
+        this.logger.warn(
+          `Only ${validatedSlides.length} out of ${payload.slides.length} images are accessible. Proceeding with available images.`,
+        );
+      }
+
+      // Step 2: Upload images to Cloudinary in parallel (much faster!)
+      const uploadPromises = validatedSlides.map(async (slide) => {
         try {
           // Check if image is already a Cloudinary URL
           if (slide.imageUrl.includes('cloudinary.com')) {
@@ -403,39 +459,18 @@ export class AiVideoService {
       // 2. Use a third-party service like Shotstack, Creatomate, or similar
       // 3. Use FFmpeg server-side to create the montage and upload to Cloudinary
       
-      // For now, we'll create a simple video from the first image
-      // In production, implement one of the above solutions
-      const firstImageId = uploadedImagePublicIds[0];
-      const totalDuration = Math.min(
-        Math.max(uploadedImagePublicIds.length * 3, 10),
-        60,
-      );
-
-      // Generate a video URL from the first image
-      // This is a placeholder - Cloudinary will generate a static video from the image
-      const generatedVideoUrl = cloudinary.url(firstImageId, {
-        resource_type: 'video',
-        transformation: [
-          {
-            width: 1920,
-            height: 1080,
-            crop: 'fill',
-            format: 'mp4',
-            duration: totalDuration,
-            fps: 24,
-          },
-        ],
-      });
-
-      this.logger.log(
-        `Video URL generated from first image: ${generatedVideoUrl}`,
-      );
+      // Since Cloudinary doesn't support multi-image montages on free tier,
+      // we'll recommend using Shotstack instead
       this.logger.warn(
-        'Note: This creates a static video from one image. For a proper montage with multiple images, ' +
-          'implement a video generation service (Shotstack, Creatomate, or FFmpeg-based solution).',
+        'Cloudinary free tier does not support video montages from multiple images. ' +
+          'Please use SHOTSTACK_API_KEY for proper multi-image video generation. ' +
+          'Falling back to Shotstack or other services...',
       );
-
-      return { videoUrl: generatedVideoUrl };
+      
+      // Throw error to trigger fallback to Shotstack or other services
+      throw new Error(
+        'Cloudinary does not support multi-image video montages. Use Shotstack API instead.',
+      );
     } catch (error) {
       this.logger.error(
         `Cloudinary video generation failed: ${error.message}`,
@@ -694,6 +729,106 @@ export class AiVideoService {
     throw new Error(
       'Génération vidéo indisponible pour le moment. Merci de réessayer après configuration d’un service.',
     );
+  }
+
+  /**
+   * Validate that image URLs are accessible before video generation
+   * This prevents video generation failures due to broken image links
+   */
+  private async validateImageUrls(
+    slides: Array<{ imageUrl: string; caption?: string | null }>,
+  ): Promise<Array<{ imageUrl: string; caption?: string | null }>> {
+    const validatedSlides: Array<{ imageUrl: string; caption?: string | null }> =
+      [];
+
+    for (const slide of slides) {
+      try {
+        // Basic URL format validation
+        const url = new URL(slide.imageUrl);
+
+        // Check if URL is from a trusted source
+        const trustedDomains = [
+          'i.ibb.co', // ImgBB
+          'ibb.co', // ImgBB
+          'imgbb.com', // ImgBB
+          'i.imgur.com', // Imgur
+          'imgur.com', // Imgur
+          'res.cloudinary.com', // Cloudinary
+          'cloudinary.com', // Cloudinary
+          'images.unsplash.com', // Unsplash
+          'unsplash.com', // Unsplash
+          'storage.googleapis.com', // Google Cloud Storage
+          's3.amazonaws.com', // AWS S3
+          'localhost', // Local development
+          '127.0.0.1', // Local development
+        ];
+
+        const isTrusted = trustedDomains.some((domain) =>
+          url.hostname.includes(domain),
+        );
+
+        if (!isTrusted && !url.hostname.includes('.')) {
+          this.logger.warn(
+            `Image URL from untrusted domain: ${url.hostname}. Skipping.`,
+          );
+          continue;
+        }
+
+        // Try to verify the image is accessible with a HEAD request
+        try {
+          const headResponse = await firstValueFrom(
+            this.httpService.head(slide.imageUrl, {
+              timeout: 5000, // 5 second timeout
+              validateStatus: (status) => status < 500, // Accept 2xx, 3xx, 4xx
+            }),
+          );
+
+          if (headResponse.status >= 200 && headResponse.status < 400) {
+            validatedSlides.push(slide);
+            this.logger.debug(`✓ Image URL validated: ${slide.imageUrl}`);
+          } else {
+            this.logger.warn(
+              `Image URL returned status ${headResponse.status}: ${slide.imageUrl}`,
+            );
+          }
+        } catch (headError) {
+          // If HEAD fails, try GET with range request (more compatible)
+          try {
+            const getResponse = await firstValueFrom(
+              this.httpService.get(slide.imageUrl, {
+                timeout: 5000,
+                headers: { Range: 'bytes=0-1023' }, // Only request first 1KB
+                validateStatus: (status) => status < 500,
+              }),
+            );
+
+            if (getResponse.status >= 200 && getResponse.status < 400) {
+              validatedSlides.push(slide);
+              this.logger.debug(`✓ Image URL validated (via GET): ${slide.imageUrl}`);
+            } else {
+              this.logger.warn(
+                `Image URL returned status ${getResponse.status}: ${slide.imageUrl}`,
+              );
+            }
+          } catch (getError) {
+            // If both HEAD and GET fail, log but still include the image
+            // Some servers block HEAD requests but allow GET
+            this.logger.warn(
+              `Could not validate image URL (will still try to use it): ${slide.imageUrl}. Error: ${(getError as Error).message}`,
+            );
+            // Include it anyway - Shotstack will handle the error if image is truly inaccessible
+            validatedSlides.push(slide);
+          }
+        }
+      } catch (urlError) {
+        this.logger.error(
+          `Invalid image URL format: ${slide.imageUrl}. Error: ${(urlError as Error).message}`,
+        );
+        // Skip invalid URLs
+      }
+    }
+
+    return validatedSlides;
   }
 
   /**

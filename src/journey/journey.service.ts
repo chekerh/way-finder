@@ -306,6 +306,13 @@ export class JourneyService {
 
     // Enqueue video generation job (async - doesn't block journey creation)
     // If queue fails, we'll process it directly as fallback
+    this.logger.log(
+      `Starting video generation for journey ${savedJourney._id} with ${queueSlides.length} images`,
+    );
+    this.logger.debug(
+      `Image URLs: ${queueSlides.map((s) => s.imageUrl).join(', ')}`,
+    );
+
     this.videoProcessingService
       .enqueueJourneyVideo({
         journeyId: savedJourney._id.toString(),
@@ -317,12 +324,12 @@ export class JourneyService {
       })
       .then(() => {
         this.logger.log(
-          `Video generation job enqueued for journey ${savedJourney._id}`,
+          `✅ Video generation job enqueued for journey ${savedJourney._id} with ${queueSlides.length} images`,
         );
       })
       .catch((error) => {
-        this.logger.error(
-          `Failed to enqueue video job for journey ${savedJourney._id}, will process directly: ${error.message}`,
+        this.logger.warn(
+          `⚠️ Failed to enqueue video job for journey ${savedJourney._id}, will process directly: ${error.message}`,
         );
         // Fallback: Process video generation directly if queue fails
         // This ensures video generation always works even without Redis
@@ -333,7 +340,8 @@ export class JourneyService {
           destination,
         ).catch((directError) => {
           this.logger.error(
-            `Direct video generation also failed: ${directError.message}`,
+            `❌ Direct video generation failed for journey ${savedJourney._id}: ${directError.message}`,
+            directError.stack,
           );
         });
       });
@@ -900,8 +908,18 @@ export class JourneyService {
     destination: string,
   ): Promise<void> {
     this.logger.log(
-      `Processing video generation directly (fallback) for journey ${journey._id}`,
+      `Processing video generation directly (fallback) for journey ${journey._id} with ${slides.length} images`,
     );
+
+    // Validate we have images
+    if (!slides || slides.length === 0) {
+      this.logger.error(
+        `No images provided for video generation in journey ${journey._id}`,
+      );
+      journey.video_status = 'failed';
+      await journey.save();
+      return;
+    }
 
     // Set status to processing
     journey.video_status = 'processing';
@@ -918,10 +936,14 @@ export class JourneyService {
         slides,
       };
 
+      this.logger.log(
+        `Calling AI video service with ${slides.length} images for journey ${journey._id}`,
+      );
       const response = await this.aiVideoService.generateVideo(videoPayload);
 
       if (response.videoUrl && response.videoUrl.trim().length > 0) {
         try {
+          // Validate URL format
           new URL(response.videoUrl);
           journey.video_url = response.videoUrl;
           journey.video_status = 'completed';
@@ -931,7 +953,7 @@ export class JourneyService {
           );
         } catch (urlError) {
           this.logger.error(
-            `Invalid video URL format: ${response.videoUrl}`,
+            `Invalid video URL format returned: ${response.videoUrl}`,
             urlError,
           );
           journey.video_status = 'failed';
@@ -939,8 +961,8 @@ export class JourneyService {
           await journey.save();
         }
       } else {
-        this.logger.warn(
-          `No valid video URL returned for journey ${journey._id}`,
+        this.logger.error(
+          `No valid video URL returned for journey ${journey._id}. Response: ${JSON.stringify(response)}`,
         );
         journey.video_status = 'failed';
         journey.video_url = undefined;
