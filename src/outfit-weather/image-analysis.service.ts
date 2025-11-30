@@ -135,14 +135,23 @@ export class ImageAnalysisService {
           'shorts': 'shorts',
           'jacket': 'jacket',
           'coat': 'coat',
+          'long coat': 'coat',
+          'overcoat': 'coat',
           'sweater': 'sweater',
+          'turtleneck': 'sweater',
+          'pullover': 'sweater',
           'hoodie': 'sweater',
           'sneakers': 'sneakers',
           'shoes': 'sneakers',
           'boots': 'boots',
+          'ankle boots': 'boots',
           'sandals': 'sandals',
           'dress': 'dress',
           'skirt': 'skirt',
+          'midi skirt': 'skirt',
+          'handbag': 'handbag',
+          'bag': 'handbag',
+          'purse': 'handbag',
         };
 
         return normalized[item] || item;
