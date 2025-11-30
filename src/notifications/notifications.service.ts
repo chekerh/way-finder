@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument } from './notifications.schema';
@@ -22,6 +22,10 @@ export class NotificationsService {
     userId: string,
     createNotificationDto: CreateNotificationDto,
   ): Promise<NotificationDocument> {
+    // Validate userId is a valid ObjectId string
+    if (!userId || !Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException(`Invalid userId provided: ${userId}`);
+    }
     // CRITICAL: For booking-related notifications, verify the booking still exists
     // This prevents notifications for deleted/cancelled bookings from being sent repeatedly
     const isBookingNotification =

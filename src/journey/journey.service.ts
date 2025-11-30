@@ -663,10 +663,18 @@ export class JourneyService {
 
     // Send notification to journey owner if it's not the same user
     // Handle both populated and non-populated user_id
-    const journeyOwnerId = journey.user_id && typeof journey.user_id === 'object' && '_id' in journey.user_id
-      ? journey.user_id._id.toString()
-      : journey.user_id.toString();
-    if (journeyOwnerId !== userId) {
+    const journeyObj = journey.toObject ? journey.toObject() : journey;
+    const populatedUserId = journeyObj.user_id as any;
+    const isPopulatedUser =
+      populatedUserId &&
+      typeof populatedUserId === 'object' &&
+      populatedUserId._id;
+    
+    const journeyOwnerId = isPopulatedUser
+      ? populatedUserId._id.toString()
+      : populatedUserId?.toString() || journeyObj.user_id?.toString();
+    
+    if (journeyOwnerId && journeyOwnerId !== userId) {
       try {
         const liker = await this.userService.findById(userId);
         const likerName = liker?.username || liker?.first_name || "Quelqu'un";
