@@ -36,7 +36,7 @@ export class WeatherService {
       const currentWeatherUrl = `${this.baseUrl}/weather?q=${encodeURIComponent(cityName)}&appid=${this.apiKey}&units=metric&lang=fr`;
       
       const response = await firstValueFrom(
-        this.httpService.get(currentWeatherUrl),
+        this.httpService.get<any>(currentWeatherUrl),
       );
 
       const weather = response.data;

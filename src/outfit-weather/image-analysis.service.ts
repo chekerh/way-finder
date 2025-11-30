@@ -43,7 +43,7 @@ export class ImageAnalysisService {
   private async analyzeWithOpenAI(imageUrl: string): Promise<string[]> {
     try {
       const response = await firstValueFrom(
-        this.httpService.post(
+        this.httpService.post<any>(
           `${this.baseUrl}/chat/completions`,
           {
             model: 'gpt-4-vision-preview',
