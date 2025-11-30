@@ -3,7 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
 import { OutfitWeatherController } from './outfit-weather.controller';
 import { OutfitWeatherService } from './outfit-weather.service';
-import { OutfitSchema } from './outfit.schema';
+import { Outfit, OutfitSchema } from './outfit.schema';
 import { WeatherService } from './weather.service';
 import { ImageAnalysisService } from './image-analysis.service';
 import { HttpModule } from '@nestjs/axios';
@@ -12,7 +12,7 @@ import { JourneyModule } from '../journey/journey.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: 'Outfit', schema: OutfitSchema }]),
+    MongooseModule.forFeature([{ name: Outfit.name, schema: OutfitSchema }]),
     HttpModule,
     ConfigModule,
     BookingModule,
