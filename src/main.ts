@@ -15,8 +15,9 @@ async function bootstrap() {
   const uploadsDir = join(__dirname, '..', 'uploads');
   const profilesDir = join(uploadsDir, 'profiles');
   const journeysDir = join(uploadsDir, 'journeys');
+  const outfitsDir = join(uploadsDir, 'outfits');
 
-  [uploadsDir, profilesDir, journeysDir].forEach((dir) => {
+  [uploadsDir, profilesDir, journeysDir, outfitsDir].forEach((dir) => {
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
       console.log(`📁 Created directory: ${dir}`);
