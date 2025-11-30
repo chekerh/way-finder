@@ -70,7 +70,15 @@ export class OutfitWeatherService {
       throw new BadRequestException('Booking must be confirmed to analyze outfit');
     }
 
-    const destination = booking.trip_details?.destination;
+    // Try to get destination from trip_details, fallback to offer_id if not available
+    let destination = booking.trip_details?.destination;
+    if (!destination) {
+      // Fallback to offer_id if trip_details.destination is not set
+      // This handles cases where bookings were created without trip_details
+      destination = booking.offer_id;
+      console.log(`[OutfitWeatherService] Using offer_id as destination fallback: ${destination}`);
+    }
+    
     if (!destination) {
       throw new BadRequestException('Booking destination not found');
     }
