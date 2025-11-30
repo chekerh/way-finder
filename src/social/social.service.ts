@@ -317,8 +317,8 @@ export class SocialService {
       valencia: 'Spain',
       // Brazil
       'rio de janeiro': 'Brazil',
-      'rio': 'Brazil',
-      sao paulo: 'Brazil',
+      rio: 'Brazil',
+      'sao paulo': 'Brazil',
       brasilia: 'Brazil',
       salvador: 'Brazil',
       // United States
@@ -326,6 +326,8 @@ export class SocialService {
       'los angeles': 'United States',
       chicago: 'United States',
       miami: 'United States',
+      // UAE
+      dubai: 'United Arab Emirates',
       // United Kingdom
       london: 'United Kingdom',
       manchester: 'United Kingdom',
