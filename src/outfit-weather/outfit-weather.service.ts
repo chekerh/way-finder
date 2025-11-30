@@ -139,8 +139,8 @@ export class OutfitWeatherService {
   ): Promise<OutfitDocument[]> {
     return this.outfitModel
       .find({
-        user_id: this.toObjectId(userId, 'user id'),
-        booking_id: this.toObjectId(bookingId, 'booking id'),
+        user_id: this.toObjectId(userId, 'user id') as any,
+        booking_id: this.toObjectId(bookingId, 'booking id') as any,
       })
       .sort({ createdAt: -1 })
       .exec();
@@ -155,8 +155,8 @@ export class OutfitWeatherService {
   ): Promise<OutfitDocument> {
     const outfit = await this.outfitModel
       .findOne({
-        _id: this.toObjectId(outfitId, 'outfit id'),
-        user_id: this.toObjectId(userId, 'user id'),
+        _id: this.toObjectId(outfitId, 'outfit id') as any,
+        user_id: this.toObjectId(userId, 'user id') as any,
       })
       .exec();
 
@@ -188,8 +188,8 @@ export class OutfitWeatherService {
   ): Promise<void> {
     const result = await this.outfitModel
       .deleteOne({
-        _id: this.toObjectId(outfitId, 'outfit id'),
-        user_id: this.toObjectId(userId, 'user id'),
+        _id: this.toObjectId(outfitId, 'outfit id') as any,
+        user_id: this.toObjectId(userId, 'user id') as any,
       })
       .exec();
 
