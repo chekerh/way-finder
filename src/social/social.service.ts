@@ -453,12 +453,6 @@ export class SocialService {
       'new york usa': 'United States',
       'madrid, spain': 'Spain',
       'madrid spain': 'Spain',
-      'dubai, uae': 'United Arab Emirates',
-      'dubai uae': 'United Arab Emirates',
-      'dubai, united arab emirates': 'United Arab Emirates',
-      uae: 'United Arab Emirates',
-      'london, united kingdom': 'United Kingdom',
-      'london united kingdom': 'United Kingdom',
     };
 
     // Country coordinates mapping (capital city coordinates)

@@ -83,10 +83,8 @@ export class OutfitWeatherService {
     }
 
     // Get weather forecast for destination
-    // If outfitDate is provided, use it; otherwise use departure_date or current date
-    const targetDate = outfitDate 
-      ? new Date(outfitDate)
-      : booking.trip_details?.departure_date
+    // Use departure_date from booking or current date
+    const targetDate = booking.trip_details?.departure_date
       ? new Date(booking.trip_details.departure_date)
       : new Date();
     
