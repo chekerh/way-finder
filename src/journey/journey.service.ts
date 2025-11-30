@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   Journey,
   JourneyDocument,
@@ -663,18 +663,23 @@ export class JourneyService {
 
     // Send notification to journey owner if it's not the same user
     // Handle both populated and non-populated user_id
-    const journeyObj = journey.toObject ? journey.toObject() : journey;
-    const populatedUserId = journeyObj.user_id as any;
-    const isPopulatedUser =
-      populatedUserId &&
-      typeof populatedUserId === 'object' &&
-      populatedUserId._id;
+    let journeyOwnerId: string | undefined;
     
-    const journeyOwnerId = isPopulatedUser
-      ? populatedUserId._id.toString()
-      : populatedUserId?.toString() || journeyObj.user_id?.toString();
+    if (journey.user_id) {
+      const journeyObj = journey.toObject ? journey.toObject() : journey;
+      const populatedUserId = journeyObj.user_id as any;
+      const isPopulatedUser =
+        populatedUserId &&
+        typeof populatedUserId === 'object' &&
+        populatedUserId._id;
+      
+      journeyOwnerId = isPopulatedUser
+        ? populatedUserId._id.toString()
+        : populatedUserId?.toString() || journeyObj.user_id?.toString();
+    }
     
-    if (journeyOwnerId && journeyOwnerId !== userId) {
+    // Only send notification if we have a valid journeyOwnerId and it's different from the liker
+    if (journeyOwnerId && Types.ObjectId.isValid(journeyOwnerId) && journeyOwnerId !== userId) {
       try {
         const liker = await this.userService.findById(userId);
         const likerName = liker?.username || liker?.first_name || "Quelqu'un";
