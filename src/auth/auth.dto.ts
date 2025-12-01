@@ -8,9 +8,9 @@ import {
 } from 'class-validator';
 
 export class LoginDto {
-  @IsString()
+  @IsEmail()
   @IsNotEmpty()
-  username: string;
+  email: string; // Required - only email addresses are accepted
 
   @IsString()
   @IsNotEmpty()

@@ -158,34 +158,20 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const identifier = dto.username.trim();
-    if (!identifier)
-      throw new BadRequestException('Username or email is required');
+    // Only accept email addresses for login
+    const email = dto.email.trim().toLowerCase();
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
 
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
 
-    // If identifier contains @, it's an email - search by email first
-    // Otherwise, try username first, then email as fallback
-    let user: any = null;
-    if (identifier.includes('@')) {
-      // It's an email - search directly by email
-      user = await this.userService.findByEmail(identifier.toLowerCase());
-      console.log(
-        `[Login] Searching by email: ${identifier.toLowerCase()}, found: ${user ? 'YES' : 'NO'}`,
-      );
-    } else {
-      // It's a username - try username first, then email as fallback
-      user = await this.userService.findByUsername(identifier);
-      if (!user) {
-        user = await this.userService.findByEmail(identifier.toLowerCase());
-        console.log(
-          `[Login] Username not found, trying as email: ${identifier.toLowerCase()}, found: ${user ? 'YES' : 'NO'}`,
-        );
-      } else {
-        console.log(`[Login] Found by username: ${identifier}`);
-      }
-    }
+    // Search user by email only
+    const user = await this.userService.findByEmail(email);
+    console.log(
+      `[Login] Searching by email: ${email}, found: ${user ? 'YES' : 'NO'}`,
+    );
 
     if (!user) {
       console.log(`[Login] User not found for identifier: ${identifier}`);
