@@ -1,18 +1,26 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Review, ReviewDocument, ReviewItemType } from './reviews.schema';
 import { CreateReviewDto, UpdateReviewDto } from './reviews.dto';
+import { RewardsService } from '../rewards/rewards.service';
+import { PointsSource } from '../rewards/rewards.dto';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class ReviewsService {
+  private readonly logger = new Logger(ReviewsService.name);
+
   constructor(
     @InjectModel(Review.name)
     private readonly reviewModel: Model<ReviewDocument>,
+    private readonly rewardsService: RewardsService,
+    private readonly userService: UserService,
   ) {}
 
   async createReview(
@@ -38,6 +46,31 @@ export class ReviewsService {
     });
 
     const savedReview = await review.save();
+    
+    // Award points for rating a destination (+15 points)
+    // Only award for destination reviews to match the requirement
+    if (createReviewDto.itemType === 'destination') {
+      try {
+        const points = this.rewardsService.getPointsForAction(PointsSource.RATING);
+        await this.rewardsService.awardPoints({
+          userId,
+          points,
+          source: PointsSource.RATING,
+          description: 'Rated a destination',
+          metadata: {
+            review_id: savedReview._id.toString(),
+            item_type: createReviewDto.itemType,
+            item_id: createReviewDto.itemId,
+            rating: createReviewDto.rating,
+          },
+        });
+        this.logger.log(`Awarded ${points} points to user ${userId} for rating destination`);
+      } catch (error) {
+        this.logger.warn(`Failed to award points for review: ${error.message}`);
+        // Don't fail review creation if points fail
+      }
+    }
+    
     return this.reviewModel
       .findById(savedReview._id)
       .populate('userId', 'username first_name last_name profile_image_url')

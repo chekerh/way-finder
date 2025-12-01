@@ -15,6 +15,10 @@ export enum PointsSource {
   ACHIEVEMENT = 'achievement',
   REFERRAL = 'referral',
   BONUS = 'bonus',
+  OUTFIT = 'outfit', // Analyze an outfit
+  COMMENT = 'comment', // Publish a comment
+  RATING = 'rating', // Rate a destination
+  FILTERS = 'filters', // Use advanced filters
 }
 
 export enum PointsType {

@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserFollow, UserFollowDocument } from './social.schema';
 import { SharedTrip, SharedTripDocument } from './social.schema';
+import { Journey, JourneyDocument } from '../journey/journey.schema';
 import { FollowUserDto, ShareTripDto, UpdateSharedTripDto } from './social.dto';
 
 @Injectable()
@@ -17,6 +18,8 @@ export class SocialService {
     private readonly userFollowModel: Model<UserFollowDocument>,
     @InjectModel(SharedTrip.name)
     private readonly sharedTripModel: Model<SharedTripDocument>,
+    @InjectModel(Journey.name)
+    private readonly journeyModel: Model<JourneyDocument>,
   ) {}
 
   // ========== FOLLOW/UNFOLLOW ==========
@@ -287,5 +290,364 @@ export class SocialService {
     await trip.save();
 
     return { message: 'Trip liked successfully', likesCount: trip.likesCount };
+  }
+
+  async getMapMemories(userId: string): Promise<any> {
+    const publicBaseUrl = (
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
+
+    // Get all shared trips for the user
+    const sharedTripsRaw = await this.sharedTripModel
+      .find({ userId, isVisible: true })
+      .populate('userId', 'username first_name last_name profile_image_url')
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // Format shared trips with full image URLs
+    const sharedTrips = sharedTripsRaw.map((trip: any) => {
+      const tripObj = trip.toObject ? trip.toObject() : trip;
+      return {
+        ...tripObj,
+        images: (tripObj.images || []).map((url: string) => {
+          return url.startsWith('http') 
+            ? url 
+            : `${publicBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+        }),
+      };
+    });
+
+    // Get all journeys for the user (these are the shared journeys)
+    const journeys = await this.journeyModel
+      .find({ user_id: userId, is_visible: true })
+      .populate('user_id', 'username first_name last_name profile_image_url')
+      .sort({ createdAt: -1 })
+      .exec();
+    
+    console.log(`[getMapMemories] Found ${journeys.length} journeys for user ${userId}`);
+
+    // Convert journeys to shared trip format for processing
+    const journeyAsTrips = journeys.map((journey: any) => {
+      const journeyObj = journey.toObject ? journey.toObject() : journey;
+      // Get images from slides or image_urls and ensure full URLs
+      let images: string[] = [];
+      if (journeyObj.slides && journeyObj.slides.length > 0) {
+        images = journeyObj.slides.map((slide: any) => {
+          const imageUrl = slide.imageUrl || slide.image_url || '';
+          return imageUrl.startsWith('http') 
+            ? imageUrl 
+            : `${publicBaseUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        });
+      } else if (journeyObj.image_urls && journeyObj.image_urls.length > 0) {
+        images = journeyObj.image_urls.map((url: string) => {
+          return url.startsWith('http') 
+            ? url 
+            : `${publicBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+        });
+      }
+      
+      // Get user info from populated user_id
+      const userIdObj = journeyObj.user_id && typeof journeyObj.user_id === 'object'
+        ? journeyObj.user_id
+        : { _id: journeyObj.user_id, username: '', first_name: '', last_name: '', profile_image_url: '' };
+      
+      return {
+        _id: journeyObj._id,
+        userId: userIdObj,
+        title: journeyObj.destination || journeyObj.caption_text || 'My Journey',
+        description: journeyObj.description || journeyObj.caption_text || null,
+        tripType: 'custom',
+        tripId: journeyObj.booking_id ? journeyObj.booking_id.toString() : null,
+        images: images,
+        tags: journeyObj.tags || [],
+        destination: journeyObj.destination, // Add destination field directly for easier detection
+        metadata: {
+          ...journeyObj.metadata,
+          destination: journeyObj.destination,
+          country: journeyObj.metadata?.country || null,
+        },
+        likesCount: journeyObj.likes_count || 0,
+        commentsCount: journeyObj.comments_count || 0,
+        sharesCount: 0,
+        isPublic: journeyObj.is_public !== false,
+        isVisible: journeyObj.is_visible !== false,
+        createdAt: journeyObj.createdAt ? new Date(journeyObj.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: journeyObj.updatedAt ? new Date(journeyObj.updatedAt).toISOString() : new Date().toISOString(),
+      };
+    });
+
+    // Combine shared trips and journeys
+    const trips = [...sharedTrips, ...journeyAsTrips];
+    
+    console.log(`[getMapMemories] Total trips found: ${trips.length} (${sharedTrips.length} shared trips + ${journeyAsTrips.length} journeys)`);
+
+    // City to Country mapping (popular cities)
+    const cityToCountry: Record<string, string> = {
+      // France
+      paris: 'France',
+      'paris, france': 'France',
+      'paris france': 'France',
+      lyon: 'France',
+      marseille: 'France',
+      nice: 'France',
+      // Italy
+      rome: 'Italy',
+      milan: 'Italy',
+      venice: 'Italy',
+      florence: 'Italy',
+      naples: 'Italy',
+      // Spain
+      madrid: 'Spain',
+      barcelona: 'Spain',
+      seville: 'Spain',
+      valencia: 'Spain',
+      // Brazil
+      'rio de janeiro': 'Brazil',
+      rio: 'Brazil',
+      'sao paulo': 'Brazil',
+      brasilia: 'Brazil',
+      salvador: 'Brazil',
+      // United States
+      'new york': 'United States',
+      'los angeles': 'United States',
+      chicago: 'United States',
+      miami: 'United States',
+      // UAE
+      dubai: 'United Arab Emirates',
+      'dubai, uae': 'United Arab Emirates',
+      'dubai uae': 'United Arab Emirates',
+      'dubai, united arab emirates': 'United Arab Emirates',
+      uae: 'United Arab Emirates',
+      // United Kingdom
+      london: 'United Kingdom',
+      'london, united kingdom': 'United Kingdom',
+      'london united kingdom': 'United Kingdom',
+      manchester: 'United Kingdom',
+      edinburgh: 'United Kingdom',
+      // Germany
+      berlin: 'Germany',
+      munich: 'Germany',
+      hamburg: 'Germany',
+      // Other
+      istanbul: 'Turkey',
+      tokyo: 'Japan',
+      'tokyo, japan': 'Japan',
+      'tokyo japan': 'Japan',
+      seoul: 'South Korea',
+      'seoul, south korea': 'South Korea',
+      'seoul south korea': 'South Korea',
+      bangkok: 'Thailand',
+      'bangkok, thailand': 'Thailand',
+      'bangkok thailand': 'Thailand',
+      singapore: 'Singapore',
+      'singapore, singapore': 'Singapore',
+      'singapore singapore': 'Singapore',
+      sydney: 'Australia',
+      melbourne: 'Australia',
+      // Additional cities from reservations
+      'new york, united states': 'United States',
+      'new york united states': 'United States',
+      'new york, usa': 'United States',
+      'new york usa': 'United States',
+      'madrid, spain': 'Spain',
+      'madrid spain': 'Spain',
+    };
+
+    // Country coordinates mapping (capital city coordinates)
+    const countryCoordinates: Record<string, { lat: number; lng: number }> = {
+      France: { lat: 48.8566, lng: 2.3522 }, // Paris
+      Spain: { lat: 40.4168, lng: -3.7038 }, // Madrid
+      Italy: { lat: 41.9028, lng: 12.4964 }, // Rome
+      Germany: { lat: 52.52, lng: 13.405 }, // Berlin
+      'United Kingdom': { lat: 51.5074, lng: -0.1278 }, // London
+      Portugal: { lat: 38.7223, lng: -9.1393 }, // Lisbon
+      Greece: { lat: 37.9838, lng: 23.7275 }, // Athens
+      Netherlands: { lat: 52.3676, lng: 4.9041 }, // Amsterdam
+      Belgium: { lat: 50.8503, lng: 4.3517 }, // Brussels
+      Switzerland: { lat: 46.2044, lng: 6.1432 }, // Geneva
+      Austria: { lat: 48.2082, lng: 16.3738 }, // Vienna
+      'Czech Republic': { lat: 50.0755, lng: 14.4378 }, // Prague
+      Poland: { lat: 52.2297, lng: 21.0122 }, // Warsaw
+      Hungary: { lat: 47.4979, lng: 19.0402 }, // Budapest
+      Croatia: { lat: 45.815, lng: 15.9819 }, // Zagreb
+      Tunisia: { lat: 36.8065, lng: 10.1815 }, // Tunis
+      Morocco: { lat: 33.9716, lng: -6.8498 }, // Rabat
+      Algeria: { lat: 36.7538, lng: 3.0588 }, // Algiers
+      Egypt: { lat: 30.0444, lng: 31.2357 }, // Cairo
+      Turkey: { lat: 41.0082, lng: 28.9784 }, // Istanbul
+      'United States': { lat: 38.9072, lng: -77.0369 }, // Washington DC
+      Canada: { lat: 45.5017, lng: -75.5673 }, // Ottawa
+      Mexico: { lat: 19.4326, lng: -99.1332 }, // Mexico City
+      Brazil: { lat: -15.7942, lng: -47.8822 }, // Brasília
+      Argentina: { lat: -34.6037, lng: -58.3816 }, // Buenos Aires
+      Japan: { lat: 35.6762, lng: 139.6503 }, // Tokyo
+      China: { lat: 39.9042, lng: 116.4074 }, // Beijing
+      India: { lat: 28.6139, lng: 77.209 }, // New Delhi
+      Thailand: { lat: 13.7563, lng: 100.5018 }, // Bangkok
+      'South Korea': { lat: 37.5665, lng: 126.978 }, // Seoul
+      Australia: { lat: -35.2809, lng: 149.13 }, // Canberra
+      'New Zealand': { lat: -41.2865, lng: 174.7762 }, // Wellington
+      'United Arab Emirates': { lat: 24.4539, lng: 54.3773 }, // Abu Dhabi
+    };
+
+    // Group trips by country
+    const countryMap = new Map<
+      string,
+      {
+        country: string;
+        lat: number;
+        lng: number;
+        trips: any[];
+        count: number;
+      }
+    >();
+
+    // Helper function to extract country from text
+    const extractCountryFromText = (text: string): string | null => {
+      if (!text) return null;
+      const lowerText = text.toLowerCase().trim();
+      
+      // First, try to find city and map to country (more specific, check this first)
+      // Sort by length (longest first) to match "paris, france" before just "paris"
+      const sortedCities = Object.entries(cityToCountry).sort((a, b) => b[0].length - a[0].length);
+      for (const [city, country] of sortedCities) {
+        if (lowerText.includes(city)) {
+          console.log(`[getMapMemories] City "${city}" found in "${lowerText}" -> ${country}`);
+          return country;
+        }
+      }
+      
+      // Then, try to find country name directly
+      for (const [countryName, _] of Object.entries(countryCoordinates)) {
+        const lowerCountryName = countryName.toLowerCase();
+        // Check for exact match or contains match
+        if (lowerText === lowerCountryName || lowerText.includes(lowerCountryName)) {
+          console.log(`[getMapMemories] Country "${countryName}" found in "${lowerText}"`);
+          return countryName;
+        }
+      }
+      
+      console.log(`[getMapMemories] No country found in "${lowerText}"`);
+      return null;
+    };
+
+    trips.forEach((trip: any) => {
+      const tripObj = trip.toObject ? trip.toObject() : trip;
+      
+      // Log trip data for debugging
+      console.log(`[getMapMemories] Processing trip:`, {
+        id: tripObj._id,
+        destination: tripObj.destination,
+        title: tripObj.title,
+        description: tripObj.description,
+        metadata: tripObj.metadata,
+        tags: tripObj.tags,
+        images: tripObj.images?.length || 0,
+      });
+      
+      // Extract country from multiple sources
+      let country: string | null = null;
+      
+      // 1. Check metadata.country
+      if (tripObj.metadata?.country) {
+        country = tripObj.metadata.country;
+        console.log(`[getMapMemories] Country found in metadata.country: ${country}`);
+      }
+      // 2. Check destination field directly (for Journey objects)
+      else if (tripObj.destination) {
+        console.log(`[getMapMemories] Checking destination: "${tripObj.destination}"`);
+        country = extractCountryFromText(tripObj.destination);
+        if (country) {
+          console.log(`[getMapMemories] Country detected from destination: ${country}`);
+        }
+      }
+      // 3. Check metadata.destination
+      else if (tripObj.metadata?.destination) {
+        console.log(`[getMapMemories] Checking metadata.destination: "${tripObj.metadata.destination}"`);
+        country = extractCountryFromText(tripObj.metadata.destination);
+        if (country) {
+          console.log(`[getMapMemories] Country detected from metadata.destination: ${country}`);
+        }
+      }
+      // 4. Check title
+      else if (tripObj.title) {
+        console.log(`[getMapMemories] Checking title: "${tripObj.title}"`);
+        country = extractCountryFromText(tripObj.title);
+        if (country) {
+          console.log(`[getMapMemories] Country detected from title: ${country}`);
+        }
+      }
+      // 5. Check description
+      else if (tripObj.description) {
+        console.log(`[getMapMemories] Checking description: "${tripObj.description}"`);
+        country = extractCountryFromText(tripObj.description);
+        if (country) {
+          console.log(`[getMapMemories] Country detected from description: ${country}`);
+        }
+      }
+      // 6. Check tags
+      else if (tripObj.tags && tripObj.tags.length > 0) {
+        console.log(`[getMapMemories] Checking tags:`, tripObj.tags);
+        for (const tag of tripObj.tags) {
+          country = extractCountryFromText(tag);
+          if (country) {
+            console.log(`[getMapMemories] Country detected from tag "${tag}": ${country}`);
+            break;
+          }
+        }
+      }
+
+      // If no country found, skip this trip
+      if (!country) {
+        // Log for debugging
+        console.warn(`[getMapMemories] ⚠️ No country found for trip:`, {
+          id: tripObj._id,
+          destination: tripObj.destination,
+          title: tripObj.title,
+          description: tripObj.description,
+          metadata: tripObj.metadata,
+          tags: tripObj.tags,
+        });
+        return;
+      }
+      
+      // Log successful country detection for debugging
+      console.log(`[getMapMemories] ✅ Country detected: ${country} for trip:`, {
+        id: tripObj._id,
+        destination: tripObj.destination || tripObj.title,
+      });
+
+      // Get coordinates for country
+      const coords = countryCoordinates[country];
+      if (!coords) {
+        return; // Skip if country not in our mapping
+      }
+
+      // Add to country map
+      if (!countryMap.has(country)) {
+        countryMap.set(country, {
+          country,
+          lat: coords.lat,
+          lng: coords.lng,
+          trips: [],
+          count: 0,
+        });
+      }
+
+      const countryData = countryMap.get(country)!;
+      countryData.trips.push(tripObj);
+      countryData.count = countryData.trips.length;
+    });
+
+    // Convert map to array
+    const result = Array.from(countryMap.values());
+
+    return {
+      countries: result,
+      totalCountries: result.length,
+      totalMemories: trips.length,
+    };
   }
 }

@@ -4,11 +4,15 @@ import { Booking, BookingSchema } from './booking.schema';
 import { BookingService } from './booking.service';
 import { BookingController } from './booking.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { RewardsModule } from '../rewards/rewards.module';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Booking.name, schema: BookingSchema }]),
     NotificationsModule,
+    RewardsModule,
+    UserModule,
   ],
   controllers: [BookingController],
   providers: [BookingService],

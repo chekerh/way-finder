@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,13 +14,20 @@ import {
 } from './booking.dto';
 import { BookingStatus } from '../common/enums/booking-status.enum';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RewardsService } from '../rewards/rewards.service';
+import { PointsSource } from '../rewards/rewards.dto';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class BookingService {
+  private readonly logger = new Logger(BookingService.name);
+
   constructor(
     @InjectModel(Booking.name)
     private readonly bookingModel: Model<BookingDocument>,
     private readonly notificationsService: NotificationsService,
+    private readonly rewardsService: RewardsService,
+    private readonly userService: UserService,
   ) {}
 
   async searchOffers(query: {
@@ -92,6 +100,30 @@ export class BookingService {
       trip_details: dto.trip_details, // Include trip details (destination, etc.)
     });
     const savedBooking = await booking.save();
+
+    // Award points for booking a flight (+50 points)
+    try {
+      const points = this.rewardsService.getPointsForAction(PointsSource.BOOKING);
+      await this.rewardsService.awardPoints({
+        userId,
+        points,
+        source: PointsSource.BOOKING,
+        description: 'Booked a flight',
+        metadata: {
+          booking_id: savedBooking._id.toString(),
+          confirmation_number,
+          destination: dto.trip_details?.destination,
+        },
+      });
+      
+      // Increment lifetime metrics
+      await this.userService.incrementLifetimeMetric(userId, 'total_bookings');
+      
+      this.logger.log(`Awarded ${points} points to user ${userId} for booking`);
+    } catch (error) {
+      this.logger.warn(`Failed to award points for booking: ${error.message}`);
+      // Don't fail booking if points fail
+    }
 
     // Send notification for confirmed booking
     const destinationName =

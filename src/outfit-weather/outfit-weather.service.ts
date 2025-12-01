@@ -13,6 +13,9 @@ import { ImageAnalysisService } from './image-analysis.service';
 import { BookingService } from '../booking/booking.service';
 import { ImgBBService } from '../journey/imgbb.service';
 import { BookingStatus } from '../common/enums/booking-status.enum';
+import { RewardsService } from '../rewards/rewards.service';
+import { PointsSource } from '../rewards/rewards.dto';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class OutfitWeatherService {
@@ -23,6 +26,8 @@ export class OutfitWeatherService {
     private readonly imageAnalysisService: ImageAnalysisService,
     private readonly bookingService: BookingService,
     private readonly imgbbService: ImgBBService,
+    private readonly rewardsService: RewardsService,
+    private readonly userService: UserService,
   ) {}
 
   /**
@@ -69,19 +74,28 @@ export class OutfitWeatherService {
       throw new BadRequestException('Booking must be confirmed to analyze outfit');
     }
 
-    const destination = booking.trip_details?.destination;
+    // Try to get destination from trip_details, fallback to offer_id if not available
+    let destination = booking.trip_details?.destination;
+    if (!destination) {
+      // Fallback to offer_id if trip_details.destination is not set
+      // This handles cases where bookings were created without trip_details
+      destination = booking.offer_id;
+      console.log(`[OutfitWeatherService] Using offer_id as destination fallback: ${destination}`);
+    }
+    
     if (!destination) {
       throw new BadRequestException('Booking destination not found');
     }
 
     // Get weather forecast for destination
-    const departureDate = booking.trip_details?.departure_date
+    // Use departure_date from booking or current date
+    const targetDate = booking.trip_details?.departure_date
       ? new Date(booking.trip_details.departure_date)
       : new Date();
     
     const weather = await this.weatherService.getWeatherForecast(
       destination,
-      departureDate,
+      targetDate,
     );
 
     // Analyze outfit image - use file buffer if available for better accuracy
@@ -132,6 +146,31 @@ export class OutfitWeatherService {
     const savedOutfit = await outfit.save();
     console.log('Saved outfit detected_items:', savedOutfit.detected_items);
     console.log('Saved outfit ID:', savedOutfit._id);
+    
+    // Award points for analyzing an outfit (+20 points)
+    try {
+      const points = this.rewardsService.getPointsForAction(PointsSource.OUTFIT);
+      await this.rewardsService.awardPoints({
+        userId,
+        points,
+        source: PointsSource.OUTFIT,
+        description: 'Analyzed an outfit',
+        metadata: {
+          outfit_id: savedOutfit._id.toString(),
+          booking_id: bookingId,
+          destination,
+        },
+      });
+      
+      // Increment lifetime metrics
+      await this.userService.incrementLifetimeMetric(userId, 'total_outfits_analyzed');
+      
+      console.log(`Awarded ${points} points to user ${userId} for outfit analysis`);
+    } catch (error) {
+      console.warn(`Failed to award points for outfit analysis: ${error.message}`);
+      // Don't fail outfit analysis if points fail
+    }
+    
     return savedOutfit;
   }
 
