@@ -279,12 +279,48 @@ export class AuthService {
       if (user) {
         // User exists with email but not Google ID - link Google account
         console.log(
-          `[GoogleSignIn] User found by email, linking Google ID. Existing username: ${user.username}`,
+          `[GoogleSignIn] User found by email, linking Google ID. Existing username: ${user.username}, User ID: ${(user as any)._id}`,
         );
-        user = await this.userService.updateGoogleId(
-          (user as any)._id.toString(),
-          googleUser.googleId,
-        );
+        try {
+          user = await this.userService.updateGoogleId(
+            (user as any)._id.toString(),
+            googleUser.googleId,
+          );
+          console.log(
+            `[GoogleSignIn] Successfully linked Google ID to existing user: ${(user as any)._id}`,
+          );
+        } catch (error: any) {
+          // Handle potential duplicate key error (Google ID already linked to another user)
+          if (error.code === 11000 || error.message?.includes('duplicate')) {
+            console.error(
+              `[GoogleSignIn] Google ID ${googleUser.googleId} is already linked to another user. Attempting to find user with this Google ID.`,
+            );
+            // Try to find the user with this Google ID (might have been linked between checks)
+            const userWithGoogleId = await this.userService.findByGoogleId(
+              googleUser.googleId,
+            );
+            if (userWithGoogleId) {
+              console.log(
+                `[GoogleSignIn] Found user with Google ID. Using that user instead.`,
+              );
+              user = userWithGoogleId;
+            } else {
+              // This shouldn't happen, but if it does, throw a more descriptive error
+              console.error(
+                `[GoogleSignIn] Failed to link Google ID: ${error.message}`,
+              );
+              throw new ConflictException(
+                'Ce compte Google est déjà lié à un autre compte. Veuillez utiliser le compte associé ou contactez le support.',
+              );
+            }
+          } else {
+            // Re-throw other errors
+            console.error(
+              `[GoogleSignIn] Error linking Google ID: ${error.message}`,
+            );
+            throw error;
+          }
+        }
       } else {
         // Create new user with Google account
         // Generate username from email (remove @domain.com)
