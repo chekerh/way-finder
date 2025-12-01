@@ -466,7 +466,7 @@ export class AiVideoService {
           'Please use SHOTSTACK_API_KEY for proper multi-image video generation. ' +
           'Falling back to Shotstack or other services...',
       );
-      
+
       // Throw error to trigger fallback to Shotstack or other services
       throw new Error(
         'Cloudinary does not support multi-image video montages. Use Shotstack API instead.',
