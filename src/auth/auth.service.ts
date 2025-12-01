@@ -174,7 +174,7 @@ export class AuthService {
     );
 
     if (!user) {
-      console.log(`[Login] User not found for identifier: ${identifier}`);
+      console.log(`[Login] User not found for email: ${email}`);
       throw new UnauthorizedException('Email ou mot de passe incorrect.');
     }
 
@@ -194,18 +194,18 @@ export class AuthService {
 
     // Update day streak on login
     try {
-      await this.userService.updateDayStreak(user._id.toString());
+      await this.userService.updateDayStreak((user as any)._id.toString());
     } catch (error) {
       console.warn(`Failed to update day streak: ${error.message}`);
       // Don't fail login if streak update fails
     }
 
     const payload = {
-      sub: user._id.toString(),
+      sub: (user as any)._id.toString(),
       username: user.username,
     };
     const token = await this.jwtService.signAsync(payload);
-    const userObj = user.toObject ? user.toObject() : user;
+    const userObj = (user as any).toObject ? (user as any).toObject() : user;
     const { password: _password, ...userData } = userObj;
     return {
       access_token: token,
