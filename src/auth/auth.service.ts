@@ -1032,12 +1032,38 @@ export class AuthService {
     );
 
     // Check if username already exists
-    const existing = await this.userService.findByUsername(username);
-    if (existing) {
+    const existingUsername = await this.userService.findByUsername(username);
+    if (existingUsername) {
       this.logger.warn(`Username conflict: ${username} already exists`);
       throw new ConflictException(
         "Ce nom d'utilisateur est déjà utilisé. Veuillez en choisir un autre.",
       );
+    }
+    
+    // Additional safety check: try to find user by email one more time
+    // This handles edge cases where the user might exist but wasn't found in the first check
+    const finalEmailCheck = await this.userService.findByEmail(email);
+    if (finalEmailCheck) {
+      this.logger.warn(
+        `Email found in final check: ${email} - user may have been created concurrently`,
+      );
+      // Auto-login if user exists
+      const payload = {
+        sub: (finalEmailCheck as any)._id.toString(),
+        username: finalEmailCheck.username,
+      };
+      const token = await this.jwtService.signAsync(payload);
+      const userObj = (finalEmailCheck as any).toObject
+        ? (finalEmailCheck as any).toObject()
+        : finalEmailCheck;
+      const { password: _password, ...userData } = userObj;
+      return {
+        message: 'Connexion réussie avec le code OTP',
+        access_token: token,
+        user: userData,
+        onboarding_completed: finalEmailCheck.onboarding_completed || false,
+        auto_login: true,
+      };
     }
 
     if (!username || !email || !firstName || !lastName) {
@@ -1077,12 +1103,29 @@ export class AuthService {
     } catch (error: any) {
       // Handle MongoDB duplicate key errors
       if (error.code === 11000) {
+        this.logger.warn(
+          `MongoDB duplicate key error for email: ${email}, username: ${username}`,
+        );
+        this.logger.debug(`Error keyPattern: ${JSON.stringify(error.keyPattern)}`);
+        this.logger.debug(`Error message: ${error.message}`);
+
         let duplicateField: string | null = null;
 
+        // First, try to extract from keyPattern (most reliable)
         if (error.keyPattern) {
-          duplicateField = Object.keys(error.keyPattern)[0];
+          const keys = Object.keys(error.keyPattern);
+          if (keys.length > 0) {
+            // Map MongoDB field names to our field names
+            const fieldName = keys[0];
+            if (fieldName === 'email' || fieldName.includes('email')) {
+              duplicateField = 'email';
+            } else if (fieldName === 'username' || fieldName.includes('username')) {
+              duplicateField = 'username';
+            }
+          }
         }
 
+        // If not found in keyPattern, try to extract from error message
         if (!duplicateField && error.message) {
           const message = error.message.toLowerCase();
           if (message.includes('email') || message.includes('email_1')) {
@@ -1095,46 +1138,61 @@ export class AuthService {
           }
         }
 
-        // If duplicateField is not determined, try to find it by checking the database
+        // If still not determined, check the database directly
+        // This handles cases where the error doesn't specify the field
         if (!duplicateField) {
+          this.logger.debug(
+            `Duplicate field not determined from error, checking database...`,
+          );
           const checkEmail = await this.userService.findByEmail(email);
           const checkUsername = await this.userService.findByUsername(username);
+          
           if (checkEmail) {
+            this.logger.debug(`Found existing user by email: ${email}`);
             duplicateField = 'email';
           } else if (checkUsername) {
+            this.logger.debug(`Found existing user by username: ${username}`);
             duplicateField = 'username';
+          } else {
+            // If MongoDB says duplicate but we can't find the user,
+            // it's likely a race condition or index issue
+            // Default to email as it's the most common case
+            this.logger.warn(
+              `MongoDB duplicate key error but user not found in database. Assuming email duplicate.`,
+            );
+            duplicateField = 'email';
           }
         }
 
+        // Handle based on duplicate field
         if (duplicateField === 'email') {
-          // Check if user has a password
+          // Check if user has a password (Google/Apple OAuth user)
           const existingUser = await this.userService.findByEmail(email);
-          if (existingUser && !existingUser.password) {
+          if (existingUser) {
+            if (!existingUser.password) {
+              throw new ConflictException(
+                'Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.',
+              );
+            }
             throw new ConflictException(
-              'Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.',
+              'Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
+            );
+          } else {
+            // User exists in DB but findByEmail didn't find it (unlikely but possible)
+            // This could happen if there's a case sensitivity or normalization issue
+            throw new ConflictException(
+              'Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
             );
           }
-          throw new ConflictException(
-            'Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
-          );
         }
+        
         if (duplicateField === 'username') {
           throw new ConflictException(
             "Ce nom d'utilisateur est déjà utilisé. Veuillez en choisir un autre.",
           );
         }
-        // Fallback: check email as it's the most common case
-        const existingUser = await this.userService.findByEmail(email);
-        if (existingUser) {
-          if (!existingUser.password) {
-            throw new ConflictException(
-              'Cet email est déjà enregistré via Google ou Apple. Veuillez vous connecter avec cette méthode ou utilisez la connexion par code OTP.',
-            );
-          }
-          throw new ConflictException(
-            'Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
-          );
-        }
+
+        // Final fallback (should rarely reach here)
         throw new ConflictException(
           'Un utilisateur avec ces informations existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
         );
