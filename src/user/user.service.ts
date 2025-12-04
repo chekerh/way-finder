@@ -20,7 +20,12 @@ export class UserService {
    * @returns Created user document
    */
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const created = new this.userModel(createUserDto);
+    // Remove google_id if it's not provided to avoid sparse index issues with null values
+    const userData = { ...createUserDto };
+    if (!userData.google_id) {
+      delete (userData as any).google_id;
+    }
+    const created = new this.userModel(userData);
     return await created.save();
   }
 

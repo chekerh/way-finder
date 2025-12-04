@@ -1144,23 +1144,51 @@ export class AuthService {
           this.logger.debug(
             `Duplicate field not determined from error, checking database...`,
           );
-          const checkEmail = await this.userService.findByEmail(email);
-          const checkUsername = await this.userService.findByUsername(username);
           
-          if (checkEmail) {
-            this.logger.debug(`Found existing user by email: ${email}`);
-            duplicateField = 'email';
-          } else if (checkUsername) {
-            this.logger.debug(`Found existing user by username: ${username}`);
-            duplicateField = 'username';
-          } else {
-            // If MongoDB says duplicate but we can't find the user,
-            // it's likely a race condition or index issue
-            // Default to email as it's the most common case
+          // Check if the error is about google_id (sparse index issue with null values)
+          if (error.keyPattern && error.keyPattern.google_id) {
             this.logger.warn(
-              `MongoDB duplicate key error but user not found in database. Assuming email duplicate.`,
+              `Duplicate key error on google_id field. This is likely due to multiple null values in sparse index. Checking if user exists by email...`,
             );
-            duplicateField = 'email';
+            // This is a google_id index issue, but we should check if email exists
+            const checkEmail = await this.userService.findByEmail(email);
+            if (checkEmail) {
+              this.logger.debug(`Found existing user by email: ${email}`);
+              duplicateField = 'email';
+            } else {
+              // google_id index issue - try to find user by email or username
+              const checkUsername = await this.userService.findByUsername(username);
+              if (checkUsername) {
+                duplicateField = 'username';
+              } else {
+                // This is a google_id sparse index issue - the user might exist but query failed
+                // Default to email as it's the most common case
+                this.logger.warn(
+                  `google_id duplicate key error but user not found. Assuming email duplicate.`,
+                );
+                duplicateField = 'email';
+              }
+            }
+          } else {
+            // Not a google_id error, check email and username normally
+            const checkEmail = await this.userService.findByEmail(email);
+            const checkUsername = await this.userService.findByUsername(username);
+            
+            if (checkEmail) {
+              this.logger.debug(`Found existing user by email: ${email}`);
+              duplicateField = 'email';
+            } else if (checkUsername) {
+              this.logger.debug(`Found existing user by username: ${username}`);
+              duplicateField = 'username';
+            } else {
+              // If MongoDB says duplicate but we can't find the user,
+              // it's likely a race condition or index issue
+              // Default to email as it's the most common case
+              this.logger.warn(
+                `MongoDB duplicate key error but user not found in database. Assuming email duplicate.`,
+              );
+              duplicateField = 'email';
+            }
           }
         }
 
