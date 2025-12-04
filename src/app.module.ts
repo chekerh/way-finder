@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -29,18 +29,79 @@ import { DestinationVideoModule } from './video-generation/destination-video.mod
 import { ChatModule } from './chat/chat.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { OutfitWeatherModule } from './outfit-weather/outfit-weather.module';
+import { CacheModule } from './common/cache/cache.module';
 
+/**
+ * Constructs MongoDB connection URI from environment variables.
+ * Falls back to localhost for development if not set.
+ */
 const mongoUri = (() => {
-  if (process.env.MONGODB_URI) {
-    return process.env.MONGODB_URI;
+  let uri = process.env.MONGODB_URI;
+  if (!uri) {
+    if (process.env.VERCEL) {
+      throw new Error(
+        'MONGODB_URI environment variable is not set. Please configure it in Vercel project settings.',
+      );
+    }
+    return 'mongodb://localhost:27017/wayfindr';
   }
-  if (process.env.VERCEL) {
-    throw new Error(
-      'MONGODB_URI environment variable is not set. Please configure it in Vercel project settings.',
-    );
-  }
-  return 'mongodb://localhost:27017/wayfindr';
+  
+  // Remove deprecated options from connection string
+  // bufferMaxEntries is deprecated and not supported in newer MongoDB drivers
+  uri = uri.replace(/[?&]bufferMaxEntries=[^&]*/gi, '');
+  uri = uri.replace(/[?&]buffermaxentries=[^&]*/gi, '');
+  
+  return uri;
 })();
+
+/**
+ * MongoDB connection options optimized for production (Render hosting).
+ * These settings balance performance, resource usage, and connection limits.
+ *
+ * Connection Pool Settings:
+ * - maxPoolSize: Maximum number of connections in the pool (50 for production, 10 for dev)
+ * - minPoolSize: Minimum number of connections maintained (5 for production, 1 for dev)
+ * - maxIdleTimeMS: Close idle connections after 30 seconds
+ * - serverSelectionTimeoutMS: Timeout for server selection (10 seconds)
+ * - socketTimeoutMS: Timeout for socket operations (45 seconds)
+ * - connectTimeoutMS: Timeout for initial connection (10 seconds)
+ * - heartbeatFrequencyMS: Frequency of heartbeat checks (10 seconds)
+ *
+ * Performance Settings:
+ * - bufferCommands: Disable Mongoose buffering (use connection pooling instead)
+ * Note: bufferMaxEntries is deprecated and not supported - removed from options
+ */
+const getMongoConnectionOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isRender = process.env.RENDER === 'true';
+
+  return {
+    // Connection pool settings - optimized for Render hosting
+    maxPoolSize: isProduction ? (isRender ? 50 : 30) : 10, // More connections for Render
+    minPoolSize: isProduction ? (isRender ? 5 : 3) : 1, // Maintain minimum connections
+    maxIdleTimeMS: 30000, // Close idle connections after 30 seconds
+
+    // Timeout settings
+    serverSelectionTimeoutMS: 10000, // 10 seconds to select server
+    socketTimeoutMS: 45000, // 45 seconds socket timeout
+    connectTimeoutMS: 10000, // 10 seconds connection timeout
+    heartbeatFrequencyMS: 10000, // Heartbeat every 10 seconds
+
+    // Performance optimizations
+    bufferCommands: false, // Disable Mongoose buffering (use connection pool)
+    // Note: bufferMaxEntries is deprecated and removed - not needed with connection pooling
+
+    // Retry settings for production
+    retryWrites: true, // Retry write operations on network errors
+    retryReads: true, // Retry read operations on network errors
+
+    // Compression (if supported by MongoDB server)
+    compressors: ['zlib'] as 'zlib'[],
+
+    // Monitoring and logging (useful for debugging)
+    monitorCommands: process.env.NODE_ENV === 'development', // Log commands in dev only
+  };
+};
 
 const createRedisOptions = (): RedisOptions => {
   const sharedOptions: Partial<RedisOptions> = {
@@ -49,29 +110,29 @@ const createRedisOptions = (): RedisOptions => {
     enableOfflineQueue: true, // Allow Bull to queue commands while Redis connects
     lazyConnect: true,
     connectTimeout: 10_000,
-        retryStrategy: (times) => {
+    retryStrategy: (times) => {
       const delay = Math.min(times * 50, 5_000);
-          if (times <= 3) {
-            console.warn(
-              `Redis connection retry attempt ${times}, waiting ${delay}ms`,
-            );
-          }
-          return delay;
-        },
+      if (times <= 3) {
+        const logger = new Logger('RedisConnection');
+        logger.warn(
+          `Redis connection retry attempt ${times}, waiting ${delay}ms`,
+        );
+      }
+      return delay;
+    },
   };
 
   const shouldUseTls = process.env.REDIS_TLS === 'true';
-  const tlsOptions =
-    shouldUseTls
-      ? {
-          tls: {
-            rejectUnauthorized:
-              process.env.REDIS_TLS_REJECT_UNAUTHORIZED === 'false'
-                ? false
-                : true,
-          },
-        }
-      : undefined;
+  const tlsOptions = shouldUseTls
+    ? {
+        tls: {
+          rejectUnauthorized:
+            process.env.REDIS_TLS_REJECT_UNAUTHORIZED === 'false'
+              ? false
+              : true,
+        },
+      }
+    : undefined;
 
   const urlFromEnv =
     process.env.REDIS_URL ||
@@ -98,8 +159,9 @@ const createRedisOptions = (): RedisOptions => {
           : tlsOptions),
         ...sharedOptions,
       } as RedisOptions;
-    } catch (error) {
-      console.warn(
+    } catch (error: any) {
+      const logger = new Logger('AppModule');
+      logger.warn(
         `Invalid Redis URL provided (${urlFromEnv}): ${error.message}. Falling back to host/port configuration.`,
       );
     }
@@ -116,11 +178,34 @@ const createRedisOptions = (): RedisOptions => {
 
 @Module({
   imports: [
-    MongooseModule.forRoot(mongoUri),
+    // MongoDB connection with optimized connection pooling for Render hosting
+    MongooseModule.forRoot(mongoUri, getMongoConnectionOptions()),
     BullModule.forRoot({
       redis: createRedisOptions(),
     }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000,
+        limit: 120, // Global default: 120 requests per minute
+      },
+      {
+        name: 'strict',
+        ttl: 60000,
+        limit: 10, // Strict limit: 10 requests per minute (for auth)
+      },
+      {
+        name: 'payment',
+        ttl: 60000,
+        limit: 20, // Payment limit: 20 requests per minute
+      },
+      {
+        name: 'catalog',
+        ttl: 60000,
+        limit: 30, // Catalog limit: 30 requests per minute
+      },
+    ]),
+    CacheModule,
     UserModule,
     AuthModule,
     BookingModule,

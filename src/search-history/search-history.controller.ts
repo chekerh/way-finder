@@ -17,6 +17,10 @@ import {
   UpdateSearchHistoryDto,
   SaveSearchDto,
 } from './search-history.dto';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
 @Controller('search-history')
 export class SearchHistoryController {
@@ -38,48 +42,66 @@ export class SearchHistoryController {
     return searchObj;
   }
 
+  /**
+   * Get recent searches with pagination
+   * @query type - Optional filter by search type
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('recent')
   async getRecentSearches(
     @Req() req: any,
     @Query('type') searchType?: string,
-    @Query('limit') limit?: string,
-    @Query('skip') skip?: string,
+    @Query() pagination?: PaginationDto,
   ) {
-    const searches = await this.searchHistoryService.getRecentSearches(
+    const { page = 1, limit = 20 } = pagination || {};
+    const result = await this.searchHistoryService.getRecentSearchesPaginated(
       req.user.sub,
+      page,
+      limit,
       searchType,
-      limit ? parseInt(limit, 10) : 20,
-      skip ? parseInt(skip, 10) : 0,
     );
-    return searches.map((search) => {
+
+    const data = result.data.map((search) => {
       const searchObj = (search as any).toObject
         ? (search as any).toObject()
         : search;
       return searchObj;
     });
+
+    return createPaginatedResponse(data, result.total, page, limit);
   }
 
+  /**
+   * Get saved searches with pagination
+   * @query type - Optional filter by search type
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 50, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('saved')
   async getSavedSearches(
     @Req() req: any,
     @Query('type') searchType?: string,
-    @Query('limit') limit?: string,
-    @Query('skip') skip?: string,
+    @Query() pagination?: PaginationDto,
   ) {
-    const searches = await this.searchHistoryService.getSavedSearches(
+    const { page = 1, limit = 50 } = pagination || {};
+    const result = await this.searchHistoryService.getSavedSearchesPaginated(
       req.user.sub,
+      page,
+      limit,
       searchType,
-      limit ? parseInt(limit, 10) : 50,
-      skip ? parseInt(skip, 10) : 0,
     );
-    return searches.map((search) => {
+
+    const data = result.data.map((search) => {
       const searchObj = (search as any).toObject
         ? (search as any).toObject()
         : search;
       return searchObj;
     });
+
+    return createPaginatedResponse(data, result.total, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)

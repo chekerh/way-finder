@@ -8,6 +8,7 @@ import {
 import { lastValueFrom } from 'rxjs';
 import { ActivitySearchDto } from './dto/activity-search.dto';
 import { FALLBACK_ACTIVITIES, FallbackActivity } from './catalog.fallback';
+import { CacheService } from '../common/cache/cache.service';
 
 interface GeoResponse {
   lat: number;
@@ -39,18 +40,43 @@ export class ActivitiesService {
   private readonly host =
     process.env.OPENTRIPMAP_HOST ?? 'https://api.opentripmap.com/0.1';
 
-  constructor(private readonly http: HttpService) {}
+  constructor(
+    private readonly http: HttpService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async findActivities(
     params: ActivitySearchDto,
   ): Promise<ActivityFeedResponse> {
     const safeCity = params.city?.trim() || 'Paris';
 
+    // Generate cache key
+    const cacheKey = `activities:${safeCity}:${JSON.stringify(params).slice(0, 50)}`;
+
+    // Try to get from cache first
+    const cachedResult =
+      await this.cacheService.get<ActivityFeedResponse>(cacheKey);
+    if (cachedResult) {
+      this.logger.debug(`Cache hit for activities: ${cacheKey}`);
+      return cachedResult;
+    }
+
     if (!this.apiKey) {
       this.logger.warn(
         'OpenTripMap API key missing, serving fallback activities',
       );
-      return this.buildFallbackResponse({ ...params, city: safeCity });
+      const fallbackResult = this.buildFallbackResponse({
+        ...params,
+        city: safeCity,
+      });
+      // Cache fallback for 10 minutes (600 seconds)
+      try {
+        await this.cacheService.set(cacheKey, fallbackResult, 600);
+      } catch (error) {
+        // Cache failures shouldn't break the response
+        this.logger.warn(`Failed to cache fallback activities: ${error}`);
+      }
+      return fallbackResult;
     }
 
     try {
@@ -87,22 +113,55 @@ export class ActivitiesService {
         this.logger.warn(
           `No activities returned for ${safeCity}, using fallback dataset`,
         );
-        return this.buildFallbackResponse({ ...params, city: safeCity });
+        const fallbackResult = this.buildFallbackResponse({
+          ...params,
+          city: safeCity,
+        });
+        // Cache fallback for 10 minutes (600 seconds)
+        try {
+          await this.cacheService.set(cacheKey, fallbackResult, 600);
+        } catch (error) {
+          // Cache failures shouldn't break the response
+          this.logger.warn(`Failed to cache fallback activities: ${error}`);
+        }
+        return fallbackResult;
       }
 
       const limited = mapped.slice(0, params.limit ?? 12);
-      return {
+      const result = {
         city: safeCity,
-        source: 'opentripmap',
+        source: 'opentripmap' as const,
         total: limited.length,
         items: limited,
       };
+
+      // Cache for 30 minutes (1800 seconds)
+      try {
+        await this.cacheService.set(cacheKey, result, 1800);
+        this.logger.debug(`Cached activities: ${cacheKey}`);
+      } catch (error) {
+        // Cache failures shouldn't break the response
+        this.logger.warn(`Failed to cache activities: ${error}`);
+      }
+
+      return result;
     } catch (error) {
       this.logger.error(
         'Failed to fetch activities',
         error instanceof Error ? error.stack : '',
       );
-      return this.buildFallbackResponse({ ...params, city: safeCity });
+      const fallbackResult = this.buildFallbackResponse({
+        ...params,
+        city: safeCity,
+      });
+      // Cache fallback for 10 minutes (600 seconds)
+      try {
+        await this.cacheService.set(cacheKey, fallbackResult, 600);
+      } catch (error) {
+        // Cache failures shouldn't break the response
+        this.logger.warn(`Failed to cache fallback activities: ${error}`);
+      }
+      return fallbackResult;
     }
   }
 

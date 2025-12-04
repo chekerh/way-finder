@@ -8,9 +8,15 @@ import { UserModule } from '../user/user.module';
 import { Booking, BookingSchema } from '../booking/booking.schema';
 import { Journey, JourneySchema } from '../journey/journey.schema';
 import { Outfit, OutfitSchema } from '../outfit-weather/outfit.schema';
-import { DiscussionComment, DiscussionCommentSchema } from '../discussion/discussion.schema';
+import {
+  DiscussionComment,
+  DiscussionCommentSchema,
+} from '../discussion/discussion.schema';
 import { Review, ReviewSchema } from '../reviews/reviews.schema';
-import { OnboardingSession, OnboardingSessionSchema } from '../onboarding/onboarding.schema';
+import {
+  OnboardingSession,
+  OnboardingSessionSchema,
+} from '../onboarding/onboarding.schema';
 import { User, UserSchema } from '../user/user.schema';
 
 @Module({

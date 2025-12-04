@@ -64,6 +64,10 @@ export class PriceAlertsService {
     return savedAlert;
   }
 
+  /**
+   * Get user price alerts (non-paginated - for backward compatibility)
+   * @deprecated Use getUserPriceAlertsPaginated instead for better performance
+   */
   async getUserPriceAlerts(
     userId: string,
     activeOnly: boolean = false,
@@ -74,7 +78,45 @@ export class PriceAlertsService {
       query.$or = [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }];
     }
 
-    return this.priceAlertModel.find(query).sort({ createdAt: -1 }).exec();
+    return this.priceAlertModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .exec();
+  }
+
+  /**
+   * Get paginated user price alerts
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @param activeOnly - Filter to active alerts only
+   * @returns Paginated price alert results
+   */
+  async getUserPriceAlertsPaginated(
+    userId: string,
+    page: number,
+    limit: number,
+    activeOnly: boolean = false,
+  ) {
+    const query: any = { userId };
+    if (activeOnly) {
+      query.isActive = true;
+      query.$or = [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }];
+    }
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.priceAlertModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.priceAlertModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
   }
 
   async getPriceAlert(userId: string, alertId: string): Promise<PriceAlert> {

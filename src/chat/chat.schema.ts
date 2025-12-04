@@ -69,3 +69,20 @@ export type ChatSessionDocument = HydratedDocument<ChatSession>;
 
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
 export const ChatSessionSchema = SchemaFactory.createForClass(ChatSession);
+
+/**
+ * Database indexes for optimized query performance
+ * ChatMessage indexes:
+ * - user_id is already indexed in schema
+ * - createdAt index: Enables efficient chronological sorting of messages
+ * - Compound index: Optimizes queries for user's messages sorted by date
+ */
+ChatMessageSchema.index({ user_id: 1, createdAt: -1 }); // User's messages sorted by date
+ChatMessageSchema.index({ createdAt: -1 }); // All messages sorted by date
+
+/**
+ * ChatSession indexes:
+ * - user_id is already unique and indexed in schema
+ * - session_id is already unique in schema
+ * Additional compound indexes not needed as queries are primarily by user_id (unique)
+ */

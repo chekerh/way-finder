@@ -12,6 +12,19 @@ export class PaymentService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  /**
+   * Record a payment transaction
+   * @param params - Payment parameters
+   * @param params.userId - User ID
+   * @param params.amount - Payment amount
+   * @param params.payment_method - Payment method (Stripe, PayPal, etc.)
+   * @param params.payment_status - Payment status (success, failed, pending)
+   * @param params.transaction_id - Optional transaction ID (auto-generated if not provided)
+   * @param params.currency - Currency code (default: USD)
+   * @param params.metadata - Additional metadata
+   * @param params.bookingId - Associated booking ID
+   * @returns Saved payment document
+   */
   async record(params: {
     userId: string;
     amount: number;
@@ -56,17 +69,58 @@ export class PaymentService {
     return savedPayment;
   }
 
+  /**
+   * Get user payments (non-paginated - for backward compatibility)
+   * @deprecated Use findByUserPaginated instead for better performance
+   */
   async findByUser(userId: string) {
     return this.paymentModel
       .find({ user_id: new Types.ObjectId(userId) })
       .sort({ createdAt: -1 })
+      .limit(100)
       .exec();
   }
 
+  /**
+   * Get paginated user payment history
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated payment results
+   */
+  async findByUserPaginated(userId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const query = { user_id: new Types.ObjectId(userId) };
+
+    const [data, total] = await Promise.all([
+      this.paymentModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.paymentModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
+  }
+
+  /**
+   * Find payment by transaction ID
+   * @param transactionId - Transaction ID
+   * @returns Payment document or null if not found
+   */
   async findByTransactionId(transactionId: string) {
     return this.paymentModel.findOne({ transaction_id: transactionId }).exec();
   }
 
+  /**
+   * Update payment status
+   * @param transactionId - Transaction ID
+   * @param status - New payment status
+   * @param metadata - Optional metadata to merge
+   * @returns Updated payment document or null if not found
+   */
   async updateStatus(
     transactionId: string,
     status: string,

@@ -24,6 +24,10 @@ import {
   CreateJourneyCommentDto,
 } from './journey.dto';
 import { Logger } from '@nestjs/common';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
 @Controller('journey')
 export class JourneyController {
@@ -160,15 +164,23 @@ export class JourneyController {
     return this.journeyService.addComment(req.user.sub, id, dto);
   }
 
+  /**
+   * Get journey comments with pagination
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 50, max: 100)
+   */
   @Get(':id/comments')
   async getComments(
     @Param('id') id: string,
-    @Query('limit') limit?: string,
-    @Query('skip') skip?: string,
+    @Query() pagination?: PaginationDto,
   ) {
-    const limitNum = limit ? parseInt(limit, 10) : 50;
-    const skipNum = skip ? parseInt(skip, 10) : 0;
-    return this.journeyService.getComments(id, limitNum, skipNum);
+    const { page = 1, limit = 50 } = pagination || {};
+    const result = await this.journeyService.getCommentsPaginated(
+      id,
+      page,
+      limit,
+    );
+    return createPaginatedResponse(result.data, result.total, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -47,5 +47,12 @@ export class Review {
 export type ReviewDocument = HydratedDocument<Review>;
 export const ReviewSchema = SchemaFactory.createForClass(Review);
 
-// Compound index to prevent duplicate reviews
-ReviewSchema.index({ userId: 1, itemType: 1, itemId: 1 }, { unique: true });
+/**
+ * Database indexes for optimized query performance
+ * - Compound unique index: Prevents duplicate reviews and enables fast lookups
+ * - itemType + itemId index: Fast queries for reviews of specific items
+ * - userId index: Efficient queries for user's reviews (already indexed in schema)
+ */
+ReviewSchema.index({ userId: 1, itemType: 1, itemId: 1 }, { unique: true }); // Prevents duplicates
+ReviewSchema.index({ itemType: 1, itemId: 1, createdAt: -1 }); // Reviews for an item sorted by date
+ReviewSchema.index({ itemType: 1, itemId: 1, rating: -1 }); // Reviews sorted by rating

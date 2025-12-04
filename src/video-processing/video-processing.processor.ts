@@ -22,7 +22,7 @@ export class VideoProcessingProcessor {
     this.logger.log(
       `Processing video generation job for journey ${job.data.journeyId}`,
     );
-    
+
     const journey = await this.journeyModel.findById(job.data.journeyId).exec();
     if (!journey) {
       this.logger.warn(
@@ -35,7 +35,9 @@ export class VideoProcessingProcessor {
     journey.video_status = 'processing';
     journey.video_url = undefined; // Ensure no URL is set during processing
     await journey.save();
-    this.logger.log(`Set journey ${job.data.journeyId} video status to processing`);
+    this.logger.log(
+      `Set journey ${job.data.journeyId} video status to processing`,
+    );
 
     try {
       this.logger.log(

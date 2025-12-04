@@ -516,7 +516,7 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     if (answers.travel_type) {
       preferences.travel_type = answers.travel_type;
     }
-    
+
     // Smart budget inference - infer from activities and destinations if not explicitly provided
     if (answers.budget) {
       preferences.budget = answers.budget;
@@ -524,10 +524,12 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
       const inferredBudget = this.inferBudgetFromPreferences(answers);
       if (inferredBudget) {
         preferences.budget = inferredBudget;
-        this.logger.log(`Inferred budget: ${inferredBudget} from user preferences`);
+        this.logger.log(
+          `Inferred budget: ${inferredBudget} from user preferences`,
+        );
       }
     }
-    
+
     if (answers.interests) {
       preferences.interests = Array.isArray(answers.interests)
         ? answers.interests
@@ -541,52 +543,88 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
    * Infers budget level from user's activity and destination preferences
    * This allows us to avoid asking about budget directly
    */
-  private inferBudgetFromPreferences(answers: Record<string, any>): string | null {
-    const activities = Array.isArray(answers.interests) 
-      ? answers.interests 
-      : answers.interests ? [answers.interests] : [];
-    
+  private inferBudgetFromPreferences(
+    answers: Record<string, any>,
+  ): string | null {
+    const activities = Array.isArray(answers.interests)
+      ? answers.interests
+      : answers.interests
+        ? [answers.interests]
+        : [];
+
     const destinations = Array.isArray(answers.destination_preferences)
       ? answers.destination_preferences
-      : answers.destination_preferences ? [answers.destination_preferences] : [];
-    
+      : answers.destination_preferences
+        ? [answers.destination_preferences]
+        : [];
+
     const travelType = answers.travel_type;
 
     // Luxury indicators (high budget)
     const luxuryActivities = [
-      'spa', 'relaxation', 'fine_dining', 'luxury', 'shopping', 
-      'private_tours', 'cruise', 'resort', 'beach_resort'
+      'spa',
+      'relaxation',
+      'fine_dining',
+      'luxury',
+      'shopping',
+      'private_tours',
+      'cruise',
+      'resort',
+      'beach_resort',
     ];
     const luxuryDestinations = [
-      'dubai', 'monaco', 'switzerland', 'paris', 'tokyo', 'singapore',
-      'maldives', 'seychelles', 'bora_bora', 'saint_tropez', 'monte_carlo'
+      'dubai',
+      'monaco',
+      'switzerland',
+      'paris',
+      'tokyo',
+      'singapore',
+      'maldives',
+      'seychelles',
+      'bora_bora',
+      'saint_tropez',
+      'monte_carlo',
     ];
 
     // Budget indicators (low budget)
     const budgetActivities = [
-      'backpacking', 'camping', 'hostel', 'hiking', 'budget_travel',
-      'street_food', 'local_experiences', 'public_transport'
+      'backpacking',
+      'camping',
+      'hostel',
+      'hiking',
+      'budget_travel',
+      'street_food',
+      'local_experiences',
+      'public_transport',
     ];
     const budgetDestinations = [
-      'southeast_asia', 'eastern_europe', 'central_america', 'india',
-      'nepal', 'vietnam', 'thailand', 'cambodia', 'laos', 'myanmar'
+      'southeast_asia',
+      'eastern_europe',
+      'central_america',
+      'india',
+      'nepal',
+      'vietnam',
+      'thailand',
+      'cambodia',
+      'laos',
+      'myanmar',
     ];
 
     // Check for luxury indicators
-    const hasLuxuryActivity = activities.some(a => 
-      luxuryActivities.some(la => String(a).toLowerCase().includes(la))
+    const hasLuxuryActivity = activities.some((a) =>
+      luxuryActivities.some((la) => String(a).toLowerCase().includes(la)),
     );
-    const hasLuxuryDestination = destinations.some(d =>
-      luxuryDestinations.some(ld => String(d).toLowerCase().includes(ld))
+    const hasLuxuryDestination = destinations.some((d) =>
+      luxuryDestinations.some((ld) => String(d).toLowerCase().includes(ld)),
     );
     const isBusinessTravel = travelType === 'business';
 
     // Check for budget indicators
-    const hasBudgetActivity = activities.some(a =>
-      budgetActivities.some(ba => String(a).toLowerCase().includes(ba))
+    const hasBudgetActivity = activities.some((a) =>
+      budgetActivities.some((ba) => String(a).toLowerCase().includes(ba)),
     );
-    const hasBudgetDestination = destinations.some(d =>
-      budgetDestinations.some(bd => String(d).toLowerCase().includes(bd))
+    const hasBudgetDestination = destinations.some((d) =>
+      budgetDestinations.some((bd) => String(d).toLowerCase().includes(bd)),
     );
 
     // Infer budget level
@@ -596,7 +634,7 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     if (hasBudgetActivity || hasBudgetDestination) {
       return 'low';
     }
-    
+
     // Default to mid-range if we have some preferences but no clear indicators
     if (activities.length > 0 || destinations.length > 0) {
       return 'mid_range';

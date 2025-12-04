@@ -16,7 +16,15 @@ import {
   CreateNotificationDto,
   UpdateNotificationDto,
 } from './notifications.dto';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
+/**
+ * Notifications Controller
+ * Handles user notifications, read/unread status, and notification management
+ */
 @UseGuards(JwtAuthGuard)
 @Controller('notifications')
 export class NotificationsController {
@@ -37,21 +45,35 @@ export class NotificationsController {
     return notificationObj;
   }
 
+  /**
+   * Get user notifications with pagination
+   * @query unreadOnly - Filter to unread notifications only (default: false)
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @Get()
   async getNotifications(
     @Req() req: any,
     @Query('unreadOnly') unreadOnly?: string,
+    @Query() pagination?: PaginationDto,
   ) {
-    const notifications = await this.notificationsService.getUserNotifications(
-      req.user.sub,
-      unreadOnly === 'true',
-    );
-    return notifications.map((notification) => {
+    const { page = 1, limit = 20 } = pagination || {};
+    const result =
+      await this.notificationsService.getUserNotificationsPaginated(
+        req.user.sub,
+        unreadOnly === 'true',
+        page,
+        limit,
+      );
+
+    const data = result.data.map((notification) => {
       const notificationObj = (notification as any).toObject
         ? (notification as any).toObject()
         : notification;
       return notificationObj;
     });
+
+    return createPaginatedResponse(data, result.total, page, limit);
   }
 
   @Get('unread-count')
@@ -105,9 +127,10 @@ export class NotificationsController {
 
   @Post('cleanup-duplicates')
   async cleanupDuplicates(@Req() req: any) {
-    const deletedCount = await this.notificationsService.cleanupDuplicateBookingNotifications(
-      req.user.sub,
-    );
+    const deletedCount =
+      await this.notificationsService.cleanupDuplicateBookingNotifications(
+        req.user.sub,
+      );
     return {
       message: `Cleaned up ${deletedCount} duplicate notification(s)`,
       deletedCount,

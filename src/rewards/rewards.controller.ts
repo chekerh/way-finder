@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Query,
   UseGuards,
   Request,
   Param,
@@ -11,7 +12,12 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RewardsService } from './rewards.service';
 import { RecalculatePointsService } from './recalculate-points.service';
 import { AwardPointsDto, UserPointsResponse } from './rewards.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
+/**
+ * Rewards Controller
+ * Handles user rewards, points system, and transaction history
+ */
 @Controller('rewards')
 export class RewardsController {
   constructor(
@@ -19,9 +25,27 @@ export class RewardsController {
     private readonly recalculatePointsService: RecalculatePointsService,
   ) {}
 
+  /**
+   * Get user points with paginated transaction history
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('points')
-  async getUserPoints(@Request() req): Promise<UserPointsResponse> {
+  async getUserPoints(
+    @Request() req,
+    @Query() pagination?: PaginationDto,
+  ): Promise<UserPointsResponse | any> {
+    // If pagination is requested, use paginated endpoint
+    if (pagination && (pagination.page || pagination.limit)) {
+      const { page = 1, limit = 20 } = pagination;
+      return this.rewardsService.getUserPointsWithPagination(
+        req.user.sub,
+        page,
+        limit,
+      );
+    }
+    // Otherwise, use non-paginated version for backward compatibility
     return this.rewardsService.getUserPoints(req.user.sub);
   }
 

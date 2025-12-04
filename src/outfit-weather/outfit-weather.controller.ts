@@ -11,10 +11,15 @@ import {
   UseInterceptors,
   BadRequestException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OutfitWeatherService } from './outfit-weather.service';
-import { AnalyzeOutfitDto, ApproveOutfitDto, UploadOutfitDto } from './outfit-weather.dto';
+import {
+  AnalyzeOutfitDto,
+  ApproveOutfitDto,
+  UploadOutfitDto,
+} from './outfit-weather.dto';
 import { diskStorage } from 'multer';
 import { extname, join } from 'node:path';
 import * as fs from 'node:fs';
@@ -24,6 +29,11 @@ import * as fs from 'node:fs';
 export class OutfitWeatherController {
   constructor(private readonly outfitWeatherService: OutfitWeatherService) {}
 
+  /**
+   * Upload outfit image for analysis
+   * Rate limited: 5 requests per minute to prevent abuse
+   */
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('image', {
@@ -82,10 +92,10 @@ export class OutfitWeatherController {
         const filePath = join(file.destination, file.filename);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
-          console.log('Cleaned up temporary file:', filePath);
+          // File cleaned up successfully
         }
-      } catch (error) {
-        console.error('Error cleaning up file:', error);
+      } catch (error: any) {
+        // Ignore cleanup errors - file will be cleaned up later
         // Ignore cleanup errors
       }
     }
@@ -137,4 +147,3 @@ export class OutfitWeatherController {
     return { message: 'Outfit deleted successfully' };
   }
 }
-

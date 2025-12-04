@@ -59,7 +59,12 @@ export class PriceAlert {
 export type PriceAlertDocument = HydratedDocument<PriceAlert>;
 export const PriceAlertSchema = SchemaFactory.createForClass(PriceAlert);
 
-// Indexes for efficient queries
-PriceAlertSchema.index({ userId: 1, isActive: 1 });
-PriceAlertSchema.index({ alertType: 1, itemId: 1, isActive: 1 });
-PriceAlertSchema.index({ isActive: 1, isTriggered: 1, expiresAt: 1 });
+/**
+ * Database indexes for optimized query performance
+ * - userId is already indexed in schema
+ * - Compound indexes optimize common query patterns
+ */
+PriceAlertSchema.index({ userId: 1, isActive: 1, createdAt: -1 }); // User's active alerts sorted by date
+PriceAlertSchema.index({ alertType: 1, itemId: 1, isActive: 1 }); // Alert type and item lookups
+PriceAlertSchema.index({ isActive: 1, isTriggered: 1, expiresAt: 1 }); // Active alerts needing processing
+PriceAlertSchema.index({ userId: 1, createdAt: -1 }); // User's all alerts sorted by date

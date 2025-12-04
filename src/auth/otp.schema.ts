@@ -9,7 +9,7 @@ export class OTP {
   @Prop({ required: true, length: 4 })
   code: string; // 4-digit code
 
-  @Prop({ required: true, expires: 300 }) // Expires after 5 minutes (300 seconds)
+  @Prop({ required: true }) // TTL index created separately below
   expires_at: Date;
 
   @Prop({ type: Boolean, default: false })

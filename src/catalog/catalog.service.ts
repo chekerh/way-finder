@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { AmadeusService, AmadeusRateLimitError } from './amadeus.service';
 import { ActivitiesService } from './activities.service';
 import type { ActivityFeedResponse } from './activities.service';
@@ -6,6 +6,7 @@ import { FlightSearchDto, RecommendedQueryDto } from './dto/flight-search.dto';
 import { ExploreSearchDto } from './dto/explore-search.dto';
 import { ActivitySearchDto } from './dto/activity-search.dto';
 import { UserService } from '../user/user.service';
+import { CacheService } from '../common/cache/cache.service';
 import {
   FALLBACK_EXPLORE_OFFERS,
   FALLBACK_FLIGHT_OFFERS,
@@ -14,15 +15,27 @@ import {
 
 @Injectable()
 export class CatalogService {
+  private readonly logger = new Logger(CatalogService.name);
   private amadeusCooldownUntil = 0;
 
   constructor(
     private readonly amadeus: AmadeusService,
     private readonly activities: ActivitiesService,
     private readonly userService: UserService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async getRecommendedFlights(userId: string, overrides: RecommendedQueryDto) {
+    // Generate cache key based on user and search parameters
+    const cacheKey = this.generateCacheKey('recommended', userId, overrides);
+
+    // Try to get from cache first
+    const cachedResult = await this.cacheService.get(cacheKey);
+    if (cachedResult) {
+      this.logger.debug(`Cache hit for recommended flights: ${cacheKey}`);
+      return cachedResult;
+    }
+
     const user = await this.userService.findById(userId);
     if (!user) {
       throw new NotFoundException('User not found');
@@ -65,7 +78,22 @@ export class CatalogService {
             }
             return offer;
           });
-          return { ...result, data: enrichedData };
+          const enrichedResult = { ...result, data: enrichedData };
+          // Cache for 5 minutes
+          try {
+            await this.cacheService.set(cacheKey, enrichedResult, 300);
+          } catch (error) {
+            // Cache failures shouldn't break the response
+            this.logger.warn(`Failed to cache enriched result: ${error}`);
+          }
+          return enrichedResult;
+        }
+        // Cache empty result for shorter time (2 minutes)
+        try {
+          await this.cacheService.set(cacheKey, result, 120);
+        } catch (error) {
+          // Cache failures shouldn't break the response
+          this.logger.warn(`Failed to cache empty result: ${error}`);
         }
         return result;
       } catch (error) {
@@ -74,10 +102,18 @@ export class CatalogService {
         } else {
           this.registerAmadeusFailure();
         }
-        return this.buildFallbackFlightResponse(
+        const fallbackResult = this.buildFallbackFlightResponse(
           [overrides.destinationLocationCode],
           overrides.maxResults ?? 5,
         );
+        // Cache fallback for shorter time (2 minutes)
+        try {
+          await this.cacheService.set(cacheKey, fallbackResult, 120);
+        } catch (error) {
+          // Cache failures shouldn't break the response
+          this.logger.warn(`Failed to cache fallback result: ${error}`);
+        }
+        return fallbackResult;
       }
     }
 
@@ -118,10 +154,18 @@ export class CatalogService {
     );
 
     if (this.shouldUseFallbackFlights()) {
-      return this.buildFallbackFlightResponse(
+      const fallbackResult = this.buildFallbackFlightResponse(
         popularDestinations,
         totalRequested,
       );
+      // Cache fallback for shorter time (2 minutes)
+      try {
+        await this.cacheService.set(cacheKey, fallbackResult, 120);
+      } catch (error) {
+        // Cache failures shouldn't break the response
+        this.logger.warn(`Failed to cache fallback result: ${error}`);
+      }
+      return fallbackResult;
     }
 
     let hadSuccessfulExternalCall = false;
@@ -185,20 +229,49 @@ export class CatalogService {
     });
 
     if (!allFlights.length) {
-      return this.buildFallbackFlightResponse(
+      const fallbackResult = this.buildFallbackFlightResponse(
         popularDestinations,
         totalRequested,
       );
+      // Cache fallback for shorter time (2 minutes)
+      try {
+        await this.cacheService.set(cacheKey, fallbackResult, 120);
+      } catch (error) {
+        // Cache failures shouldn't break the response
+        this.logger.warn(`Failed to cache fallback result: ${error}`);
+      }
+      return fallbackResult;
     }
 
     if (hadSuccessfulExternalCall) {
       this.registerAmadeusSuccess();
     }
 
-    return { data: allFlights.slice(0, totalRequested), meta: {} };
+    const result = { data: allFlights.slice(0, totalRequested), meta: {} };
+
+    // Cache the result for 5 minutes (300 seconds)
+    try {
+      await this.cacheService.set(cacheKey, result, 300);
+      this.logger.debug(`Cached recommended flights: ${cacheKey}`);
+    } catch (error) {
+      // Cache failures shouldn't break the response
+      this.logger.warn(`Failed to cache recommended flights: ${error}`);
+    }
+
+    return result;
   }
 
   async getExploreOffers(params: ExploreSearchDto) {
+    // Generate cache key for explore offers
+    const cacheKey = this.generateCacheKey('explore', null, params);
+
+    // Try to get from cache first
+    const cachedResult = await this.cacheService.get(cacheKey);
+    if (cachedResult) {
+      this.logger.debug(`Cache hit for explore offers: ${cacheKey}`);
+      return cachedResult;
+    }
+
     const origin = (params.origin ?? 'TUN').toUpperCase();
     const max = params.limit ?? 10;
     const budget = params.budget;
@@ -220,11 +293,22 @@ export class CatalogService {
       offers = FALLBACK_EXPLORE_OFFERS;
     }
 
-    return {
+    const result = {
       data: offers.slice(0, max),
       currency: 'EUR',
       source: 'fallback',
     };
+
+    // Cache for 10 minutes (600 seconds)
+    try {
+      await this.cacheService.set(cacheKey, result, 600);
+      this.logger.debug(`Cached explore offers: ${cacheKey}`);
+    } catch (error) {
+      // Cache failures shouldn't break the response
+      this.logger.warn(`Failed to cache explore offers: ${error}`);
+    }
+
+    return result;
   }
 
   async getActivitiesFeed(
@@ -269,6 +353,23 @@ export class CatalogService {
 
   private registerAmadeusSuccess() {
     this.amadeusCooldownUntil = 0;
+  }
+
+  /**
+   * Generate cache key for catalog endpoints
+   * @param type - Cache type (recommended, explore, activities)
+   * @param userId - Optional user ID
+   * @param params - Search parameters
+   * @returns Cache key string
+   */
+  private generateCacheKey(
+    type: string,
+    userId: string | null,
+    params: any,
+  ): string {
+    const paramsHash = JSON.stringify(params).replace(/\s+/g, '').slice(0, 100); // Limit hash length
+    const userPart = userId ? `:${userId}` : '';
+    return `catalog:${type}${userPart}:${paramsHash}`;
   }
 
   private buildFallbackFlightResponse(

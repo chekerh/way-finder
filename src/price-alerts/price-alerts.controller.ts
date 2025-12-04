@@ -13,6 +13,10 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PriceAlertsService } from './price-alerts.service';
 import { CreatePriceAlertDto, UpdatePriceAlertDto } from './price-alerts.dto';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
 @Controller('price-alerts')
 export class PriceAlertsController {
@@ -34,22 +38,35 @@ export class PriceAlertsController {
     return alertObj;
   }
 
+  /**
+   * Get user price alerts with pagination
+   * @query activeOnly - Filter to active alerts only (default: false)
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get()
   async getUserPriceAlerts(
     @Req() req: any,
     @Query('activeOnly') activeOnly?: string,
+    @Query() pagination?: PaginationDto,
   ) {
-    const alerts = await this.priceAlertsService.getUserPriceAlerts(
+    const { page = 1, limit = 20 } = pagination || {};
+    const result = await this.priceAlertsService.getUserPriceAlertsPaginated(
       req.user.sub,
+      page,
+      limit,
       activeOnly === 'true',
     );
-    return alerts.map((alert) => {
+
+    const data = result.data.map((alert) => {
       const alertObj = (alert as any).toObject
         ? (alert as any).toObject()
         : alert;
       return alertObj;
     });
+
+    return createPaginatedResponse(data, result.total, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)

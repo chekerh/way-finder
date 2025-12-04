@@ -1,18 +1,46 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { UserService } from '../user/user.service';
+import { CacheService } from '../common/cache/cache.service';
 
+/**
+ * Recommendations Service
+ * Generates personalized travel recommendations based on user preferences and onboarding data
+ */
 @Injectable()
 export class RecommendationsService {
-  constructor(private readonly userService: UserService) {}
+  private readonly logger = new Logger(RecommendationsService.name);
 
+  constructor(
+    private readonly userService: UserService,
+    private readonly cacheService: CacheService,
+  ) {}
+
+  /**
+   * Generate personalized recommendations for a user
+   * @param userId - User ID
+   * @param type - Type of recommendations ('all', 'destinations', 'offers', 'activities')
+   * @param limit - Maximum number of recommendations per category
+   * @returns Personalized recommendations object
+   * @throws NotFoundException if user not found
+   */
   async generatePersonalizedRecommendations(
     userId: string,
     type: string = 'all',
     limit: number = 10,
   ): Promise<any> {
+    // Generate cache key
+    const cacheKey = `recommendations:${userId}:${type}:${limit}`;
+
+    // Try to get from cache first
+    const cachedResult = await this.cacheService.get(cacheKey);
+    if (cachedResult) {
+      this.logger.debug(`Cache hit for recommendations: ${cacheKey}`);
+      return cachedResult;
+    }
+
     const user = await this.userService.findById(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     const preferences = user.onboarding_preferences || {};
@@ -36,6 +64,15 @@ export class RecommendationsService {
     }
     if (type === 'all' || type === 'activities') {
       result.activities = activities;
+    }
+
+    // Cache for 15 minutes (900 seconds)
+    try {
+      await this.cacheService.set(cacheKey, result, 900);
+      this.logger.debug(`Cached recommendations: ${cacheKey}`);
+    } catch (error) {
+      // Cache failures shouldn't break the response
+      this.logger.warn(`Failed to cache recommendations: ${error}`);
     }
 
     return result;

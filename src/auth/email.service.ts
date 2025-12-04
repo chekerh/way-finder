@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import * as crypto from 'crypto';
 import axios from 'axios';
@@ -115,7 +119,9 @@ export class EmailService {
       !this.mailjetApiSecret ||
       !this.mailjetFromEmail
     ) {
-      throw new Error('Mailjet credentials not configured');
+      throw new ServiceUnavailableException(
+        'Email service is not configured. Mailjet credentials are missing.',
+      );
     }
 
     const mailjetUrl = 'https://api.mailjet.com/v3.1/send';
@@ -164,7 +170,9 @@ export class EmailService {
         `Failed to send Mailjet email to ${to}:`,
         error.response?.data || error.message,
       );
-      throw new Error('Failed to send email via Mailjet');
+      throw new ServiceUnavailableException(
+        'Failed to send email via Mailjet service',
+      );
     }
   }
 

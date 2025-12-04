@@ -12,7 +12,15 @@ import {
 import { FavoritesService } from './favorites.service';
 import { CreateFavoriteDto, FavoriteItemType } from './favorites.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
+/**
+ * Favorites Controller
+ * Handles user favorites for destinations, hotels, activities, and other items
+ */
 @Controller('favorites')
 @UseGuards(JwtAuthGuard)
 export class FavoritesController {
@@ -26,12 +34,26 @@ export class FavoritesController {
     return this.favoritesService.addFavorite(req.user.sub, createFavoriteDto);
   }
 
+  /**
+   * Get user favorites with pagination
+   * @query type - Optional filter by item type
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @Get()
   async getFavorites(
     @Req() req: any,
     @Query('type') itemType?: FavoriteItemType,
+    @Query() pagination?: PaginationDto,
   ) {
-    return this.favoritesService.getFavorites(req.user.sub, itemType);
+    const { page = 1, limit = 20 } = pagination || {};
+    const result = await this.favoritesService.getFavoritesPaginated(
+      req.user.sub,
+      page,
+      limit,
+      itemType,
+    );
+    return createPaginatedResponse(result.data, result.total, page, limit);
   }
 
   @Get('count')

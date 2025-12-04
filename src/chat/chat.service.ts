@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -64,7 +70,7 @@ export class ChatService {
 
     // Verify model is available
     if (!this.aiService.isModelAvailable(model)) {
-      throw new Error(
+      throw new ServiceUnavailableException(
         `Model ${model} is not available. Please check API keys.`,
       );
     }
@@ -192,7 +198,7 @@ export class ChatService {
       await this.createSession(userId);
     } else {
       if (!this.aiService.isModelAvailable(dto.model)) {
-        throw new Error(
+        throw new ServiceUnavailableException(
           `Model ${dto.model} is not available. Please check API keys.`,
         );
       }
@@ -203,6 +209,10 @@ export class ChatService {
     return { success: true, model: dto.model };
   }
 
+  /**
+   * Get chat history (non-paginated - for backward compatibility)
+   * @deprecated Use getHistoryPaginated instead for better performance
+   */
   async getHistory(userId: string, limit: number = 50): Promise<any[]> {
     const session = await this.chatSessionModel
       .findOne({ user_id: new Types.ObjectId(userId) })
@@ -225,6 +235,46 @@ export class ChatService {
       flight_packs: msg.metadata?.flight_packs || [],
       created_at: (msg as any).createdAt,
     }));
+  }
+
+  /**
+   * Get paginated chat history
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated chat history results
+   */
+  async getHistoryPaginated(userId: string, page: number, limit: number) {
+    const session = await this.chatSessionModel
+      .findOne({ user_id: new Types.ObjectId(userId) })
+      .exec();
+
+    if (!session || !session.messages.length) {
+      return { data: [], total: 0 };
+    }
+
+    const skip = (page - 1) * limit;
+    const messageIds = session.messages;
+
+    const [data, total] = await Promise.all([
+      this.chatMessageModel
+        .find({ _id: { $in: messageIds } })
+        .sort({ createdAt: 1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.chatMessageModel.countDocuments({ _id: { $in: messageIds } }).exec(),
+    ]);
+
+    const transformedData = data.map((msg) => ({
+      message: msg.message,
+      role: msg.role,
+      model_used: msg.model_used,
+      flight_packs: msg.metadata?.flight_packs || [],
+      created_at: (msg as any).createdAt,
+    }));
+
+    return { data: transformedData, total };
   }
 
   async clearHistory(userId: string): Promise<{ success: boolean }> {

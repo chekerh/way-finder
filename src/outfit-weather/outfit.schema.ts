@@ -38,4 +38,3 @@ export class Outfit {
 }
 
 export const OutfitSchema = SchemaFactory.createForClass(Outfit);
-

@@ -55,6 +55,11 @@ export class TravelTip {
 
 export const TravelTipSchema = SchemaFactory.createForClass(TravelTip);
 
-// Create indexes for efficient queries
-TravelTipSchema.index({ destinationId: 1, category: 1 });
-TravelTipSchema.index({ destinationId: 1, isActive: 1 });
+/**
+ * Database indexes for optimized query performance
+ * - destinationId is already indexed in schema
+ * - Compound indexes optimize common query patterns
+ */
+TravelTipSchema.index({ destinationId: 1, category: 1, isActive: 1 }); // Destination tips by category
+TravelTipSchema.index({ destinationId: 1, isActive: 1, createdAt: -1 }); // Active tips sorted by date
+TravelTipSchema.index({ category: 1, isActive: 1, helpfulCount: -1 }); // Popular tips by category

@@ -12,6 +12,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { BookingService } from './booking.service';
 import {
   ConfirmBookingDto,
@@ -19,21 +20,47 @@ import {
   UpdateBookingDto,
 } from './booking.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
+/**
+ * Booking Controller
+ * Handles flight and hotel booking operations, offers search, and booking management
+ */
 @Controller('booking')
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
+  /**
+   * Search for flight/hotel offers (mock data)
+   * @query destination - Destination location
+   * @query dates - Travel dates
+   * @query type - Offer type (flight/hotel)
+   * @returns Array of mock offers
+   * @deprecated Consider using /catalog/recommended or /catalog/explore for real flight search
+   */
   @Get('offers')
   async offers(@Query() query: any) {
     return this.bookingService.searchOffers(query);
   }
 
+  /**
+   * Compare offer prices and get detailed breakdown
+   * @query offer_id - Offer identifier
+   * @returns Price breakdown with base price, taxes, fees, and total
+   */
   @Get('compare')
   async compare(@Query('offer_id') offer_id: string) {
     return this.bookingService.compare(offer_id);
   }
 
+  /**
+   * Confirm a booking
+   * Rate limited: 10 requests per minute to prevent abuse
+   */
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @Post('confirm')
   @UsePipes(
@@ -44,20 +71,41 @@ export class BookingController {
     }),
   )
   async confirm(@Req() req: any, @Body() dto: ConfirmBookingDto) {
-    console.log('Confirm booking request:', JSON.stringify(dto, null, 2));
     return this.bookingService.confirm(req.user.sub, dto);
   }
 
+  /**
+   * Get booking history with pagination
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('history')
-  async history(@Req() req: any) {
-    return this.bookingService.history(req.user.sub);
+  async history(@Req() req: any, @Query() pagination: PaginationDto) {
+    const { page = 1, limit = 20 } = pagination;
+    const result = await this.bookingService.historyPaginated(
+      req.user.sub,
+      page,
+      limit,
+    );
+    return createPaginatedResponse(result.data, result.total, page, limit);
   }
 
+  /**
+   * List bookings with pagination (alias for history)
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get()
-  async list(@Req() req: any) {
-    return this.bookingService.history(req.user.sub);
+  async list(@Req() req: any, @Query() pagination: PaginationDto) {
+    const { page = 1, limit = 20 } = pagination;
+    const result = await this.bookingService.historyPaginated(
+      req.user.sub,
+      page,
+      limit,
+    );
+    return createPaginatedResponse(result.data, result.total, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)

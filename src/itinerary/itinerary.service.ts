@@ -27,6 +27,10 @@ export class ItineraryService {
     return createdItinerary.save();
   }
 
+  /**
+   * Get user itineraries (non-paginated - for backward compatibility)
+   * @deprecated Use findAllPaginated instead for better performance
+   */
   async findAll(
     userId: string,
     includePublic: boolean = false,
@@ -41,7 +45,49 @@ export class ItineraryService {
       query.userId = userId;
     }
 
-    return this.itineraryModel.find(query).sort({ createdAt: -1 }).exec();
+    return this.itineraryModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .exec();
+  }
+
+  /**
+   * Get paginated user itineraries
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @param includePublic - Include public itineraries from other users
+   * @returns Paginated itinerary results
+   */
+  async findAllPaginated(
+    userId: string,
+    page: number,
+    limit: number,
+    includePublic: boolean = false,
+  ) {
+    const query: any = {};
+
+    if (includePublic) {
+      // Get user's own itineraries OR public itineraries from other users
+      query.$or = [{ userId }, { isPublic: true, userId: { $ne: userId } }];
+    } else {
+      // Only user's own itineraries
+      query.userId = userId;
+    }
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.itineraryModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.itineraryModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
   }
 
   async findOne(id: string, userId: string): Promise<Itinerary> {

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument } from './notifications.schema';
@@ -7,8 +13,15 @@ import { FcmService } from './fcm.service';
 import { UserService } from '../user/user.service';
 import { Booking, BookingDocument } from '../booking/booking.schema';
 
+/**
+ * Notifications Service
+ * Handles in-app notifications, push notifications (FCM), and notification management
+ * Includes duplicate prevention, atomic operations, and booking verification
+ */
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<NotificationDocument>,
@@ -18,6 +31,16 @@ export class NotificationsService {
     private readonly userService: UserService,
   ) {}
 
+  /**
+   * Create a new notification with duplicate prevention
+   * For booking notifications, verifies booking exists and prevents duplicates
+   * Sends FCM push notification if configured and user has FCM token
+   * @param userId - User ID to send notification to
+   * @param createNotificationDto - Notification data
+   * @returns Created notification document
+   * @throws BadRequestException if userId is invalid
+   * @throws NotFoundException if booking doesn't exist for booking notifications
+   */
   async createNotification(
     userId: string,
     createNotificationDto: CreateNotificationDto,
@@ -40,15 +63,15 @@ export class NotificationsService {
     if (isBookingNotification && createNotificationDto.data?.bookingId) {
       // Ensure bookingId is a string (not ObjectId) for consistent indexing
       const bookingId = String(createNotificationDto.data.bookingId);
-      
+
       // Verify booking exists before creating notification
       const booking = await this.bookingModel
         .findById(new Types.ObjectId(bookingId))
         .exec();
 
       if (!booking) {
-        console.log(
-          `[NotificationsService] ⚠️ Booking ${bookingId} does not exist. Skipping notification creation to prevent infinite loop.`,
+        this.logger.warn(
+          `Booking ${bookingId} does not exist. Skipping notification creation to prevent infinite loop.`,
         );
         // Return a dummy notification document to avoid breaking the flow
         // but don't save it or send FCM
@@ -74,17 +97,18 @@ export class NotificationsService {
 
       if (existingNotification) {
         // Reduced logging - only log once per minute to avoid spam
-        const shouldLog = !existingNotification.createdAt || 
-          (Date.now() - existingNotification.createdAt.getTime()) > 60000; // Only log if notification is older than 1 minute
-        
+        const shouldLog =
+          !existingNotification.createdAt ||
+          Date.now() - existingNotification.createdAt.getTime() > 60000; // Only log if notification is older than 1 minute
+
         if (shouldLog) {
-          console.log(
-            `[NotificationsService] ⚠️ PERMANENT DEDUPLICATION: Notification of type "${createNotificationDto.type}" already exists for booking ${bookingId} (user ${userId})`,
+          this.logger.warn(
+            `PERMANENT DEDUPLICATION: Notification of type "${createNotificationDto.type}" already exists for booking ${bookingId} (user ${userId})`,
           );
           // Log call stack to identify what's calling this repeatedly (only occasionally)
           const stack = new Error().stack;
-          console.log(
-            `[NotificationsService] ⚠️ DUPLICATE CALL DETECTED - Call stack: ${stack?.split('\n').slice(1, 6).join('\n')}`,
+          this.logger.debug(
+            `DUPLICATE CALL DETECTED - Call stack: ${stack?.split('\n').slice(1, 6).join('\n')}`,
           );
         }
         // Return existing notification without creating a new one or sending FCM
@@ -103,12 +127,14 @@ export class NotificationsService {
         actionUrl: createNotificationDto.actionUrl,
         isRead: false,
       };
-      
+
       // Ensure data.bookingId is a string for consistent indexing
       if (createNotificationDto.data) {
         notificationData.data = { ...createNotificationDto.data };
         if (notificationData.data.bookingId) {
-          notificationData.data.bookingId = String(notificationData.data.bookingId);
+          notificationData.data.bookingId = String(
+            notificationData.data.bookingId,
+          );
         }
       } else {
         notificationData.data = {};
@@ -134,14 +160,19 @@ export class NotificationsService {
       } catch (error: any) {
         // If unique index violation (duplicate key error), fetch the existing notification
         if (error.code === 11000 || error.codeName === 'DuplicateKey') {
-          console.log(
-            `[NotificationsService] ⚠️ Unique index violation - notification already exists. Fetching existing notification.`,
+          this.logger.warn(
+            `Unique index violation - notification already exists. Fetching existing notification.`,
           );
           const existingAtomicNotification = await this.notificationModel
             .findOne(deduplicationKey)
             .exec();
           if (!existingAtomicNotification) {
-            throw new Error('Failed to find existing notification after duplicate key error');
+            this.logger.error(
+              `Database inconsistency: Duplicate key error occurred but notification not found`,
+            );
+            throw new InternalServerErrorException(
+              'Database consistency error: notification state is invalid',
+            );
           }
           // Return existing notification without sending FCM
           return existingAtomicNotification;
@@ -152,39 +183,43 @@ export class NotificationsService {
       // CRITICAL: Check if this notification was already existing before we tried to create it
       // If we found an existing notification before the upsert, this is definitely not new
       if (existingNotification) {
-        console.log(
-          `[NotificationsService] ⚠️ RACE CONDITION PREVENTED: Another request created the notification first. Using existing notification.`,
+        this.logger.warn(
+          `RACE CONDITION PREVENTED: Another request created the notification first. Using existing notification.`,
         );
         // Return the existing notification without sending FCM again
         return atomicNotification;
       }
-      
+
       // CRITICAL: Double-check if the notification was already existing by checking createdAt
       // If createdAt is older than 2 seconds, it was definitely already existing
       const now = new Date();
       const createdAt = atomicNotification.createdAt || now;
       const timeDiff = now.getTime() - createdAt.getTime();
-      
+
       // If the notification was created more than 2 seconds ago, it was already existing
       // This handles race conditions where two requests both don't find existingNotification
       // but one creates it before the other, and the second one gets the existing one
       if (timeDiff > 2000) {
-        console.log(
-          `[NotificationsService] ⚠️ Notification was already existing (created ${timeDiff}ms ago). Skipping FCM.`,
+        this.logger.debug(
+          `Notification was already existing (created ${timeDiff}ms ago). Skipping FCM.`,
         );
         // Return existing notification without sending FCM
         return atomicNotification;
       }
 
       // Additional check: if updatedAt is different from createdAt, the notification was updated (not newly created)
-      if (atomicNotification.updatedAt && atomicNotification.createdAt && 
-          atomicNotification.updatedAt.getTime() !== atomicNotification.createdAt.getTime()) {
-        console.log(
-          `[NotificationsService] ⚠️ Notification was updated (not newly created). Skipping FCM.`,
+      if (
+        atomicNotification.updatedAt &&
+        atomicNotification.createdAt &&
+        atomicNotification.updatedAt.getTime() !==
+          atomicNotification.createdAt.getTime()
+      ) {
+        this.logger.debug(
+          `Notification was updated (not newly created). Skipping FCM.`,
         );
         return atomicNotification;
       }
-      
+
       // CRITICAL: Final check - query again to make absolutely sure this notification is unique
       // This catches cases where the index unique didn't work or wasn't applied
       // Only do this check if the notification was created very recently (within 1 second)
@@ -194,38 +229,41 @@ export class NotificationsService {
           .sort({ createdAt: -1 })
           .limit(2)
           .exec();
-        
+
         if (finalCheck.length > 1) {
           // Multiple notifications with the same key exist - this is a duplicate
           // Return the oldest one (first in sorted order)
-          console.log(
-            `[NotificationsService] ⚠️ Multiple notifications with same key exist (${finalCheck.length} found). This is a duplicate. Skipping FCM and returning oldest.`,
+          this.logger.warn(
+            `Multiple notifications with same key exist (${finalCheck.length} found). This is a duplicate. Skipping FCM and returning oldest.`,
           );
           return finalCheck[finalCheck.length - 1]; // Return the oldest one
         }
-        
+
         // If we got the notification we just created, make sure it's the only one
-        if (finalCheck.length === 1 && finalCheck[0]._id.toString() !== atomicNotification._id.toString()) {
-          console.log(
-            `[NotificationsService] ⚠️ Another notification with same key exists (ID: ${finalCheck[0]._id}). This is a duplicate. Skipping FCM.`,
+        if (
+          finalCheck.length === 1 &&
+          finalCheck[0]._id.toString() !== atomicNotification._id.toString()
+        ) {
+          this.logger.warn(
+            `Another notification with same key exists (ID: ${finalCheck[0]._id}). This is a duplicate. Skipping FCM.`,
           );
           return finalCheck[0]; // Return the existing one
         }
       }
 
-      console.log(
-        `[NotificationsService] ✅ Atomically created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${atomicNotification._id}`,
+      this.logger.log(
+        `Atomically created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${atomicNotification._id}`,
       );
-      
+
       // Continue with FCM sending for the newly created notification
       notificationToReturn = atomicNotification;
       shouldSendFCM = true;
-      
+
       // Skip the rest of the notification creation logic since we already created it atomically
       // Go directly to FCM sending section at the end
     } else {
       // For non-booking notifications, use normal flow
-      
+
       // For likes/comments, prevent duplicates within 5 minutes to avoid spam
       const shouldPreventDuplicates =
         createNotificationDto.type === 'post_liked' ||
@@ -261,14 +299,14 @@ export class NotificationsService {
       if (existingNotificationForSocial && shouldPreventDuplicates) {
         // For likes/comments: A notification already exists within the last 5 minutes
         // DO NOT create a new one or send another FCM notification to avoid spam
-        console.log(
-          `[NotificationsService] ⚠️ Duplicate notification prevented for user ${userId}, type ${createNotificationDto.type}`,
+        this.logger.warn(
+          `Duplicate notification prevented for user ${userId}, type ${createNotificationDto.type}`,
         );
-        console.log(
-          `[NotificationsService] Existing notification ID: ${existingNotificationForSocial._id}, created at: ${existingNotificationForSocial.createdAt}`,
+        this.logger.debug(
+          `Existing notification ID: ${existingNotificationForSocial._id}, created at: ${existingNotificationForSocial.createdAt}`,
         );
-        console.log(
-          `[NotificationsService] Skipping notification creation and FCM send to prevent spam`,
+        this.logger.debug(
+          `Skipping notification creation and FCM send to prevent spam`,
         );
 
         // Return existing notification without sending FCM
@@ -281,28 +319,28 @@ export class NotificationsService {
           ...createNotificationDto,
         });
         notificationToReturn = await notification.save();
-        console.log(
-          `[NotificationsService] ✅ Created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${notificationToReturn._id}`,
+        this.logger.log(
+          `Created new notification for user ${userId}, type ${createNotificationDto.type}, ID: ${notificationToReturn._id}`,
         );
         shouldSendFCM = true; // Always send FCM for new notifications
       }
     }
 
     // Send FCM push notification ONLY if this is a new notification (not a duplicate)
-    console.log(
-      `[NotificationsService] Attempting to send FCM - shouldSendFCM: ${shouldSendFCM}, isInitialized: ${this.fcmService.isInitialized()}`,
+    this.logger.debug(
+      `Attempting to send FCM - shouldSendFCM: ${shouldSendFCM}, isInitialized: ${this.fcmService.isInitialized()}`,
     );
 
     if (shouldSendFCM && this.fcmService.isInitialized()) {
       try {
         const fcmToken = await this.userService.getFcmToken(userId);
-        console.log(
-          `[NotificationsService] FCM token for user ${userId}: ${fcmToken ? 'FOUND' : 'NOT FOUND'}`,
+        this.logger.debug(
+          `FCM token for user ${userId}: ${fcmToken ? 'FOUND' : 'NOT FOUND'}`,
         );
 
         if (fcmToken) {
-          console.log(
-            `[NotificationsService] Sending FCM notification to token: ${fcmToken.substring(0, 20)}...`,
+          this.logger.debug(
+            `Sending FCM notification to token: ${fcmToken.substring(0, 20)}...`,
           );
           const sent = await this.fcmService.sendNotification(
             fcmToken,
@@ -316,57 +354,54 @@ export class NotificationsService {
             },
           );
           if (sent) {
-            console.log(
-              `[NotificationsService] ✅ FCM push notification sent successfully for user ${userId}, type ${createNotificationDto.type}`,
+            this.logger.log(
+              `FCM push notification sent successfully for user ${userId}, type ${createNotificationDto.type}`,
             );
           } else {
-            console.log(
-              `[NotificationsService] ⚠️ FCM push notification failed (notification saved to database)`,
+            this.logger.warn(
+              `FCM push notification failed (notification saved to database)`,
             );
-            console.log(
-              `[NotificationsService] Check FCM service logs above for error details`,
-            );
+            this.logger.debug('Check FCM service logs above for error details');
           }
         } else {
-          console.log(
-            `[NotificationsService] ⚠️ No FCM token found for user ${userId}`,
+          this.logger.warn(`No FCM token found for user ${userId}`);
+          this.logger.debug(
+            'User needs to register FCM token via POST /api/user/fcm-token',
           );
-          console.log(
-            `[NotificationsService] User needs to register FCM token via POST /api/user/fcm-token`,
-          );
-          console.log(
-            `[NotificationsService] Notification saved to database but push notification not sent`,
+          this.logger.debug(
+            'Notification saved to database but push notification not sent',
           );
         }
       } catch (error: any) {
         // Log error but don't fail notification creation
         // Notification is still saved to database even if push fails
-        console.error(
-          '[NotificationsService] ❌ Error attempting to send FCM notification:',
-          error.message,
+        this.logger.error(
+          `Error attempting to send FCM notification: ${error.message}`,
+          error.stack,
         );
-        console.error('[NotificationsService] Error stack:', error.stack);
-        console.error(
-          '[NotificationsService] Notification saved to database but push notification failed',
+        this.logger.warn(
+          'Notification saved to database but push notification failed',
         );
       }
     } else if (!shouldSendFCM) {
-      console.log(
-        `[NotificationsService] ⏭️ Skipping FCM send - duplicate notification prevented`,
-      );
+      this.logger.debug('Skipping FCM send - duplicate notification prevented');
     } else if (!this.fcmService.isInitialized()) {
-      console.log(`[NotificationsService] ⚠️ FCM service not initialized`);
-      console.log(
-        `[NotificationsService] Configure FIREBASE_SERVICE_ACCOUNT_KEY environment variable on Render`,
+      this.logger.warn('FCM service not initialized');
+      this.logger.debug(
+        'Configure FIREBASE_SERVICE_ACCOUNT_KEY environment variable on Render',
       );
-      console.log(
-        `[NotificationsService] Notification saved to database but push notifications are disabled`,
+      this.logger.debug(
+        'Notification saved to database but push notifications are disabled',
       );
     }
 
     return notificationToReturn;
   }
 
+  /**
+   * Get user notifications (non-paginated - for backward compatibility)
+   * @deprecated Use getUserNotificationsPaginated instead for better performance
+   */
   async getUserNotifications(
     userId: string,
     unreadOnly: boolean = false,
@@ -380,6 +415,39 @@ export class NotificationsService {
       .sort({ createdAt: -1 })
       .limit(50)
       .exec();
+  }
+
+  /**
+   * Get paginated user notifications
+   * @param userId - User ID
+   * @param unreadOnly - Filter to unread notifications only
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated notification results
+   */
+  async getUserNotificationsPaginated(
+    userId: string,
+    unreadOnly: boolean = false,
+    page: number,
+    limit: number,
+  ) {
+    const query: any = { userId: new Types.ObjectId(userId) };
+    if (unreadOnly) {
+      query.isRead = false;
+    }
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.notificationModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.notificationModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
   }
 
   async markNotificationsAsReadByAction(
@@ -437,7 +505,9 @@ export class NotificationsService {
   }
 
   async deleteAllNotifications(userId: string): Promise<void> {
-    await this.notificationModel.deleteMany({ userId: new Types.ObjectId(userId) }).exec();
+    await this.notificationModel
+      .deleteMany({ userId: new Types.ObjectId(userId) })
+      .exec();
   }
 
   /**
@@ -454,8 +524,8 @@ export class NotificationsService {
         'data.bookingId': String(bookingId), // Ensure bookingId is string for consistent querying
       })
       .exec();
-    console.log(
-      `[NotificationsService] ✅ Deleted ${result.deletedCount} notification(s) for booking ${bookingId}`,
+    this.logger.log(
+      `Deleted ${result.deletedCount} notification(s) for booking ${bookingId}`,
     );
   }
 
@@ -473,26 +543,24 @@ export class NotificationsService {
       type: type,
       'data.bookingId': String(bookingId), // Ensure bookingId is string for consistent querying
     };
-    
+
     return await this.notificationModel
       .findOne(deduplicationKey)
       .sort({ createdAt: -1 }) // Get the most recent one
       .exec();
   }
-  
+
   /**
    * Clean up duplicate notifications for booking-related events
    * This removes all but the most recent notification for each bookingId+type combination
    */
   async cleanupDuplicateBookingNotifications(userId: string): Promise<number> {
-    const bookingTypes: Array<'booking_confirmed' | 'booking_cancelled' | 'booking_updated'> = [
-      'booking_confirmed',
-      'booking_cancelled',
-      'booking_updated',
-    ];
-    
+    const bookingTypes: Array<
+      'booking_confirmed' | 'booking_cancelled' | 'booking_updated'
+    > = ['booking_confirmed', 'booking_cancelled', 'booking_updated'];
+
     let totalDeleted = 0;
-    
+
     for (const type of bookingTypes) {
       // Find all notifications of this type for this user
       const allNotifications = await this.notificationModel
@@ -503,9 +571,12 @@ export class NotificationsService {
         })
         .sort({ createdAt: -1 })
         .exec();
-      
+
       // Group by bookingId
-      const notificationsByBookingId = new Map<string, NotificationDocument[]>();
+      const notificationsByBookingId = new Map<
+        string,
+        NotificationDocument[]
+      >();
       for (const notification of allNotifications) {
         const bookingId = String(notification.data?.bookingId || '');
         if (bookingId) {
@@ -515,32 +586,35 @@ export class NotificationsService {
           notificationsByBookingId.get(bookingId)!.push(notification);
         }
       }
-      
+
       // For each bookingId, keep only the most recent notification and delete the rest
-      for (const [bookingId, notifications] of notificationsByBookingId.entries()) {
+      for (const [
+        bookingId,
+        notifications,
+      ] of notificationsByBookingId.entries()) {
         if (notifications.length > 1) {
           // Keep the first one (most recent), delete the rest
           const toDelete = notifications.slice(1);
           const idsToDelete = toDelete.map((n) => n._id);
-          
+
           const result = await this.notificationModel
             .deleteMany({ _id: { $in: idsToDelete } })
             .exec();
-          
+
           totalDeleted += result.deletedCount;
-          console.log(
-            `[NotificationsService] 🧹 Cleaned up ${result.deletedCount} duplicate ${type} notification(s) for booking ${bookingId}`,
+          this.logger.debug(
+            `Cleaned up ${result.deletedCount} duplicate ${type} notification(s) for booking ${bookingId}`,
           );
         }
       }
     }
-    
+
     if (totalDeleted > 0) {
-      console.log(
-        `[NotificationsService] ✅ Cleaned up ${totalDeleted} total duplicate booking notifications`,
+      this.logger.log(
+        `Cleaned up ${totalDeleted} total duplicate booking notifications`,
       );
     }
-    
+
     return totalDeleted;
   }
 

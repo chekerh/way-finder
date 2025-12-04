@@ -79,7 +79,7 @@ export class JourneyLike {
   @Prop({ type: Types.ObjectId, ref: 'Journey', required: true, index: true })
   journey_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user_id: Types.ObjectId;
 }
 
@@ -95,7 +95,7 @@ export class JourneyComment {
   @Prop({ type: Types.ObjectId, ref: 'Journey', required: true, index: true })
   journey_id: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   user_id: Types.ObjectId;
 
   @Prop({ required: true, trim: true })

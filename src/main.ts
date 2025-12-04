@@ -1,14 +1,36 @@
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
+import compression from 'compression';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Enable gzip compression for all responses
+  // This significantly reduces response sizes and improves performance, especially on Render hosting
+  // Compression level: 6 (balanced between CPU usage and compression ratio)
+  // Filter: Only compress responses larger than 1KB and non-binary content
+  app.use(
+    compression({
+      level: 6, // Compression level (1-9, 6 is balanced)
+      threshold: 1024, // Only compress responses > 1KB
+      filter: (req, res) => {
+        // Don't compress if explicitly disabled
+        if (req.headers['x-no-compression']) {
+          return false;
+        }
+        // Use compression for all other responses
+        return compression.filter(req, res);
+      },
+    }),
+  );
+  logger.log('✅ Response compression enabled (gzip)');
 
   // Create uploads directories if they don't exist
   // NOTE: On Render, the filesystem is ephemeral. For production, consider using cloud storage (S3, Cloudinary, etc.)
@@ -20,7 +42,7 @@ async function bootstrap() {
   [uploadsDir, profilesDir, journeysDir, outfitsDir].forEach((dir) => {
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
-      console.log(`📁 Created directory: ${dir}`);
+      logger.log(`📁 Created directory: ${dir}`);
     }
   });
 
@@ -43,10 +65,44 @@ async function bootstrap() {
     prefix: '/uploads/destination-videos/',
   });
 
+  // CORS configuration - restrict origins for security
+  // In production, always specify exact origins. Wildcard (*) is only for development.
+  const allowedOrigins = process.env.FRONTEND_ORIGIN
+    ? process.env.FRONTEND_ORIGIN.split(',').map((origin) => origin.trim())
+    : process.env.NODE_ENV === 'production'
+      ? [] // Production must specify origins
+      : ['http://localhost:3000', 'http://localhost:3001']; // Development defaults
+
   app.enableCors({
-    origin: process.env.FRONTEND_ORIGIN || '*',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // In development, allow all origins if FRONTEND_ORIGIN is not set
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        (!process.env.FRONTEND_ORIGIN || process.env.FRONTEND_ORIGIN === '*')
+      ) {
+        return callback(null, true);
+      }
+
+      // Check if origin is in allowed list
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        logger.warn(`CORS blocked request from origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
+  logger.log(
+    `✅ CORS configured for ${allowedOrigins.length || 'all'} origin(s)`,
+  );
 
   app.use(helmet());
 
@@ -71,13 +127,14 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT) || 3000;
   await app.listen(port, '0.0.0.0');
-  console.log(`🚀 Application is running on: http://localhost:${port}/api`);
-  console.log(
-    `📚 Swagger docs available at: http://localhost:${port}/api-docs`,
-  );
+  logger.log(`🚀 Application is running on: http://localhost:${port}/api`);
+  logger.log(`📚 Swagger docs available at: http://localhost:${port}/api-docs`);
+  logger.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.log(`💾 MongoDB: Connected with connection pooling enabled`);
 }
 
 bootstrap().catch((error) => {
-  console.error('Error starting the application:', error);
+  const logger = new Logger('Bootstrap');
+  logger.error('Error starting the application:', error);
   process.exit(1);
 });

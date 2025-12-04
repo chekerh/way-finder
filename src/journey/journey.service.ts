@@ -320,13 +320,20 @@ export class JourneyService {
           destination,
         },
       });
-      
+
       // Increment lifetime metrics
-      await this.userService.incrementLifetimeMetric(userId, 'total_posts_shared');
-      
-      this.logger.log(`Awarded ${points} points to user ${userId} for sharing journey`);
+      await this.userService.incrementLifetimeMetric(
+        userId,
+        'total_posts_shared',
+      );
+
+      this.logger.log(
+        `Awarded ${points} points to user ${userId} for sharing journey`,
+      );
     } catch (error) {
-      this.logger.warn(`Failed to award points for journey share: ${error.message}`);
+      this.logger.warn(
+        `Failed to award points for journey share: ${error.message}`,
+      );
       // Don't fail journey creation if points fail
     }
 
@@ -384,6 +391,10 @@ export class JourneyService {
     };
   }
 
+  /**
+   * Get journeys (non-paginated - for backward compatibility)
+   * @deprecated Use getJourneysPaginated instead for better performance
+   */
   async getJourneys(userId?: string, limit: number = 20, skip: number = 0) {
     const query: any = { is_visible: true, is_public: true };
 
@@ -391,7 +402,10 @@ export class JourneyService {
       // Include user's own journeys even if private
       query.$or = [
         { is_public: true, is_visible: true },
-        { user_id: this.toObjectId(userId, 'user id') as any, is_visible: true },
+        {
+          user_id: this.toObjectId(userId, 'user id') as any,
+          is_visible: true,
+        },
       ];
     }
 
@@ -577,7 +591,10 @@ export class JourneyService {
 
   async getUserJourneys(userId: string, limit: number = 20, skip: number = 0) {
     const journeys = await this.journeyModel
-      .find({ user_id: this.toObjectId(userId, 'user id') as any, is_visible: true })
+      .find({
+        user_id: this.toObjectId(userId, 'user id') as any,
+        is_visible: true,
+      })
       .populate('user_id', 'username firstName lastName profile_image_url')
       .populate('booking_id')
       .sort({ createdAt: -1 })
@@ -701,7 +718,7 @@ export class JourneyService {
     // Send notification to journey owner if it's not the same user
     // Handle both populated and non-populated user_id
     let journeyOwnerId: string | undefined;
-    
+
     if (journey.user_id) {
       const journeyObj = journey.toObject ? journey.toObject() : journey;
       const populatedUserId = journeyObj.user_id as any;
@@ -709,14 +726,18 @@ export class JourneyService {
         populatedUserId &&
         typeof populatedUserId === 'object' &&
         populatedUserId._id;
-      
+
       journeyOwnerId = isPopulatedUser
         ? populatedUserId._id.toString()
         : populatedUserId?.toString() || journeyObj.user_id?.toString();
     }
-    
+
     // Only send notification if we have a valid journeyOwnerId and it's different from the liker
-    if (journeyOwnerId && Types.ObjectId.isValid(journeyOwnerId) && journeyOwnerId !== userId) {
+    if (
+      journeyOwnerId &&
+      Types.ObjectId.isValid(journeyOwnerId) &&
+      journeyOwnerId !== userId
+    ) {
       try {
         const liker = await this.userService.findById(userId);
         const likerName = liker?.username || liker?.first_name || "Quelqu'un";
@@ -729,7 +750,10 @@ export class JourneyService {
         });
       } catch (error) {
         // Log error but don't fail the like operation
-        console.error('Error sending journey like notification:', error);
+        this.logger.error(
+          `Error sending journey like notification: ${error.message}`,
+          error.stack,
+        );
       }
     }
 
@@ -781,13 +805,20 @@ export class JourneyService {
         });
       } catch (error) {
         // Log error but don't fail the comment operation
-        console.error('Error sending journey comment notification:', error);
+        this.logger.error(
+          `Error sending journey comment notification: ${error.message}`,
+          error.stack,
+        );
       }
     }
 
     return savedComment;
   }
 
+  /**
+   * Get journey comments (non-paginated - for backward compatibility)
+   * @deprecated Use getCommentsPaginated instead for better performance
+   */
   async getComments(journeyId: string, limit: number = 50, skip: number = 0) {
     const comments = await this.journeyCommentModel
       .find({ journey_id: this.toObjectId(journeyId, 'journey id') as any })
@@ -833,6 +864,69 @@ export class JourneyService {
           commentObj.parent_comment_id,
       };
     });
+  }
+
+  /**
+   * Get paginated journey comments
+   * @param journeyId - Journey ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated comment results
+   */
+  async getCommentsPaginated(journeyId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const query = {
+      journey_id: this.toObjectId(journeyId, 'journey id') as any,
+    };
+
+    const [data, total] = await Promise.all([
+      this.journeyCommentModel
+        .find(query)
+        .populate('user_id', 'username firstName lastName profile_image_url')
+        .populate('parent_comment_id')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.journeyCommentModel.countDocuments(query).exec(),
+    ]);
+
+    const transformedData = data.map((comment) => {
+      const commentObj = comment.toObject ? comment.toObject() : comment;
+      const populatedUserId = commentObj.user_id as any;
+
+      const isPopulatedUser =
+        populatedUserId &&
+        typeof populatedUserId === 'object' &&
+        populatedUserId._id;
+
+      return {
+        ...commentObj,
+        user_id: isPopulatedUser
+          ? populatedUserId._id.toString()
+          : populatedUserId?.toString() || commentObj.user_id?.toString(),
+        user: isPopulatedUser
+          ? {
+              _id: populatedUserId._id.toString(),
+              username: populatedUserId.username || '',
+              firstName:
+                populatedUserId.firstName || populatedUserId.first_name || '',
+              lastName:
+                populatedUserId.lastName || populatedUserId.last_name || '',
+              profileImageUrl:
+                populatedUserId.profile_image_url ||
+                populatedUserId.profileImageUrl ||
+                '',
+            }
+          : null,
+        journey_id: commentObj.journey_id?.toString() || commentObj.journey_id,
+        parent_comment_id:
+          commentObj.parent_comment_id?.toString() ||
+          commentObj.parent_comment_id,
+      };
+    });
+
+    return { data: transformedData, total };
   }
 
   async deleteComment(userId: string, commentId: string) {

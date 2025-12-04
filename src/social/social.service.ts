@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -13,6 +14,8 @@ import { FollowUserDto, ShareTripDto, UpdateSharedTripDto } from './social.dto';
 
 @Injectable()
 export class SocialService {
+  private readonly logger = new Logger(SocialService.name);
+
   constructor(
     @InjectModel(UserFollow.name)
     private readonly userFollowModel: Model<UserFollowDocument>,
@@ -84,6 +87,10 @@ export class SocialService {
     return !!follow;
   }
 
+  /**
+   * Get followers (non-paginated - for backward compatibility)
+   * @deprecated Use getFollowersPaginated instead for better performance
+   */
   async getFollowers(
     userId: string,
     limit: number = 50,
@@ -108,6 +115,48 @@ export class SocialService {
     });
   }
 
+  /**
+   * Get paginated followers
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated followers results
+   */
+  async getFollowersPaginated(userId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const query = { followingId: userId };
+
+    const [data, total] = await Promise.all([
+      this.userFollowModel
+        .find(query)
+        .populate(
+          'followerId',
+          'username first_name last_name profile_image_url',
+        )
+        .sort({ followedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.userFollowModel.countDocuments(query).exec(),
+    ]);
+
+    const transformedData = data.map((follow) => {
+      const follower = (follow.followerId as any).toObject
+        ? (follow.followerId as any).toObject()
+        : follow.followerId;
+      return {
+        ...follower,
+        followedAt: follow.followedAt,
+      };
+    });
+
+    return { data: transformedData, total };
+  }
+
+  /**
+   * Get following (non-paginated - for backward compatibility)
+   * @deprecated Use getFollowingPaginated instead for better performance
+   */
   async getFollowing(
     userId: string,
     limit: number = 50,
@@ -133,6 +182,44 @@ export class SocialService {
         followedAt: follow.followedAt,
       };
     });
+  }
+
+  /**
+   * Get paginated following
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated following results
+   */
+  async getFollowingPaginated(userId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const query = { followerId: userId };
+
+    const [data, total] = await Promise.all([
+      this.userFollowModel
+        .find(query)
+        .populate(
+          'followingId',
+          'username first_name last_name profile_image_url',
+        )
+        .sort({ followedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.userFollowModel.countDocuments(query).exec(),
+    ]);
+
+    const transformedData = data.map((follow) => {
+      const following = (follow.followingId as any).toObject
+        ? (follow.followingId as any).toObject()
+        : follow.followingId;
+      return {
+        ...following,
+        followedAt: follow.followedAt,
+      };
+    });
+
+    return { data: transformedData, total };
   }
 
   async getFollowCounts(
@@ -230,6 +317,10 @@ export class SocialService {
     return trip as any;
   }
 
+  /**
+   * Get user shared trips (non-paginated - for backward compatibility)
+   * @deprecated Use getUserSharedTripsPaginated instead for better performance
+   */
   async getUserSharedTrips(
     userId: string,
     limit: number = 20,
@@ -244,6 +335,39 @@ export class SocialService {
       .exec() as any;
   }
 
+  /**
+   * Get paginated user shared trips
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated shared trips results
+   */
+  async getUserSharedTripsPaginated(
+    userId: string,
+    page: number,
+    limit: number,
+  ) {
+    const skip = (page - 1) * limit;
+    const query = { userId, isVisible: true };
+
+    const [data, total] = await Promise.all([
+      this.sharedTripModel
+        .find(query)
+        .populate('userId', 'username first_name last_name profile_image_url')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.sharedTripModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
+  }
+
+  /**
+   * Get social feed (non-paginated - for backward compatibility)
+   * @deprecated Use getSocialFeedPaginated instead for better performance
+   */
   async getSocialFeed(
     userId: string,
     limit: number = 20,
@@ -273,6 +397,47 @@ export class SocialService {
       .limit(limit)
       .skip(skip)
       .exec() as any;
+  }
+
+  /**
+   * Get paginated social feed
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated social feed results
+   */
+  async getSocialFeedPaginated(userId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+
+    // Get list of users that the current user is following
+    const following = await this.userFollowModel
+      .find({ followerId: userId })
+      .select('followingId')
+      .exec();
+
+    const followingIds = following.map((f) => f.followingId);
+
+    // Get public trips from followed users, plus user's own trips
+    const query = {
+      isVisible: true,
+      $or: [
+        { userId: { $in: [...followingIds, userId] } }, // Trips from followed users or self
+        { isPublic: true }, // Or any public trips
+      ],
+    };
+
+    const [data, total] = await Promise.all([
+      this.sharedTripModel
+        .find(query)
+        .populate('userId', 'username first_name last_name profile_image_url')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.sharedTripModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
   }
 
   async likeSharedTrip(
@@ -312,8 +477,8 @@ export class SocialService {
       return {
         ...tripObj,
         images: (tripObj.images || []).map((url: string) => {
-          return url.startsWith('http') 
-            ? url 
+          return url.startsWith('http')
+            ? url
             : `${publicBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
         }),
       };
@@ -325,8 +490,8 @@ export class SocialService {
       .populate('user_id', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
-    
-    console.log(`[getMapMemories] Found ${journeys.length} journeys for user ${userId}`);
+
+    this.logger.debug(`Found ${journeys.length} journeys for user ${userId}`);
 
     // Convert journeys to shared trip format for processing
     const journeyAsTrips = journeys.map((journey: any) => {
@@ -336,27 +501,35 @@ export class SocialService {
       if (journeyObj.slides && journeyObj.slides.length > 0) {
         images = journeyObj.slides.map((slide: any) => {
           const imageUrl = slide.imageUrl || slide.image_url || '';
-          return imageUrl.startsWith('http') 
-            ? imageUrl 
+          return imageUrl.startsWith('http')
+            ? imageUrl
             : `${publicBaseUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
         });
       } else if (journeyObj.image_urls && journeyObj.image_urls.length > 0) {
         images = journeyObj.image_urls.map((url: string) => {
-          return url.startsWith('http') 
-            ? url 
+          return url.startsWith('http')
+            ? url
             : `${publicBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
         });
       }
-      
+
       // Get user info from populated user_id
-      const userIdObj = journeyObj.user_id && typeof journeyObj.user_id === 'object'
-        ? journeyObj.user_id
-        : { _id: journeyObj.user_id, username: '', first_name: '', last_name: '', profile_image_url: '' };
-      
+      const userIdObj =
+        journeyObj.user_id && typeof journeyObj.user_id === 'object'
+          ? journeyObj.user_id
+          : {
+              _id: journeyObj.user_id,
+              username: '',
+              first_name: '',
+              last_name: '',
+              profile_image_url: '',
+            };
+
       return {
         _id: journeyObj._id,
         userId: userIdObj,
-        title: journeyObj.destination || journeyObj.caption_text || 'My Journey',
+        title:
+          journeyObj.destination || journeyObj.caption_text || 'My Journey',
         description: journeyObj.description || journeyObj.caption_text || null,
         tripType: 'custom',
         tripId: journeyObj.booking_id ? journeyObj.booking_id.toString() : null,
@@ -373,15 +546,21 @@ export class SocialService {
         sharesCount: 0,
         isPublic: journeyObj.is_public !== false,
         isVisible: journeyObj.is_visible !== false,
-        createdAt: journeyObj.createdAt ? new Date(journeyObj.createdAt).toISOString() : new Date().toISOString(),
-        updatedAt: journeyObj.updatedAt ? new Date(journeyObj.updatedAt).toISOString() : new Date().toISOString(),
+        createdAt: journeyObj.createdAt
+          ? new Date(journeyObj.createdAt).toISOString()
+          : new Date().toISOString(),
+        updatedAt: journeyObj.updatedAt
+          ? new Date(journeyObj.updatedAt).toISOString()
+          : new Date().toISOString(),
       };
     });
 
     // Combine shared trips and journeys
     const trips = [...sharedTrips, ...journeyAsTrips];
-    
-    console.log(`[getMapMemories] Total trips found: ${trips.length} (${sharedTrips.length} shared trips + ${journeyAsTrips.length} journeys)`);
+
+    this.logger.debug(
+      `Total trips found: ${trips.length} (${sharedTrips.length} shared trips + ${journeyAsTrips.length} journeys)`,
+    );
 
     // City to Country mapping (popular cities)
     const cityToCountry: Record<string, string> = {
@@ -508,92 +687,70 @@ export class SocialService {
     const extractCountryFromText = (text: string): string | null => {
       if (!text) return null;
       const lowerText = text.toLowerCase().trim();
-      
+
       // First, try to find city and map to country (more specific, check this first)
       // Sort by length (longest first) to match "paris, france" before just "paris"
-      const sortedCities = Object.entries(cityToCountry).sort((a, b) => b[0].length - a[0].length);
+      const sortedCities = Object.entries(cityToCountry).sort(
+        (a, b) => b[0].length - a[0].length,
+      );
       for (const [city, country] of sortedCities) {
         if (lowerText.includes(city)) {
-          console.log(`[getMapMemories] City "${city}" found in "${lowerText}" -> ${country}`);
+          this.logger.debug(`City "${city}" found in text -> ${country}`);
           return country;
         }
       }
-      
+
       // Then, try to find country name directly
       for (const [countryName, _] of Object.entries(countryCoordinates)) {
         const lowerCountryName = countryName.toLowerCase();
         // Check for exact match or contains match
-        if (lowerText === lowerCountryName || lowerText.includes(lowerCountryName)) {
-          console.log(`[getMapMemories] Country "${countryName}" found in "${lowerText}"`);
+        if (
+          lowerText === lowerCountryName ||
+          lowerText.includes(lowerCountryName)
+        ) {
+          this.logger.debug(`Country "${countryName}" found in text`);
           return countryName;
         }
       }
-      
-      console.log(`[getMapMemories] No country found in "${lowerText}"`);
+
+      // Country not found in text - will be handled later
       return null;
     };
 
     trips.forEach((trip: any) => {
       const tripObj = trip.toObject ? trip.toObject() : trip;
-      
-      // Log trip data for debugging
-      console.log(`[getMapMemories] Processing trip:`, {
-        id: tripObj._id,
-        destination: tripObj.destination,
-        title: tripObj.title,
-        description: tripObj.description,
-        metadata: tripObj.metadata,
-        tags: tripObj.tags,
-        images: tripObj.images?.length || 0,
-      });
-      
+
+      // Processing trip for country extraction
+
       // Extract country from multiple sources
       let country: string | null = null;
-      
+
       // 1. Check metadata.country
       if (tripObj.metadata?.country) {
         country = tripObj.metadata.country;
-        console.log(`[getMapMemories] Country found in metadata.country: ${country}`);
+        // Country found in metadata
       }
       // 2. Check destination field directly (for Journey objects)
       else if (tripObj.destination) {
-        console.log(`[getMapMemories] Checking destination: "${tripObj.destination}"`);
         country = extractCountryFromText(tripObj.destination);
-        if (country) {
-          console.log(`[getMapMemories] Country detected from destination: ${country}`);
-        }
       }
       // 3. Check metadata.destination
       else if (tripObj.metadata?.destination) {
-        console.log(`[getMapMemories] Checking metadata.destination: "${tripObj.metadata.destination}"`);
         country = extractCountryFromText(tripObj.metadata.destination);
-        if (country) {
-          console.log(`[getMapMemories] Country detected from metadata.destination: ${country}`);
-        }
       }
       // 4. Check title
       else if (tripObj.title) {
-        console.log(`[getMapMemories] Checking title: "${tripObj.title}"`);
         country = extractCountryFromText(tripObj.title);
-        if (country) {
-          console.log(`[getMapMemories] Country detected from title: ${country}`);
-        }
       }
       // 5. Check description
       else if (tripObj.description) {
-        console.log(`[getMapMemories] Checking description: "${tripObj.description}"`);
         country = extractCountryFromText(tripObj.description);
-        if (country) {
-          console.log(`[getMapMemories] Country detected from description: ${country}`);
-        }
       }
       // 6. Check tags
       else if (tripObj.tags && tripObj.tags.length > 0) {
-        console.log(`[getMapMemories] Checking tags:`, tripObj.tags);
         for (const tag of tripObj.tags) {
           country = extractCountryFromText(tag);
           if (country) {
-            console.log(`[getMapMemories] Country detected from tag "${tag}": ${country}`);
             break;
           }
         }
@@ -602,22 +759,11 @@ export class SocialService {
       // If no country found, skip this trip
       if (!country) {
         // Log for debugging
-        console.warn(`[getMapMemories] ⚠️ No country found for trip:`, {
-          id: tripObj._id,
-          destination: tripObj.destination,
-          title: tripObj.title,
-          description: tripObj.description,
-          metadata: tripObj.metadata,
-          tags: tripObj.tags,
-        });
+        this.logger.warn(`No country found for trip: ${tripObj._id}`);
         return;
       }
-      
-      // Log successful country detection for debugging
-      console.log(`[getMapMemories] ✅ Country detected: ${country} for trip:`, {
-        id: tripObj._id,
-        destination: tripObj.destination || tripObj.title,
-      });
+
+      // Country successfully detected
 
       // Get coordinates for country
       const coords = countryCoordinates[country];

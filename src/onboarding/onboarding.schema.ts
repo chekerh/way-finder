@@ -41,3 +41,12 @@ export class OnboardingSession {
 export type OnboardingSessionDocument = HydratedDocument<OnboardingSession>;
 export const OnboardingSessionSchema =
   SchemaFactory.createForClass(OnboardingSession);
+
+/**
+ * Database indexes for optimized query performance
+ * - user_id is already unique (enforced by schema)
+ * - completed index: Efficient filtering of completed/incomplete sessions
+ * - Compound index: Optimizes queries for user's onboarding status
+ */
+OnboardingSessionSchema.index({ completed: 1, createdAt: -1 }); // Status-based queries
+OnboardingSessionSchema.index({ user_id: 1, completed: 1 }); // User's onboarding status

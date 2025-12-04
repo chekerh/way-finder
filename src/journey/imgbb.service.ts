@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  BadRequestException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import FormData from 'form-data';
@@ -66,7 +71,9 @@ export class ImgBBService {
    */
   async uploadImage(filePath: string, fileName?: string): Promise<string> {
     if (!this.apiKey) {
-      throw new Error('IMGBB_API_KEY is not configured');
+      throw new ServiceUnavailableException(
+        'ImgBB service is not configured. IMGBB_API_KEY is missing.',
+      );
     }
 
     try {
@@ -94,7 +101,7 @@ export class ImgBBService {
         );
         return response.data.data.url;
       } else {
-        throw new Error(
+        throw new BadRequestException(
           `ImgBB upload failed: ${JSON.stringify(response.data)}`,
         );
       }
@@ -114,7 +121,9 @@ export class ImgBBService {
    */
   async uploadImages(filePaths: string[]): Promise<string[]> {
     if (!this.apiKey) {
-      throw new Error('IMGBB_API_KEY is not configured');
+      throw new ServiceUnavailableException(
+        'ImgBB service is not configured. IMGBB_API_KEY is missing.',
+      );
     }
 
     try {
@@ -153,7 +162,9 @@ export class ImgBBService {
     mimeType: string = 'image/jpeg',
   ): Promise<string> {
     if (!this.apiKey) {
-      throw new Error('IMGBB_API_KEY is not configured');
+      throw new ServiceUnavailableException(
+        'ImgBB service is not configured. IMGBB_API_KEY is missing.',
+      );
     }
 
     try {
@@ -179,7 +190,7 @@ export class ImgBBService {
         );
         return response.data.data.url;
       } else {
-        throw new Error(
+        throw new BadRequestException(
           `ImgBB upload failed: ${JSON.stringify(response.data)}`,
         );
       }

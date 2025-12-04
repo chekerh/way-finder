@@ -12,6 +12,11 @@ import { RewardsService } from '../rewards/rewards.service';
 import { PointsSource } from '../rewards/rewards.dto';
 import { UserService } from '../user/user.service';
 
+/**
+ * Reviews Service
+ * Handles reviews and ratings for destinations, hotels, flights, and other items
+ * Awards points for reviews and provides statistics
+ */
 @Injectable()
 export class ReviewsService {
   private readonly logger = new Logger(ReviewsService.name);
@@ -23,6 +28,14 @@ export class ReviewsService {
     private readonly userService: UserService,
   ) {}
 
+  /**
+   * Create a new review
+   * Checks for duplicate reviews and awards points for destination reviews
+   * @param userId - User ID creating the review
+   * @param createReviewDto - Review data
+   * @returns Created review document
+   * @throws BadRequestException if user already reviewed this item
+   */
   async createReview(
     userId: string,
     createReviewDto: CreateReviewDto,
@@ -46,12 +59,14 @@ export class ReviewsService {
     });
 
     const savedReview = await review.save();
-    
+
     // Award points for rating a destination (+15 points)
     // Only award for destination reviews to match the requirement
     if (createReviewDto.itemType === 'destination') {
       try {
-        const points = this.rewardsService.getPointsForAction(PointsSource.RATING);
+        const points = this.rewardsService.getPointsForAction(
+          PointsSource.RATING,
+        );
         await this.rewardsService.awardPoints({
           userId,
           points,
@@ -64,13 +79,15 @@ export class ReviewsService {
             rating: createReviewDto.rating,
           },
         });
-        this.logger.log(`Awarded ${points} points to user ${userId} for rating destination`);
+        this.logger.log(
+          `Awarded ${points} points to user ${userId} for rating destination`,
+        );
       } catch (error) {
         this.logger.warn(`Failed to award points for review: ${error.message}`);
         // Don't fail review creation if points fail
       }
     }
-    
+
     return this.reviewModel
       .findById(savedReview._id)
       .populate('userId', 'username first_name last_name profile_image_url')
@@ -108,6 +125,10 @@ export class ReviewsService {
     }
   }
 
+  /**
+   * Get reviews for an item (non-paginated - for backward compatibility)
+   * @deprecated Use getReviewsPaginated instead for better performance
+   */
   async getReviews(
     itemType: ReviewItemType,
     itemId: string,
@@ -116,9 +137,45 @@ export class ReviewsService {
       .find({ itemType, itemId, isVisible: true })
       .populate('userId', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
+      .limit(50)
       .exec();
   }
 
+  /**
+   * Get paginated reviews for an item
+   * @param itemType - Type of item (destination, hotel, etc.)
+   * @param itemId - ID of the item
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated review results
+   */
+  async getReviewsPaginated(
+    itemType: ReviewItemType,
+    itemId: string,
+    page: number,
+    limit: number,
+  ) {
+    const query = { itemType, itemId, isVisible: true };
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.reviewModel
+        .find(query)
+        .populate('userId', 'username first_name last_name profile_image_url')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.reviewModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
+  }
+
+  /**
+   * Get user reviews (non-paginated - for backward compatibility)
+   * @deprecated Use getUserReviewsPaginated instead for better performance
+   */
   async getUserReviews(
     userId: string,
     itemType?: ReviewItemType,
@@ -131,7 +188,42 @@ export class ReviewsService {
       .find(query)
       .populate('userId', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
+      .limit(50)
       .exec();
+  }
+
+  /**
+   * Get paginated user reviews
+   * @param userId - User ID
+   * @param itemType - Optional filter by item type
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated review results
+   */
+  async getUserReviewsPaginated(
+    userId: string,
+    page: number,
+    limit: number,
+    itemType?: ReviewItemType,
+  ) {
+    const query: any = { userId };
+    if (itemType) {
+      query.itemType = itemType;
+    }
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.reviewModel
+        .find(query)
+        .populate('userId', 'username first_name last_name profile_image_url')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.reviewModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
   }
 
   async getReviewStats(

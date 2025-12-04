@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { PointsTransaction, PointsTransactionDocument } from './rewards.schema';
@@ -42,7 +47,7 @@ export class RewardsService {
     // Update user's total points
     const user = await this.userModel.findById(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     const currentPoints = user.total_points || 0;
@@ -65,7 +70,8 @@ export class RewardsService {
   }
 
   /**
-   * Get user's points summary
+   * Get user's points summary (non-paginated - for backward compatibility)
+   * @deprecated Use getUserPointsWithPagination instead for better performance
    */
   async getUserPoints(userId: string): Promise<{
     total_points: number;
@@ -75,7 +81,7 @@ export class RewardsService {
   }> {
     const user = await this.userModel.findById(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     const recentTransactions = await this.pointsTransactionModel
@@ -101,6 +107,57 @@ export class RewardsService {
   }
 
   /**
+   * Get user's points summary with paginated transaction history
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns User points summary with paginated transactions
+   */
+  async getUserPointsWithPagination(
+    userId: string,
+    page: number,
+    limit: number,
+  ) {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const skip = (page - 1) * limit;
+    const query = { user_id: new Types.ObjectId(userId) };
+
+    const [transactions, total] = await Promise.all([
+      this.pointsTransactionModel
+        .find(query)
+        .sort({ transaction_date: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      this.pointsTransactionModel.countDocuments(query).exec(),
+    ]);
+
+    const transformedTransactions = transactions.map((t) => ({
+      transaction_id: t._id.toString(),
+      user_id: t.user_id.toString(),
+      points: t.points,
+      type: t.type,
+      source: t.source,
+      description: t.description,
+      transaction_date: t.transaction_date,
+    }));
+
+    return {
+      total_points: user.total_points || 0,
+      available_points: user.total_points || 0,
+      lifetime_points: user.lifetime_points || 0,
+      transactions: {
+        data: transformedTransactions,
+        total,
+      },
+    };
+  }
+
+  /**
    * Redeem points (for future use - discounts, perks, etc.)
    */
   async redeemPoints(
@@ -114,12 +171,12 @@ export class RewardsService {
   }> {
     const user = await this.userModel.findById(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     const currentPoints = user.total_points || 0;
     if (currentPoints < points) {
-      throw new Error('Insufficient points');
+      throw new BadRequestException('Insufficient points');
     }
 
     const transaction = new this.pointsTransactionModel({

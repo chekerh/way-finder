@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -19,6 +20,8 @@ import { UserService } from '../user/user.service';
 
 @Injectable()
 export class OutfitWeatherService {
+  private readonly logger = new Logger(OutfitWeatherService.name);
+
   constructor(
     @InjectModel(Outfit.name)
     private readonly outfitModel: Model<OutfitDocument>,
@@ -33,9 +36,7 @@ export class OutfitWeatherService {
   /**
    * Upload outfit image and get URL
    */
-  async uploadOutfitImage(
-    file: Express.Multer.File,
-  ): Promise<string> {
+  async uploadOutfitImage(file: Express.Multer.File): Promise<string> {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -65,13 +66,15 @@ export class OutfitWeatherService {
   ): Promise<OutfitDocument> {
     // Get booking details
     const booking = await this.bookingService.findOne(userId, bookingId);
-    
+
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
 
     if (booking.status !== BookingStatus.CONFIRMED) {
-      throw new BadRequestException('Booking must be confirmed to analyze outfit');
+      throw new BadRequestException(
+        'Booking must be confirmed to analyze outfit',
+      );
     }
 
     // Try to get destination from trip_details, fallback to offer_id if not available
@@ -80,9 +83,11 @@ export class OutfitWeatherService {
       // Fallback to offer_id if trip_details.destination is not set
       // This handles cases where bookings were created without trip_details
       destination = booking.offer_id;
-      console.log(`[OutfitWeatherService] Using offer_id as destination fallback: ${destination}`);
+      this.logger.debug(
+        `Using offer_id as destination fallback: ${destination}`,
+      );
     }
-    
+
     if (!destination) {
       throw new BadRequestException('Booking destination not found');
     }
@@ -92,7 +97,7 @@ export class OutfitWeatherService {
     const targetDate = booking.trip_details?.departure_date
       ? new Date(booking.trip_details.departure_date)
       : new Date();
-    
+
     const weather = await this.weatherService.getWeatherForecast(
       destination,
       targetDate,
@@ -103,14 +108,14 @@ export class OutfitWeatherService {
       imageUrl,
       imageFile,
     );
-    
-    console.log('Detected items from analysis service:', detectedItems);
-    console.log('Detected items type:', typeof detectedItems, 'is array:', Array.isArray(detectedItems));
+
+    this.logger.debug('Detected items from analysis service', {
+      itemsCount: Array.isArray(detectedItems) ? detectedItems.length : 1,
+    });
 
     // Get clothing recommendations
-    const recommendations = this.weatherService.getClothingRecommendations(
-      weather,
-    );
+    const recommendations =
+      this.weatherService.getClothingRecommendations(weather);
 
     // Compare detected items with recommendations
     const comparison = this.imageAnalysisService.compareWithWeather(
@@ -120,7 +125,7 @@ export class OutfitWeatherService {
     );
 
     // Create outfit record
-    console.log('Creating outfit record with detected_items:', detectedItems);
+    this.logger.debug('Creating outfit record with detected items');
     const outfit = new this.outfitModel({
       user_id: this.toObjectId(userId, 'user id') as any,
       booking_id: this.toObjectId(bookingId, 'booking id') as any,
@@ -144,12 +149,13 @@ export class OutfitWeatherService {
     });
 
     const savedOutfit = await outfit.save();
-    console.log('Saved outfit detected_items:', savedOutfit.detected_items);
-    console.log('Saved outfit ID:', savedOutfit._id);
-    
+    this.logger.debug(`Saved outfit ID: ${savedOutfit._id}`);
+
     // Award points for analyzing an outfit (+20 points)
     try {
-      const points = this.rewardsService.getPointsForAction(PointsSource.OUTFIT);
+      const points = this.rewardsService.getPointsForAction(
+        PointsSource.OUTFIT,
+      );
       await this.rewardsService.awardPoints({
         userId,
         points,
@@ -161,16 +167,23 @@ export class OutfitWeatherService {
           destination,
         },
       });
-      
+
       // Increment lifetime metrics
-      await this.userService.incrementLifetimeMetric(userId, 'total_outfits_analyzed');
-      
-      console.log(`Awarded ${points} points to user ${userId} for outfit analysis`);
-    } catch (error) {
-      console.warn(`Failed to award points for outfit analysis: ${error.message}`);
+      await this.userService.incrementLifetimeMetric(
+        userId,
+        'total_outfits_analyzed',
+      );
+
+      this.logger.log(
+        `Awarded ${points} points to user ${userId} for outfit analysis`,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to award points for outfit analysis: ${error.message}`,
+      );
       // Don't fail outfit analysis if points fail
     }
-    
+
     return savedOutfit;
   }
 
@@ -193,10 +206,7 @@ export class OutfitWeatherService {
   /**
    * Get a specific outfit
    */
-  async getOutfit(
-    userId: string,
-    outfitId: string,
-  ): Promise<OutfitDocument> {
+  async getOutfit(userId: string, outfitId: string): Promise<OutfitDocument> {
     const outfit = await this.outfitModel
       .findOne({
         _id: this.toObjectId(outfitId, 'outfit id') as any,
@@ -226,10 +236,7 @@ export class OutfitWeatherService {
   /**
    * Delete an outfit
    */
-  async deleteOutfit(
-    userId: string,
-    outfitId: string,
-  ): Promise<void> {
+  async deleteOutfit(userId: string, outfitId: string): Promise<void> {
     const result = await this.outfitModel
       .deleteOne({
         _id: this.toObjectId(outfitId, 'outfit id') as any,
@@ -255,4 +262,3 @@ export class OutfitWeatherService {
     return new Types.ObjectId(id);
   }
 }
-

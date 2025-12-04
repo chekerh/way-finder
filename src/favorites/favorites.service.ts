@@ -8,6 +8,10 @@ import { Model } from 'mongoose';
 import { Favorite, FavoriteDocument } from './favorites.schema';
 import { CreateFavoriteDto } from './favorites.dto';
 
+/**
+ * Favorites Service
+ * Handles user favorites management for destinations, hotels, flights, etc.
+ */
 @Injectable()
 export class FavoritesService {
   constructor(
@@ -57,6 +61,10 @@ export class FavoritesService {
     }
   }
 
+  /**
+   * Get favorites (non-paginated - for backward compatibility)
+   * @deprecated Use getFavoritesPaginated instead for better performance
+   */
   async getFavorites(userId: string, itemType?: string): Promise<Favorite[]> {
     const query: any = { user_id: userId };
     if (itemType) {
@@ -66,7 +74,41 @@ export class FavoritesService {
     return await this.favoriteModel
       .find(query)
       .sort({ favorited_at: -1 })
+      .limit(100)
       .exec();
+  }
+
+  /**
+   * Get paginated favorites
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @param itemType - Optional filter by item type
+   * @returns Paginated favorite results
+   */
+  async getFavoritesPaginated(
+    userId: string,
+    page: number,
+    limit: number,
+    itemType?: string,
+  ) {
+    const query: any = { user_id: userId };
+    if (itemType) {
+      query.item_type = itemType;
+    }
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.favoriteModel
+        .find(query)
+        .sort({ favorited_at: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.favoriteModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
   }
 
   async isFavorite(

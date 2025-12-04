@@ -18,4 +18,3 @@ export class UploadOutfitDto {
   @IsString()
   booking_id: string;
 }
-

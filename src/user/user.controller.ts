@@ -11,6 +11,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './user.dto';
@@ -21,6 +22,10 @@ import { extname } from 'node:path';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
+/**
+ * User Controller
+ * Handles user profile management, profile image uploads, and FCM token registration
+ */
 @Controller('user')
 export class UserController {
   private readonly logger = new Logger(UserController.name);
@@ -30,6 +35,10 @@ export class UserController {
     private readonly imgbbService: ImgBBService,
   ) {}
 
+  /**
+   * Get authenticated user's profile
+   * @returns User profile without password field
+   */
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@Req() req: any) {
@@ -40,6 +49,11 @@ export class UserController {
     return result;
   }
 
+  /**
+   * Update authenticated user's profile
+   * @body UpdateUserDto - Profile update data
+   * @returns Updated user profile without password field
+   */
   @UseGuards(JwtAuthGuard)
   @Put('profile')
   async updateProfile(@Req() req: any, @Body() dto: UpdateUserDto) {
@@ -49,6 +63,11 @@ export class UserController {
     return result;
   }
 
+  /**
+   * Upload profile image
+   * Rate limited: 5 requests per minute to prevent abuse
+   */
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @Post('profile/upload-image')
   @UseInterceptors(
@@ -147,6 +166,11 @@ export class UserController {
     };
   }
 
+  /**
+   * Register FCM (Firebase Cloud Messaging) token for push notifications
+   * @body token - FCM token string
+   * @returns Success message
+   */
   @UseGuards(JwtAuthGuard)
   @Post('fcm-token')
   async registerFcmToken(@Req() req: any, @Body() body: { token: string }) {

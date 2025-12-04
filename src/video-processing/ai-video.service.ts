@@ -41,7 +41,7 @@ export class AiVideoService {
     this.kaggleUsername = process.env.KAGGLE_USERNAME;
     this.kaggleKey = process.env.KAGGLE_KEY;
     this.shotstackApiKey = process.env.SHOTSTACK_API_KEY;
-    
+
     // Auto-detect environment based on API key or use explicit URL
     if (process.env.SHOTSTACK_API_URL) {
       this.shotstackApiUrl = process.env.SHOTSTACK_API_URL;
@@ -50,11 +50,12 @@ export class AiVideoService {
       // Default to production, but user can override with SHOTSTACK_API_URL
       // Sandbox: https://api.shotstack.io/stage
       // Production: https://api.shotstack.io/v1
-      const isSandbox = this.shotstackApiKey.startsWith('z') || 
-                       this.shotstackApiKey.startsWith('zk') ||
-                       process.env.SHOTSTACK_ENV === 'sandbox';
-      this.shotstackApiUrl = isSandbox 
-        ? 'https://api.shotstack.io/stage' 
+      const isSandbox =
+        this.shotstackApiKey.startsWith('z') ||
+        this.shotstackApiKey.startsWith('zk') ||
+        process.env.SHOTSTACK_ENV === 'sandbox';
+      this.shotstackApiUrl = isSandbox
+        ? 'https://api.shotstack.io/stage'
         : 'https://api.shotstack.io/v1';
     } else {
       this.shotstackApiUrl = 'https://api.shotstack.io/v1'; // Default to production
@@ -227,9 +228,11 @@ export class AiVideoService {
       // Step 1: Validate all image URLs are accessible
       this.logger.log('Validating image URLs...');
       const validatedSlides = await this.validateImageUrls(payload.slides);
-      
+
       if (validatedSlides.length === 0) {
-        throw new Error('No valid/accessible images found for video generation');
+        throw new Error(
+          'No valid/accessible images found for video generation',
+        );
       }
 
       if (validatedSlides.length < payload.slides.length) {
@@ -282,7 +285,9 @@ export class AiVideoService {
         };
         this.logger.log(`Using custom music URL: ${soundtrackUrl}`);
       } else {
-        this.logger.log('No music URL provided, generating video without soundtrack');
+        this.logger.log(
+          'No music URL provided, generating video without soundtrack',
+        );
       }
 
       // Create render request
@@ -298,17 +303,13 @@ export class AiVideoService {
 
       // Submit render job
       const renderResponse = await firstValueFrom(
-        this.httpService.post(
-          `${this.shotstackApiUrl}/render`,
-          renderRequest,
-          {
-            headers: {
-              'x-api-key': this.shotstackApiKey,
-              'Content-Type': 'application/json',
-            },
-            timeout: 10000,
+        this.httpService.post(`${this.shotstackApiUrl}/render`, renderRequest, {
+          headers: {
+            'x-api-key': this.shotstackApiKey,
+            'Content-Type': 'application/json',
           },
-        ),
+          timeout: 10000,
+        }),
       );
 
       const renderId = renderResponse.data.response.id;
@@ -402,9 +403,11 @@ export class AiVideoService {
       // Step 1: Validate image URLs first
       this.logger.log('Validating image URLs for Cloudinary...');
       const validatedSlides = await this.validateImageUrls(payload.slides);
-      
+
       if (validatedSlides.length === 0) {
-        throw new Error('No valid/accessible images found for video generation');
+        throw new Error(
+          'No valid/accessible images found for video generation',
+        );
       }
 
       if (validatedSlides.length < payload.slides.length) {
@@ -426,15 +429,20 @@ export class AiVideoService {
           }
 
           // Upload image to Cloudinary (parallel uploads)
-          const uploadResult = await cloudinary.uploader.upload(slide.imageUrl, {
-            resource_type: 'image',
-            folder: 'wayfinder/journeys',
-            transformation: [
-              { width: 1920, height: 1080, crop: 'fill', quality: 'auto' },
-            ],
-            timeout: 30000, // 30 seconds per image (reduced from default)
-          });
-          this.logger.log(`Uploaded image to Cloudinary: ${uploadResult.public_id}`);
+          const uploadResult = await cloudinary.uploader.upload(
+            slide.imageUrl,
+            {
+              resource_type: 'image',
+              folder: 'wayfinder/journeys',
+              transformation: [
+                { width: 1920, height: 1080, crop: 'fill', quality: 'auto' },
+              ],
+              timeout: 30000, // 30 seconds per image (reduced from default)
+            },
+          );
+          this.logger.log(
+            `Uploaded image to Cloudinary: ${uploadResult.public_id}`,
+          );
           return uploadResult.public_id;
         } catch (uploadError) {
           this.logger.warn(
@@ -446,7 +454,9 @@ export class AiVideoService {
 
       // Wait for all uploads in parallel
       const uploadResults = await Promise.all(uploadPromises);
-      const uploadedImagePublicIds = uploadResults.filter((id): id is string => id !== null);
+      const uploadedImagePublicIds = uploadResults.filter(
+        (id): id is string => id !== null,
+      );
 
       if (uploadedImagePublicIds.length === 0) {
         throw new Error('Failed to upload any images to Cloudinary');
@@ -458,7 +468,7 @@ export class AiVideoService {
       // 1. Use Cloudinary's video generation API (paid feature)
       // 2. Use a third-party service like Shotstack, Creatomate, or similar
       // 3. Use FFmpeg server-side to create the montage and upload to Cloudinary
-      
+
       // Since Cloudinary doesn't support multi-image montages on free tier,
       // we'll recommend using Shotstack instead
       this.logger.warn(
@@ -610,7 +620,7 @@ export class AiVideoService {
       // For image-to-video, we'll use the first image and create a video
       // Note: Most Replicate models are text-to-video, not image-to-video
       // For image montages, consider using a custom service or Cloudinary
-      
+
       // Use the first image for video generation
       const firstImageUrl = payload.slides[0]?.imageUrl;
       if (!firstImageUrl) {
@@ -622,13 +632,13 @@ export class AiVideoService {
       // For image-to-video, we need a different approach or model
       // For now, we'll skip Replicate for image montages and use it only for text-to-video
       // If you have an image-to-video model, update the model ID and input format
-      
+
       this.logger.warn(
         `Replicate model ${modelId} is designed for text-to-video, not image montages. ` +
           'Skipping Replicate for image montage generation. ' +
           'Use SHOTSTACK_API_KEY or CLOUDINARY_* for proper image montage generation.',
       );
-      
+
       // Skip Replicate for image montages - it's not suitable
       throw new Error(
         'Replicate API is not suitable for image montage generation. Use Shotstack or Cloudinary instead.',
@@ -738,8 +748,10 @@ export class AiVideoService {
   private async validateImageUrls(
     slides: Array<{ imageUrl: string; caption?: string | null }>,
   ): Promise<Array<{ imageUrl: string; caption?: string | null }>> {
-    const validatedSlides: Array<{ imageUrl: string; caption?: string | null }> =
-      [];
+    const validatedSlides: Array<{
+      imageUrl: string;
+      caption?: string | null;
+    }> = [];
 
     for (const slide of slides) {
       try {
@@ -804,7 +816,9 @@ export class AiVideoService {
 
             if (getResponse.status >= 200 && getResponse.status < 400) {
               validatedSlides.push(slide);
-              this.logger.debug(`✓ Image URL validated (via GET): ${slide.imageUrl}`);
+              this.logger.debug(
+                `✓ Image URL validated (via GET): ${slide.imageUrl}`,
+              );
             } else {
               this.logger.warn(
                 `Image URL returned status ${getResponse.status}: ${slide.imageUrl}`,

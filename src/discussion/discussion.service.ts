@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -20,8 +21,15 @@ import { UserService } from '../user/user.service';
 import { RewardsService } from '../rewards/rewards.service';
 import { PointsSource } from '../rewards/rewards.dto';
 
+/**
+ * Discussion Service
+ * Handles forum posts, comments, likes, and discussion features
+ * Includes notifications and reward points for user engagement
+ */
 @Injectable()
 export class DiscussionService {
+  private readonly logger = new Logger(DiscussionService.name);
+
   constructor(
     @InjectModel(DiscussionPost.name)
     private readonly postModel: Model<DiscussionPostDocument>,
@@ -32,6 +40,26 @@ export class DiscussionService {
     private readonly rewardsService: RewardsService,
   ) {}
 
+  /**
+   * Create a new discussion post
+   * Creates a post and populates user information for immediate display
+   *
+   * @param userId - ID of the user creating the post
+   * @param dto - Post data containing title, content, tags, destination, image_url
+   * @returns Created post document with populated user information
+   * @throws BadRequestException if user ID is invalid
+   *
+   * @example
+   * const post = await discussionService.createPost('user123', {
+   *   title: 'Travel tips for Paris',
+   *   content: 'Great places to visit...',
+   *   tags: ['travel', 'paris'],
+   *   destination: 'Paris'
+   * });
+   *
+   * Note: User information is automatically populated for immediate display
+   * Note: Tags and destination are optional fields
+   */
   async createPost(userId: string, dto: CreatePostDto) {
     const post = new this.postModel({
       user_id: this.toObjectId(userId, 'user id'),
@@ -49,6 +77,10 @@ export class DiscussionService {
     );
   }
 
+  /**
+   * Get posts (non-paginated - for backward compatibility)
+   * @deprecated Use getPostsPaginated instead for better performance
+   */
   async getPosts(limit: number = 20, skip: number = 0, destination?: string) {
     const query: any = {};
     if (destination) {
@@ -73,6 +105,45 @@ export class DiscussionService {
     };
   }
 
+  /**
+   * Get paginated posts
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @param destination - Optional destination filter
+   * @returns Paginated post results
+   */
+  async getPostsPaginated(page: number, limit: number, destination?: string) {
+    const query: any = {};
+    if (destination) {
+      query.destination = destination;
+    }
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.postModel
+        .find(query)
+        .populate('user_id', 'username first_name last_name profile_image_url')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.postModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
+  }
+
+  /**
+   * Get a single discussion post by ID
+   * Retrieves post with populated user information
+   *
+   * @param postId - ID of the post to retrieve
+   * @returns Post document with populated user information
+   * @throws NotFoundException if post doesn't exist
+   *
+   * @example
+   * const post = await discussionService.getPost('post123');
+   */
   async getPost(postId: string) {
     const post = await this.postModel
       .findById(this.toObjectId(postId, 'post id'))
@@ -86,6 +157,22 @@ export class DiscussionService {
     return post;
   }
 
+  /**
+   * Update an existing discussion post
+   * Only the post owner can update their posts
+   *
+   * @param userId - ID of the user updating the post (must be post owner)
+   * @param postId - ID of the post to update
+   * @param dto - Updated post data (title, content, tags, destination, image_url)
+   * @returns Updated post document
+   * @throws NotFoundException if post doesn't exist or user is not the owner
+   *
+   * @example
+   * const updated = await discussionService.updatePost('user123', 'post123', {
+   *   title: 'Updated title',
+   *   content: 'Updated content'
+   * });
+   */
   async updatePost(userId: string, postId: string, dto: UpdatePostDto) {
     const post = await this.postModel
       .findOneAndUpdate(
@@ -161,8 +248,8 @@ export class DiscussionService {
         try {
           const liker = await this.userService.findById(userId);
           const likerName = liker?.username || liker?.first_name || "Quelqu'un";
-          console.log(
-            `[DiscussionService] Creating like notification for post ${postId}: owner=${postOwnerId}, liker=${userId}`,
+          this.logger.debug(
+            `Creating like notification for post ${postId}: owner=${postOwnerId}, liker=${userId}`,
           );
           const notification =
             await this.notificationsService.createNotification(postOwnerId, {
@@ -172,19 +259,19 @@ export class DiscussionService {
               data: { postId: postId, likerId: userId },
               actionUrl: `/post_detail/${postId}`,
             });
-          console.log(
-            `[DiscussionService] Notification created successfully: ${(notification as any)._id || 'unknown'}`,
+          this.logger.debug(
+            `Notification created successfully: ${(notification as any)._id || 'unknown'}`,
           );
-        } catch (error) {
+        } catch (error: any) {
           // Log error but don't fail the like operation
-          console.error(
-            '[DiscussionService] Error sending like notification:',
-            error,
+          this.logger.error(
+            `Error sending like notification: ${error.message}`,
+            error.stack,
           );
         }
       } else {
-        console.log(
-          `[DiscussionService] Skipping notification: user ${userId} liked their own post ${postId}`,
+        this.logger.debug(
+          `Skipping notification: user ${userId} liked their own post ${postId}`,
         );
       }
     }
@@ -230,7 +317,9 @@ export class DiscussionService {
 
     // Award points for publishing a comment (+10 points)
     try {
-      const points = this.rewardsService.getPointsForAction(PointsSource.COMMENT);
+      const points = this.rewardsService.getPointsForAction(
+        PointsSource.COMMENT,
+      );
       await this.rewardsService.awardPoints({
         userId,
         points,
@@ -241,9 +330,9 @@ export class DiscussionService {
           post_id: postId,
         },
       });
-      console.log(`Awarded ${points} points to user ${userId} for comment`);
-    } catch (error) {
-      console.warn(`Failed to award points for comment: ${error.message}`);
+      this.logger.log(`Awarded ${points} points to user ${userId} for comment`);
+    } catch (error: any) {
+      this.logger.warn(`Failed to award points for comment: ${error.message}`);
       // Don't fail comment creation if points fail
     }
 
@@ -260,8 +349,8 @@ export class DiscussionService {
           const replier = await this.userService.findById(userId);
           const replierName =
             replier?.username || replier?.first_name || "Quelqu'un";
-          console.log(
-            `[DiscussionService] Creating reply notification for comment ${dto.parent_id}: owner=${parentCommentOwnerId}, replier=${userId}`,
+          this.logger.debug(
+            `Creating reply notification for comment ${dto.parent_id}: owner=${parentCommentOwnerId}, replier=${userId}`,
           );
           const notification =
             await this.notificationsService.createNotification(
@@ -279,13 +368,13 @@ export class DiscussionService {
                 actionUrl: `/post_detail/${postId}`,
               },
             );
-          console.log(
-            `[DiscussionService] Reply notification created successfully: ${(notification as any)._id || 'unknown'}`,
+          this.logger.debug(
+            `Reply notification created successfully: ${(notification as any)._id || 'unknown'}`,
           );
-        } catch (error) {
-          console.error(
-            '[DiscussionService] Error sending reply notification:',
-            error,
+        } catch (error: any) {
+          this.logger.error(
+            `Error sending reply notification: ${error.message}`,
+            error.stack,
           );
         }
       }
@@ -299,8 +388,8 @@ export class DiscussionService {
           const commenter = await this.userService.findById(userId);
           const commenterName =
             commenter?.username || commenter?.first_name || "Quelqu'un";
-          console.log(
-            `[DiscussionService] Creating comment notification for post ${postId}: owner=${postOwnerId}, commenter=${userId}`,
+          this.logger.debug(
+            `Creating comment notification for post ${postId}: owner=${postOwnerId}, commenter=${userId}`,
           );
           const notification =
             await this.notificationsService.createNotification(postOwnerId, {
@@ -314,13 +403,13 @@ export class DiscussionService {
               },
               actionUrl: `/post_detail/${postId}`,
             });
-          console.log(
-            `[DiscussionService] Notification created successfully: ${(notification as any)._id || 'unknown'}`,
+          this.logger.debug(
+            `Notification created successfully: ${(notification as any)._id || 'unknown'}`,
           );
-        } catch (error) {
-          console.error(
-            '[DiscussionService] Error sending comment notification:',
-            error,
+        } catch (error: any) {
+          this.logger.error(
+            `Error sending comment notification: ${error.message}`,
+            error.stack,
           );
         }
       }
@@ -332,6 +421,10 @@ export class DiscussionService {
     );
   }
 
+  /**
+   * Get comments for a post (non-paginated - for backward compatibility)
+   * @deprecated Use getCommentsPaginated instead for better performance
+   */
   async getComments(postId: string, limit: number = 50, skip: number = 0) {
     // Get top-level comments (no parent_id) and their replies
     const topLevelComments = await this.commentModel
@@ -390,6 +483,70 @@ export class DiscussionService {
       limit,
       skip,
     };
+  }
+
+  /**
+   * Get paginated comments for a post
+   * @param postId - Post ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page (top-level comments only)
+   * @returns Paginated comment results (includes replies for each comment)
+   */
+  async getCommentsPaginated(postId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+
+    // Get top-level comments (no parent_id) and their replies
+    const topLevelComments = await this.commentModel
+      .find({
+        post_id: this.toObjectId(postId, 'post id'),
+        parent_id: { $exists: false },
+      })
+      .populate('user_id', 'username first_name last_name profile_image_url')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    // Get all replies for these top-level comments
+    const topLevelCommentIds = topLevelComments.map((c) => c._id);
+    const replies = await this.commentModel
+      .find({
+        post_id: this.toObjectId(postId, 'post id'),
+        parent_id: { $in: topLevelCommentIds },
+      })
+      .populate('user_id', 'username first_name last_name profile_image_url')
+      .sort({ createdAt: 1 }) // Oldest first for replies
+      .exec();
+
+    // Group replies by parent comment
+    const repliesByParent = new Map();
+    replies.forEach((reply) => {
+      if (reply.parent_id) {
+        const parentId = reply.parent_id.toString();
+        if (!repliesByParent.has(parentId)) {
+          repliesByParent.set(parentId, []);
+        }
+        repliesByParent.get(parentId).push(reply);
+      }
+    });
+
+    // Attach replies to their parent comments
+    const commentsWithReplies = topLevelComments.map((comment) => {
+      const commentObj = comment.toObject
+        ? comment.toObject()
+        : JSON.parse(JSON.stringify(comment));
+      commentObj.replies = repliesByParent.get(comment._id.toString()) || [];
+      return commentObj;
+    });
+
+    const total = await this.commentModel
+      .countDocuments({
+        post_id: this.toObjectId(postId, 'post id'),
+        parent_id: { $exists: false },
+      })
+      .exec();
+
+    return { data: commentsWithReplies, total };
   }
 
   async likeComment(userId: string, commentId: string) {

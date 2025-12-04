@@ -18,6 +18,10 @@ import { RewardsService } from '../rewards/rewards.service';
 import { PointsSource } from '../rewards/rewards.dto';
 import { UserService } from '../user/user.service';
 
+/**
+ * Booking Service
+ * Handles flight booking operations, offers search, booking confirmation, and booking management
+ */
 @Injectable()
 export class BookingService {
   private readonly logger = new Logger(BookingService.name);
@@ -30,37 +34,120 @@ export class BookingService {
     private readonly userService: UserService,
   ) {}
 
+  /**
+   * Search for flight/hotel offers
+   * Returns mock offer data for testing/development purposes.
+   * For production flight search, use the CatalogService endpoints:
+   * - GET /catalog/recommended (personalized flights)
+   * - GET /catalog/explore (explore offers)
+   *
+   * @param query - Search parameters (destination, dates, type)
+   * @returns Array of mock offers with realistic structure
+   * @deprecated Consider using CatalogService for real flight search in production
+   */
   async searchOffers(query: {
     destination?: string;
     dates?: string;
     type?: string;
   }) {
-    // Stub: integrate with providers later
+    this.logger.debug(
+      `Searching offers: destination=${query.destination}, type=${query.type}`,
+    );
+    const offerType = query.type ?? 'flight';
+    const destination = query.destination ?? 'Unknown';
+
+    // Return realistic mock offers for testing
+    if (offerType === 'flight') {
+      return [
+        {
+          id: `offer_flight_${Date.now()}`,
+          type: 'flight',
+          destination,
+          origin: 'TUN',
+          price: 299.99,
+          currency: 'USD',
+          departure_date: query.dates || new Date().toISOString().split('T')[0],
+          airline: 'Example Airlines',
+          duration: '2h 30m',
+          stops: 0,
+        },
+        {
+          id: `offer_flight_${Date.now() + 1}`,
+          type: 'flight',
+          destination,
+          origin: 'TUN',
+          price: 349.99,
+          currency: 'USD',
+          departure_date: query.dates || new Date().toISOString().split('T')[0],
+          airline: 'Premium Airlines',
+          duration: '2h 15m',
+          stops: 0,
+        },
+      ];
+    }
+
+    // Hotel offers
     return [
       {
-        id: 'offer_1',
-        type: query.type ?? 'flight',
-        destination: query.destination ?? 'N/A',
-        price: 199,
+        id: `offer_hotel_${Date.now()}`,
+        type: 'hotel',
+        destination,
+        name: 'Example Hotel',
+        price: 89.99,
+        currency: 'USD',
+        check_in: query.dates || new Date().toISOString().split('T')[0],
+        rating: 4.5,
+        amenities: ['WiFi', 'Pool', 'Gym'],
       },
       {
-        id: 'offer_2',
-        type: query.type ?? 'hotel',
-        destination: query.destination ?? 'N/A',
-        price: 99,
+        id: `offer_hotel_${Date.now() + 1}`,
+        type: 'hotel',
+        destination,
+        name: 'Premium Hotel',
+        price: 149.99,
+        currency: 'USD',
+        check_in: query.dates || new Date().toISOString().split('T')[0],
+        rating: 4.8,
+        amenities: ['WiFi', 'Pool', 'Gym', 'Spa'],
       },
     ];
   }
 
+  /**
+   * Compare offer prices (breakdown of costs)
+   * Returns mock price breakdown for testing/development purposes.
+   * In production, this should fetch actual pricing from the offer provider.
+   *
+   * @param offer_id - Offer identifier
+   * @returns Detailed price breakdown with base price, taxes, fees, and total
+   * @deprecated Consider integrating with actual offer provider for real pricing
+   */
   async compare(offer_id: string) {
-    // Stub breakdown
+    this.logger.debug(`Comparing prices for offer: ${offer_id}`);
+
+    if (!offer_id || offer_id.trim() === '') {
+      throw new BadRequestException('Offer ID is required');
+    }
+
+    // Return realistic mock price breakdown
+    const basePrice = Math.floor(Math.random() * 200) + 150; // $150-$350
+    const taxes = Math.round(basePrice * 0.15); // 15% taxes
+    const baggage = Math.round(Math.random() * 30) + 10; // $10-$40
+    const serviceFees = Math.round(basePrice * 0.05); // 5% service fee
+    const total = basePrice + taxes + baggage + serviceFees;
+
     return {
       offer_id,
-      base_price: 150,
-      taxes: 30,
-      baggage: 20,
-      service_fees: 10,
-      total: 210,
+      breakdown: {
+        base_price: basePrice,
+        taxes,
+        baggage_fees: baggage,
+        service_fees: serviceFees,
+        currency: 'USD',
+      },
+      total,
+      savings: null, // Could include comparison with other offers
+      notes: 'Mock pricing data - use CatalogService for real pricing',
     };
   }
 
@@ -71,6 +158,14 @@ export class BookingService {
     return new Types.ObjectId(id);
   }
 
+  /**
+   * Confirm and create a booking
+   * Awards points, sends notification, and creates booking record
+   * @param userId - User ID making the booking
+   * @param dto - Booking confirmation data
+   * @returns Created booking document
+   * @throws BadRequestException if user already has confirmed booking for this offer
+   */
   async confirm(userId: string, dto: ConfirmBookingDto) {
     // Check if user already has a confirmed booking for this offer
     const existingBooking = await this.bookingModel
@@ -103,7 +198,9 @@ export class BookingService {
 
     // Award points for booking a flight (+50 points)
     try {
-      const points = this.rewardsService.getPointsForAction(PointsSource.BOOKING);
+      const points = this.rewardsService.getPointsForAction(
+        PointsSource.BOOKING,
+      );
       await this.rewardsService.awardPoints({
         userId,
         points,
@@ -115,10 +212,10 @@ export class BookingService {
           destination: dto.trip_details?.destination,
         },
       });
-      
+
       // Increment lifetime metrics
       await this.userService.incrementLifetimeMetric(userId, 'total_bookings');
-      
+
       this.logger.log(`Awarded ${points} points to user ${userId} for booking`);
     } catch (error) {
       this.logger.warn(`Failed to award points for booking: ${error.message}`);
@@ -143,11 +240,40 @@ export class BookingService {
     return savedBooking;
   }
 
+  /**
+   * Get booking history (non-paginated - for backward compatibility)
+   * @deprecated Use historyPaginated instead for better performance
+   */
   async history(userId: string) {
     return this.bookingModel
       .find({ user_id: this.toObjectId(userId, 'user id') })
       .sort({ createdAt: -1 })
+      .limit(50) // Limit to prevent memory issues
       .exec();
+  }
+
+  /**
+   * Get paginated booking history
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @returns Paginated booking results
+   */
+  async historyPaginated(userId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.bookingModel
+        .find({ user_id: this.toObjectId(userId, 'user id') })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.bookingModel
+        .countDocuments({ user_id: this.toObjectId(userId, 'user id') })
+        .exec(),
+    ]);
+
+    return { data, total };
   }
 
   async create(userId: string, dto: CreateBookingDto) {
@@ -301,29 +427,30 @@ export class BookingService {
       booking.trip_details?.destination ||
       booking.trip_details?.origin ||
       'votre destination';
-    
+
     // CRITICAL: Check if notification already exists before attempting to create
     // This prevents unnecessary calls to createNotification
     try {
-      const existingNotification = await this.notificationsService.findExistingNotification(
-        userId,
-        'booking_cancelled',
-        booking._id.toString(),
-      );
-      
+      const existingNotification =
+        await this.notificationsService.findExistingNotification(
+          userId,
+          'booking_cancelled',
+          booking._id.toString(),
+        );
+
       if (existingNotification) {
-        console.log(
-          `[BookingService] ⚠️ Cancellation notification already exists for booking ${booking._id.toString()}. Skipping creation.`,
+        this.logger.warn(
+          `Cancellation notification already exists for booking ${booking._id.toString()}. Skipping creation.`,
         );
         return booking;
       }
     } catch (error: any) {
       // If check fails, continue with creation attempt
-      console.log(
-        `[BookingService] Could not check for existing notification, proceeding with creation: ${error.message}`,
+      this.logger.debug(
+        `Could not check for existing notification, proceeding with creation: ${error.message}`,
       );
     }
-    
+
     try {
       await this.notificationsService.createBookingNotification(
         userId,
@@ -339,8 +466,9 @@ export class BookingService {
     } catch (error: any) {
       // If notification creation fails (e.g., booking doesn't exist or duplicate),
       // log but don't fail the cancellation
-      console.error(
-        `[BookingService] ⚠️ Error creating cancellation notification: ${error.message}`,
+      this.logger.error(
+        `Error creating cancellation notification: ${error.message}`,
+        error.stack,
       );
     }
 
@@ -357,7 +485,7 @@ export class BookingService {
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
-    
+
     // CRITICAL: Delete all notifications related to this booking to prevent infinite loops
     // This ensures that deleted bookings don't trigger notifications anymore
     try {
@@ -365,14 +493,12 @@ export class BookingService {
         userId,
         bookingId,
       );
-      console.log(
-        `[BookingService] ✅ Deleted all notifications for booking ${bookingId}`,
-      );
+      this.logger.log(`Deleted all notifications for booking ${bookingId}`);
     } catch (error: any) {
       // Log error but don't fail the deletion
-      console.error(
-        `[BookingService] ⚠️ Error deleting notifications for booking ${bookingId}:`,
-        error.message,
+      this.logger.error(
+        `Error deleting notifications for booking ${bookingId}: ${error.message}`,
+        error.stack,
       );
     }
     // No notification sent for deletion (different from cancellation)

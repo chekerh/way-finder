@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
 @Injectable()
@@ -179,7 +183,9 @@ export class FcmService {
     data?: Record<string, any>,
   ): Promise<admin.messaging.BatchResponse> {
     if (!this.firebaseApp || !fcmTokens || fcmTokens.length === 0) {
-      throw new Error('FCM not initialized or tokens not provided');
+      throw new ServiceUnavailableException(
+        'FCM service is not initialized or no tokens provided',
+      );
     }
 
     try {

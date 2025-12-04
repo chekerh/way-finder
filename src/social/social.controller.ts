@@ -20,7 +20,15 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SocialService } from './social.service';
 import { FollowUserDto, ShareTripDto, UpdateSharedTripDto } from './social.dto';
 import { ImgBBService } from '../journey/imgbb.service';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
+/**
+ * Social Controller
+ * Handles social features including following users, sharing trips, and social feed
+ */
 @Controller('social')
 export class SocialController {
   constructor(
@@ -30,12 +38,22 @@ export class SocialController {
 
   // ========== FOLLOW/UNFOLLOW ==========
 
+  /**
+   * Follow a user
+   * @body FollowUserDto - User ID to follow
+   * @returns Follow relationship status
+   */
   @UseGuards(JwtAuthGuard)
   @Post('follow')
   async followUser(@Req() req: any, @Body() followUserDto: FollowUserDto) {
     return this.socialService.followUser(req.user.sub, followUserDto.userId);
   }
 
+  /**
+   * Unfollow a user
+   * @body FollowUserDto - User ID to unfollow
+   * @returns Unfollow confirmation
+   */
   @UseGuards(JwtAuthGuard)
   @Post('unfollow')
   async unfollowUser(@Req() req: any, @Body() followUserDto: FollowUserDto) {
@@ -52,34 +70,38 @@ export class SocialController {
     return { isFollowing };
   }
 
+  /**
+   * Get user's followers with pagination
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('followers')
-  async getFollowers(
-    @Req() req: any,
-    @Query('limit') limit?: string,
-    @Query('skip') skip?: string,
-  ) {
-    const followers = await this.socialService.getFollowers(
+  async getFollowers(@Req() req: any, @Query() pagination?: PaginationDto) {
+    const { page = 1, limit = 20 } = pagination || {};
+    const result = await this.socialService.getFollowersPaginated(
       req.user.sub,
-      limit ? parseInt(limit, 10) : 50,
-      skip ? parseInt(skip, 10) : 0,
+      page,
+      limit,
     );
-    return followers;
+    return createPaginatedResponse(result.data, result.total, page, limit);
   }
 
+  /**
+   * Get users that the authenticated user is following with pagination
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('following')
-  async getFollowing(
-    @Req() req: any,
-    @Query('limit') limit?: string,
-    @Query('skip') skip?: string,
-  ) {
-    const following = await this.socialService.getFollowing(
+  async getFollowing(@Req() req: any, @Query() pagination?: PaginationDto) {
+    const { page = 1, limit = 20 } = pagination || {};
+    const result = await this.socialService.getFollowingPaginated(
       req.user.sub,
-      limit ? parseInt(limit, 10) : 50,
-      skip ? parseInt(skip, 10) : 0,
+      page,
+      limit,
     );
-    return following;
+    return createPaginatedResponse(result.data, result.total, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -134,39 +156,52 @@ export class SocialController {
     return tripObj;
   }
 
+  /**
+   * Get user's shared trips with pagination
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @Get('user/:userId/shared-trips')
   async getUserSharedTrips(
     @Param('userId') userId: string,
-    @Query('limit') limit?: string,
-    @Query('skip') skip?: string,
+    @Query() pagination?: PaginationDto,
   ) {
-    const trips = await this.socialService.getUserSharedTrips(
+    const { page = 1, limit = 20 } = pagination || {};
+    const result = await this.socialService.getUserSharedTripsPaginated(
       userId,
-      limit ? parseInt(limit, 10) : 20,
-      skip ? parseInt(skip, 10) : 0,
+      page,
+      limit,
     );
-    return trips.map((trip) => {
+
+    const data = result.data.map((trip) => {
       const tripObj = (trip as any).toObject ? (trip as any).toObject() : trip;
       return tripObj;
     });
+
+    return createPaginatedResponse(data, result.total, page, limit);
   }
 
+  /**
+   * Get social feed with pagination
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('feed')
-  async getSocialFeed(
-    @Req() req: any,
-    @Query('limit') limit?: string,
-    @Query('skip') skip?: string,
-  ) {
-    const trips = await this.socialService.getSocialFeed(
+  async getSocialFeed(@Req() req: any, @Query() pagination?: PaginationDto) {
+    const { page = 1, limit = 20 } = pagination || {};
+    const result = await this.socialService.getSocialFeedPaginated(
       req.user.sub,
-      limit ? parseInt(limit, 10) : 20,
-      skip ? parseInt(skip, 10) : 0,
+      page,
+      limit,
     );
-    return trips.map((trip) => {
+
+    const data = result.data.map((trip) => {
       const tripObj = (trip as any).toObject ? (trip as any).toObject() : trip;
       return tripObj;
     });
+
+    return createPaginatedResponse(data, result.total, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)

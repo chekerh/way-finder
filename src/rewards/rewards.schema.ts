@@ -29,6 +29,11 @@ export type PointsTransactionDocument = HydratedDocument<PointsTransaction>;
 export const PointsTransactionSchema =
   SchemaFactory.createForClass(PointsTransaction);
 
-// Index for efficient queries
-PointsTransactionSchema.index({ user_id: 1, transaction_date: -1 });
-PointsTransactionSchema.index({ user_id: 1, type: 1 });
+/**
+ * Database indexes for optimized query performance
+ * - user_id index: Fast lookups for user's points transactions
+ * - Compound indexes: Optimize common query patterns
+ */
+PointsTransactionSchema.index({ user_id: 1, transaction_date: -1 }); // User's transactions sorted by date
+PointsTransactionSchema.index({ user_id: 1, type: 1, transaction_date: -1 }); // User's transactions by type
+PointsTransactionSchema.index({ user_id: 1, source: 1 }); // Transactions by source (e.g., booking, review)

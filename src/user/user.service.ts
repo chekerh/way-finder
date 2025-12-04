@@ -4,41 +4,82 @@ import { Model } from 'mongoose';
 import { User, UserDocument } from './user.schema';
 import { CreateUserDto, UpdateUserDto } from './user.dto';
 
+/**
+ * User Service
+ * Handles all user-related operations including CRUD, authentication helpers, and profile management
+ */
 @Injectable()
 export class UserService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
+  /**
+   * Create a new user
+   * @param createUserDto - User creation data
+   * @returns Created user document
+   */
   async create(createUserDto: CreateUserDto): Promise<User> {
     const created = new this.userModel(createUserDto);
     return await created.save();
   }
 
+  /**
+   * Find user by username (case-sensitive, trimmed)
+   * @param username - Username to search for
+   * @returns User document or null if not found
+   */
   async findByUsername(username: string): Promise<User | null> {
     // Normalize username by trimming
     const normalizedUsername = username.trim();
     return this.userModel.findOne({ username: normalizedUsername }).exec();
   }
 
+  /**
+   * Find user by email (case-insensitive, normalized to lowercase)
+   * @param email - Email address to search for
+   * @returns User document or null if not found
+   */
   async findByEmail(email: string): Promise<User | null> {
     // Normalize email to lowercase to match schema behavior
     const normalizedEmail = email.trim().toLowerCase();
     return this.userModel.findOne({ email: normalizedEmail }).exec();
   }
 
+  /**
+   * Find user by Google OAuth ID
+   * @param googleId - Google user ID
+   * @returns User document or null if not found
+   */
   async findByGoogleId(googleId: string): Promise<User | null> {
     return this.userModel.findOne({ google_id: googleId }).exec();
   }
 
+  /**
+   * Find user by email verification token
+   * @param token - Email verification token
+   * @returns User document or null if not found
+   */
   async findByVerificationToken(token: string): Promise<User | null> {
     return this.userModel.findOne({ email_verification_token: token }).exec();
   }
 
+  /**
+   * Find user by MongoDB ObjectId
+   * @param id - User ID (ObjectId string)
+   * @returns User document or null if not found
+   */
   async findById(id: string): Promise<User | null> {
     return this.userModel.findById(id).exec();
   }
 
+  /**
+   * Update user's Google OAuth ID (links Google account to existing user)
+   * @param userId - User ID
+   * @param googleId - Google user ID to link
+   * @returns Updated user document
+   * @throws NotFoundException if user not found
+   */
   async updateGoogleId(userId: string, googleId: string): Promise<User> {
     const updated = await this.userModel
       .findByIdAndUpdate(
@@ -51,6 +92,13 @@ export class UserService {
     return updated;
   }
 
+  /**
+   * Mark user's email as verified
+   * Removes verification token and sets verified status
+   * @param userId - User ID
+   * @returns Updated user document
+   * @throws NotFoundException if user not found
+   */
   async verifyEmail(userId: string): Promise<User> {
     const updated = await this.userModel
       .findByIdAndUpdate(
@@ -195,7 +243,14 @@ export class UserService {
    */
   async incrementLifetimeMetric(
     userId: string,
-    metric: 'total_bookings' | 'total_destinations' | 'total_travel_days' | 'total_distance_km' | 'total_countries' | 'total_outfits_analyzed' | 'total_posts_shared',
+    metric:
+      | 'total_bookings'
+      | 'total_destinations'
+      | 'total_travel_days'
+      | 'total_distance_km'
+      | 'total_countries'
+      | 'total_outfits_analyzed'
+      | 'total_posts_shared',
     amount: number = 1,
   ): Promise<void> {
     await this.userModel.findByIdAndUpdate(userId, {

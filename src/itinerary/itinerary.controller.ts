@@ -17,7 +17,15 @@ import {
   UpdateItineraryDto,
   ActivityDto,
 } from './itinerary.dto';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
+/**
+ * Itinerary Controller
+ * Handles travel itineraries, activities, and itinerary management
+ */
 @UseGuards(JwtAuthGuard)
 @Controller('itinerary')
 export class ItineraryController {
@@ -38,21 +46,34 @@ export class ItineraryController {
     return itineraryObj;
   }
 
+  /**
+   * Get user itineraries with pagination
+   * @query includePublic - Include public itineraries from other users (optional)
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 20, max: 100)
+   */
   @Get()
   async findAll(
     @Req() req: any,
     @Query('includePublic') includePublic?: string,
+    @Query() pagination?: PaginationDto,
   ) {
-    const itineraries = await this.itineraryService.findAll(
+    const { page = 1, limit = 20 } = pagination || {};
+    const result = await this.itineraryService.findAllPaginated(
       req.user.sub,
+      page,
+      limit,
       includePublic === 'true',
     );
-    return itineraries.map((itinerary) => {
+
+    const data = result.data.map((itinerary) => {
       const itineraryObj = (itinerary as any).toObject
         ? (itinerary as any).toObject()
         : itinerary;
       return itineraryObj;
     });
+
+    return createPaginatedResponse(data, result.total, page, limit);
   }
 
   @Get(':id')

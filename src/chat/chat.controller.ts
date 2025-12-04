@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -11,6 +12,10 @@ import { ChatService } from './chat.service';
 import { SendMessageDto, SwitchModelDto, ChatModel } from './chat.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MultiModelAIService } from './ai/multi-model-ai.service';
+import {
+  PaginationDto,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
 @Controller('chat')
 export class ChatController {
@@ -31,10 +36,21 @@ export class ChatController {
     return this.chatService.switchModel(req.user.sub, dto);
   }
 
+  /**
+   * Get chat history with pagination
+   * @query page - Page number (default: 1)
+   * @query limit - Items per page (default: 50, max: 100)
+   */
   @UseGuards(JwtAuthGuard)
   @Get('history')
-  async getHistory(@Req() req: any) {
-    return this.chatService.getHistory(req.user.sub);
+  async getHistory(@Req() req: any, @Query() pagination?: PaginationDto) {
+    const { page = 1, limit = 50 } = pagination || {};
+    const result = await this.chatService.getHistoryPaginated(
+      req.user.sub,
+      page,
+      limit,
+    );
+    return createPaginatedResponse(result.data, result.total, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)

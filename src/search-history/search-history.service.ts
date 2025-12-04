@@ -8,6 +8,11 @@ import {
   SaveSearchDto,
 } from './search-history.dto';
 
+/**
+ * Search History Service
+ * Handles search history tracking, recording, and retrieval
+ * Supports both recent and saved searches with deduplication
+ */
 @Injectable()
 export class SearchHistoryService {
   constructor(
@@ -58,6 +63,10 @@ export class SearchHistoryService {
     return savedSearch;
   }
 
+  /**
+   * Get recent searches (non-paginated - for backward compatibility)
+   * @deprecated Use getRecentSearchesPaginated instead for better performance
+   */
   async getRecentSearches(
     userId: string,
     searchType?: string,
@@ -77,6 +86,43 @@ export class SearchHistoryService {
       .exec();
   }
 
+  /**
+   * Get paginated recent searches
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @param searchType - Optional filter by search type
+   * @returns Paginated search history results
+   */
+  async getRecentSearchesPaginated(
+    userId: string,
+    page: number,
+    limit: number,
+    searchType?: string,
+  ) {
+    const query: any = { userId, isActive: true };
+    if (searchType) {
+      query.searchType = searchType;
+    }
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.searchHistoryModel
+        .find(query)
+        .sort({ lastSearchedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.searchHistoryModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
+  }
+
+  /**
+   * Get saved searches (non-paginated - for backward compatibility)
+   * @deprecated Use getSavedSearchesPaginated instead for better performance
+   */
   async getSavedSearches(
     userId: string,
     searchType?: string,
@@ -94,6 +140,39 @@ export class SearchHistoryService {
       .limit(limit)
       .skip(skip)
       .exec();
+  }
+
+  /**
+   * Get paginated saved searches
+   * @param userId - User ID
+   * @param page - Page number (1-based)
+   * @param limit - Items per page
+   * @param searchType - Optional filter by search type
+   * @returns Paginated saved search results
+   */
+  async getSavedSearchesPaginated(
+    userId: string,
+    page: number,
+    limit: number,
+    searchType?: string,
+  ) {
+    const query: any = { userId, isSaved: true, isActive: true };
+    if (searchType) {
+      query.searchType = searchType;
+    }
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.searchHistoryModel
+        .find(query)
+        .sort({ lastSearchedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.searchHistoryModel.countDocuments(query).exec(),
+    ]);
+
+    return { data, total };
   }
 
   async saveSearch(

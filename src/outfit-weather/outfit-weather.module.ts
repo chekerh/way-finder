@@ -30,4 +30,3 @@ import { UserModule } from '../user/user.module';
   exports: [OutfitWeatherService],
 })
 export class OutfitWeatherModule {}
-

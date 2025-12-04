@@ -1,13 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../user/user.schema';
 import { Booking, BookingDocument } from '../booking/booking.schema';
 import { Journey, JourneyDocument } from '../journey/journey.schema';
 import { Outfit, OutfitDocument } from '../outfit-weather/outfit.schema';
-import { DiscussionComment, DiscussionCommentDocument } from '../discussion/discussion.schema';
+import {
+  DiscussionComment,
+  DiscussionCommentDocument,
+} from '../discussion/discussion.schema';
 import { Review, ReviewDocument } from '../reviews/reviews.schema';
-import { OnboardingSession, OnboardingSessionDocument } from '../onboarding/onboarding.schema';
+import {
+  OnboardingSession,
+  OnboardingSessionDocument,
+} from '../onboarding/onboarding.schema';
 import { PointsTransaction, PointsTransactionDocument } from './rewards.schema';
 import { RewardsService } from './rewards.service';
 import { PointsSource } from './rewards.dto';
@@ -64,7 +70,9 @@ export class RecalculatePointsService {
       }
     }
 
-    this.logger.log(`Recalculation complete: ${usersUpdated}/${users.length} users updated`);
+    this.logger.log(
+      `Recalculation complete: ${usersUpdated}/${users.length} users updated`,
+    );
     return {
       totalUsers: users.length,
       usersUpdated,
@@ -78,10 +86,12 @@ export class RecalculatePointsService {
   async recalculateUserPoints(userId: string): Promise<void> {
     const user = await this.userModel.findById(userId).exec();
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
-    this.logger.log(`Recalculating points for user ${userId} (${user.username})`);
+    this.logger.log(
+      `Recalculating points for user ${userId} (${user.username})`,
+    );
 
     // Check if points have already been calculated (to avoid duplicates)
     const existingTransactions = await this.pointsTransactionModel
@@ -96,9 +106,14 @@ export class RecalculatePointsService {
     const onboarding = await this.onboardingModel
       .findOne({ user_id: new Types.ObjectId(userId), completed: true })
       .exec();
-    
-    if (onboarding && !this.hasTransactionFor(existingTransactions, PointsSource.ONBOARDING)) {
-      const points = this.rewardsService.getPointsForAction(PointsSource.ONBOARDING);
+
+    if (
+      onboarding &&
+      !this.hasTransactionFor(existingTransactions, PointsSource.ONBOARDING)
+    ) {
+      const points = this.rewardsService.getPointsForAction(
+        PointsSource.ONBOARDING,
+      );
       await this.rewardsService.awardPoints({
         userId,
         points,
@@ -119,8 +134,16 @@ export class RecalculatePointsService {
       .exec();
 
     for (const booking of confirmedBookings) {
-      if (!this.hasTransactionFor(existingTransactions, PointsSource.BOOKING, booking._id.toString())) {
-        const points = this.rewardsService.getPointsForAction(PointsSource.BOOKING);
+      if (
+        !this.hasTransactionFor(
+          existingTransactions,
+          PointsSource.BOOKING,
+          booking._id.toString(),
+        )
+      ) {
+        const points = this.rewardsService.getPointsForAction(
+          PointsSource.BOOKING,
+        );
         await this.rewardsService.awardPoints({
           userId,
           points,
@@ -145,8 +168,16 @@ export class RecalculatePointsService {
       .exec();
 
     for (const journey of journeys) {
-      if (!this.hasTransactionFor(existingTransactions, PointsSource.SHARE, journey._id.toString())) {
-        const points = this.rewardsService.getPointsForAction(PointsSource.SHARE);
+      if (
+        !this.hasTransactionFor(
+          existingTransactions,
+          PointsSource.SHARE,
+          journey._id.toString(),
+        )
+      ) {
+        const points = this.rewardsService.getPointsForAction(
+          PointsSource.SHARE,
+        );
         await this.rewardsService.awardPoints({
           userId,
           points,
@@ -170,8 +201,16 @@ export class RecalculatePointsService {
       .exec();
 
     for (const outfit of outfits) {
-      if (!this.hasTransactionFor(existingTransactions, PointsSource.OUTFIT, outfit._id.toString())) {
-        const points = this.rewardsService.getPointsForAction(PointsSource.OUTFIT);
+      if (
+        !this.hasTransactionFor(
+          existingTransactions,
+          PointsSource.OUTFIT,
+          outfit._id.toString(),
+        )
+      ) {
+        const points = this.rewardsService.getPointsForAction(
+          PointsSource.OUTFIT,
+        );
         await this.rewardsService.awardPoints({
           userId,
           points,
@@ -195,8 +234,16 @@ export class RecalculatePointsService {
       .exec();
 
     for (const comment of comments) {
-      if (!this.hasTransactionFor(existingTransactions, PointsSource.COMMENT, comment._id.toString())) {
-        const points = this.rewardsService.getPointsForAction(PointsSource.COMMENT);
+      if (
+        !this.hasTransactionFor(
+          existingTransactions,
+          PointsSource.COMMENT,
+          comment._id.toString(),
+        )
+      ) {
+        const points = this.rewardsService.getPointsForAction(
+          PointsSource.COMMENT,
+        );
         await this.rewardsService.awardPoints({
           userId,
           points,
@@ -221,8 +268,16 @@ export class RecalculatePointsService {
       .exec();
 
     for (const review of destinationReviews) {
-      if (!this.hasTransactionFor(existingTransactions, PointsSource.RATING, review._id.toString())) {
-        const points = this.rewardsService.getPointsForAction(PointsSource.RATING);
+      if (
+        !this.hasTransactionFor(
+          existingTransactions,
+          PointsSource.RATING,
+          review._id.toString(),
+        )
+      ) {
+        const points = this.rewardsService.getPointsForAction(
+          PointsSource.RATING,
+        );
         await this.rewardsService.awardPoints({
           userId,
           points,
@@ -239,10 +294,22 @@ export class RecalculatePointsService {
     }
 
     // Update lifetime metrics using UserService
-    await this.userService.incrementLifetimeMetric(userId, 'total_bookings', confirmedBookings.length);
-    await this.userService.incrementLifetimeMetric(userId, 'total_outfits_analyzed', outfits.length);
-    await this.userService.incrementLifetimeMetric(userId, 'total_posts_shared', journeys.length);
-    
+    await this.userService.incrementLifetimeMetric(
+      userId,
+      'total_bookings',
+      confirmedBookings.length,
+    );
+    await this.userService.incrementLifetimeMetric(
+      userId,
+      'total_outfits_analyzed',
+      outfits.length,
+    );
+    await this.userService.incrementLifetimeMetric(
+      userId,
+      'total_posts_shared',
+      journeys.length,
+    );
+
     // Calculate unique destinations from bookings
     const uniqueDestinations = new Set(
       confirmedBookings
@@ -282,4 +349,3 @@ export class RecalculatePointsService {
     return transactions.some((t) => t.source === source);
   }
 }
-

@@ -82,7 +82,9 @@ NotificationSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      type: { $in: ['booking_cancelled', 'booking_confirmed', 'booking_updated'] },
+      type: {
+        $in: ['booking_cancelled', 'booking_confirmed', 'booking_updated'],
+      },
       'data.bookingId': { $exists: true },
     },
     name: 'unique_booking_notification_index',
