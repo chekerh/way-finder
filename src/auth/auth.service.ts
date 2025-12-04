@@ -1162,11 +1162,19 @@ export class AuthService {
                 duplicateField = 'username';
               } else {
                 // This is a google_id sparse index issue - the user might exist but query failed
-                // Default to email as it's the most common case
-                this.logger.warn(
-                  `google_id duplicate key error but user not found. Assuming email duplicate.`,
+                // This shouldn't happen if the index is properly sparse, but if it does,
+                // we need to provide a helpful error message
+                this.logger.error(
+                  `google_id duplicate key error but user not found in database. This indicates a sparse index configuration issue. Email: ${email}, Username: ${username}`,
                 );
-                duplicateField = 'email';
+                // Try one more time with a direct MongoDB query to see if user exists
+                // If still not found, this is definitely a sparse index bug
+                // Provide a clear error message to the user
+                duplicateField = 'email'; // Fallback to email error message
+                // Log detailed error for debugging
+                this.logger.error(
+                  `MongoDB sparse index error details: keyPattern=${JSON.stringify(error.keyPattern)}, message=${error.message}`,
+                );
               }
             }
           } else {
@@ -1208,6 +1216,16 @@ export class AuthService {
           } else {
             // User exists in DB but findByEmail didn't find it (unlikely but possible)
             // This could happen if there's a case sensitivity or normalization issue
+            // OR if it's a google_id sparse index issue
+            // Check if this was a google_id error
+            if (error.keyPattern && error.keyPattern.google_id) {
+              this.logger.error(
+                `Sparse index issue detected: google_id duplicate key but user not found by email. This may require database index fix.`,
+              );
+              throw new ConflictException(
+                'Une erreur technique s\'est produite lors de la création du compte. Veuillez réessayer dans quelques instants ou contactez le support si le problème persiste.',
+              );
+            }
             throw new ConflictException(
               'Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
             );

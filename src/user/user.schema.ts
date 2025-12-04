@@ -37,8 +37,8 @@ export class User {
   @Prop({ required: false }) // Made optional for Google OAuth users
   password?: string;
 
-  @Prop({ type: String, trim: true, default: null })
-  google_id?: string; // Google user ID for OAuth
+  @Prop({ type: String, trim: true, required: false })
+  google_id?: string; // Google user ID for OAuth - no default to allow sparse index
 
   @Prop({ type: Boolean, default: false })
   email_verified: boolean; // Email verification status
@@ -120,6 +120,17 @@ export class User {
 
 export type UserDocument = HydratedDocument<User>;
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Pre-save hook to ensure google_id is omitted (not set to null) when not provided
+// This prevents sparse index issues with multiple null values
+UserSchema.pre('save', function (next) {
+  // If google_id is null, undefined, or empty string, set it to undefined
+  // This ensures the field is truly omitted from the document, not stored as null
+  if (this.google_id === null || this.google_id === undefined || this.google_id === '') {
+    this.google_id = undefined;
+  }
+  next();
+});
 
 // Ensure google_id index is sparse (allows multiple null values)
 // This fixes the duplicate key error when multiple users sign up without Google
