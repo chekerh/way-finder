@@ -30,6 +30,8 @@ import { ChatModule } from './chat/chat.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { OutfitWeatherModule } from './outfit-weather/outfit-weather.module';
 import { CacheModule } from './common/cache/cache.module';
+import { CommissionModule } from './commission/commission.module';
+import { UpsellsModule } from './upsells/upsells.module';
 
 /**
  * Constructs MongoDB connection URI from environment variables.
@@ -227,6 +229,8 @@ const createRedisOptions = (): RedisOptions => {
     DestinationVideoModule,
     ChatModule,
     OutfitWeatherModule,
+    CommissionModule,
+    UpsellsModule,
   ],
   controllers: [AppController],
   providers: [

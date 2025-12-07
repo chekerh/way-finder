@@ -6,6 +6,7 @@ import { BookingController } from './booking.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RewardsModule } from '../rewards/rewards.module';
 import { UserModule } from '../user/user.module';
+import { CommissionModule } from '../commission/commission.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { UserModule } from '../user/user.module';
     NotificationsModule,
     RewardsModule,
     UserModule,
+    CommissionModule,
   ],
   controllers: [BookingController],
   providers: [BookingService],

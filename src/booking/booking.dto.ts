@@ -39,6 +39,55 @@ export class TripDetailsDto {
   seats?: string;
 }
 
+export class AccommodationDto {
+  @IsNotEmpty()
+  @IsString()
+  id: string;
+
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
+  price: number;
+
+  @IsNotEmpty()
+  @IsString()
+  currency: string;
+}
+
+export class UpsellItemDto {
+  @IsNotEmpty()
+  @IsString()
+  product_id: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
+  quantity: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
+  price: number;
+
+  @IsNotEmpty()
+  @IsString()
+  currency: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
+  commission_rate: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
+  commission_amount: number;
+}
+
 export class ConfirmBookingDto {
   @IsNotEmpty()
   @IsString()
@@ -57,6 +106,17 @@ export class ConfirmBookingDto {
   @ValidateNested()
   @Type(() => TripDetailsDto)
   trip_details?: TripDetailsDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AccommodationDto)
+  accommodation?: AccommodationDto;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpsellItemDto)
+  upsells?: UpsellItemDto[];
 }
 
 export class PassengerDto {

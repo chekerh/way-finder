@@ -44,6 +44,32 @@ export class Booking {
 
   @Prop({ required: true })
   total_price: number;
+
+  @Prop({ type: Object })
+  accommodation?: {
+    id: string;
+    name: string;
+    price: number;
+    currency: string;
+  };
+
+  @Prop({ type: [Object], default: [] })
+  upsells?: Array<{
+    product_id: string;
+    quantity: number;
+    price: number;
+    currency: string;
+    commission_rate: number;
+    commission_amount: number;
+  }>;
+
+  @Prop({ type: Object })
+  commission_breakdown?: {
+    flight_commission: number;
+    accommodation_commission?: number;
+    upsell_commission: number;
+    total_commission: number;
+  };
 }
 
 export type BookingDocument = HydratedDocument<Booking>;

@@ -17,6 +17,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RewardsService } from '../rewards/rewards.service';
 import { PointsSource } from '../rewards/rewards.dto';
 import { UserService } from '../user/user.service';
+import { CommissionService } from '../commission/commission.service';
 
 /**
  * Booking Service
@@ -32,6 +33,7 @@ export class BookingService {
     private readonly notificationsService: NotificationsService,
     private readonly rewardsService: RewardsService,
     private readonly userService: UserService,
+    private readonly commissionService: CommissionService,
   ) {}
 
   /**
@@ -184,6 +186,38 @@ export class BookingService {
 
     const confirmation_number = `CONF-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
     const total_price = dto.total_price ?? 0;
+    
+    // Calculate commission breakdown
+    let flightCommission = 0;
+    let accommodationCommission = 0;
+    let upsellCommission = 0;
+    
+    // Calculate flight commission (assume base price is flight price)
+    const flightCalculation = this.commissionService.calculateCommission(
+      total_price * 0.7, // Estimate 70% is flight, adjust based on your pricing
+      'flight',
+    );
+    flightCommission = flightCalculation.commissionAmount;
+    
+    // Calculate accommodation commission if present
+    if (dto.accommodation) {
+      const accCalculation = this.commissionService.calculateCommission(
+        dto.accommodation.price,
+        'accommodation',
+      );
+      accommodationCommission = accCalculation.commissionAmount;
+    }
+    
+    // Calculate upsell commissions
+    if (dto.upsells && dto.upsells.length > 0) {
+      upsellCommission = dto.upsells.reduce(
+        (sum, upsell) => sum + upsell.commission_amount * upsell.quantity,
+        0,
+      );
+    }
+    
+    const totalCommission = flightCommission + accommodationCommission + upsellCommission;
+    
     const booking = new this.bookingModel({
       user_id: this.toObjectId(userId, 'user id'),
       offer_id: dto.offer_id,
@@ -192,9 +226,68 @@ export class BookingService {
       booking_date: new Date(),
       confirmation_number,
       total_price,
-      trip_details: dto.trip_details, // Include trip details (destination, etc.)
+      trip_details: dto.trip_details,
+      accommodation: dto.accommodation,
+      upsells: dto.upsells,
+      commission_breakdown: {
+        flight_commission: flightCommission,
+        accommodation_commission: accommodationCommission,
+        upsell_commission: upsellCommission,
+        total_commission: totalCommission,
+      },
     });
     const savedBooking = await booking.save();
+    
+    // Create commission records
+    try {
+      const commissionItems = [];
+      
+      // Flight commission
+      commissionItems.push({
+        type: 'flight' as const,
+        id: dto.offer_id,
+        name: dto.trip_details?.destination || 'Flight',
+        basePrice: total_price * 0.7,
+        currency: 'EUR',
+      });
+      
+      // Accommodation commission
+      if (dto.accommodation) {
+        commissionItems.push({
+          type: 'accommodation' as const,
+          id: dto.accommodation.id,
+          name: dto.accommodation.name,
+          basePrice: dto.accommodation.price,
+          currency: dto.accommodation.currency,
+        });
+      }
+      
+      // Upsell commissions
+      if (dto.upsells && dto.upsells.length > 0) {
+        dto.upsells.forEach((upsell) => {
+          commissionItems.push({
+            type: 'upsell' as const,
+            id: upsell.product_id,
+            name: `Upsell ${upsell.product_id}`,
+            basePrice: upsell.price,
+            currency: upsell.currency,
+            category: upsell.product_id.split('_')[0], // Extract category from product_id
+          });
+        });
+      }
+      
+      await this.commissionService.createCommissions(
+        savedBooking._id.toString(),
+        userId,
+        commissionItems,
+      );
+      
+      // Confirm commissions
+      await this.commissionService.confirmCommissions(savedBooking._id.toString());
+    } catch (error) {
+      this.logger.warn(`Failed to create commissions: ${error.message}`);
+      // Don't fail booking if commission creation fails
+    }
 
     // Award points for booking a flight (+50 points)
     try {
