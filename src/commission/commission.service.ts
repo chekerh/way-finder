@@ -136,7 +136,7 @@ export class CommissionService {
   async updateCommissionStatus(
     commissionId: string,
     status: 'pending' | 'confirmed' | 'paid' | 'cancelled',
-  ): Promise<CommissionDocument> {
+  ): Promise<CommissionDocument | null> {
     const update: any = { status };
     if (status === 'paid') {
       update.paidAt = new Date();

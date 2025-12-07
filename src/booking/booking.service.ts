@@ -240,7 +240,14 @@ export class BookingService {
     
     // Create commission records
     try {
-      const commissionItems = [];
+      const commissionItems: Array<{
+        type: 'flight' | 'accommodation' | 'upsell';
+        id: string;
+        name: string;
+        basePrice: number;
+        currency: string;
+        category?: string;
+      }> = [];
       
       // Flight commission
       commissionItems.push({
