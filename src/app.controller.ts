@@ -40,6 +40,7 @@ export class AppController {
   /**
    * Health check endpoint for Render monitoring
    * Returns application status and basic metrics
+   * Enhanced to verify that services are truly ready (not just responding)
    */
   @Get('health')
   async getHealth() {
@@ -49,10 +50,12 @@ export class AppController {
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       version: process.env.npm_package_version || '1.0.0',
+      ready: false, // New field to indicate if truly ready
       services: {
         database: {
           status: 'unknown',
           latency: 0,
+          ready: false,
         },
         redis: {
           status: 'unknown',
@@ -65,21 +68,34 @@ export class AppController {
       },
     };
 
-    // Check MongoDB connection
+    // Check MongoDB connection with actual ping
     try {
       if (this.mongooseConnection?.db) {
         const startTime = Date.now();
+        // Perform actual ping to ensure connection is working
         await this.mongooseConnection.db.admin().ping();
-        health.services.database.latency = Date.now() - startTime;
+        const latency = Date.now() - startTime;
+        health.services.database.latency = latency;
         health.services.database.status = 'connected';
+        health.services.database.ready = true;
+        
+        // Only mark as ready if database ping is fast (< 100ms)
+        // This ensures the database is truly responsive, not just connected
+        if (latency < 100) {
+          health.ready = true;
+        }
       } else {
         health.services.database.status = 'disconnected';
+        health.services.database.ready = false;
         health.status = 'degraded';
+        health.ready = false;
       }
     } catch (error) {
       this.logger.error('MongoDB health check failed', error);
       health.services.database.status = 'disconnected';
+      health.services.database.ready = false;
       health.status = 'degraded';
+      health.ready = false;
     }
 
     // Note: Redis check would require Redis client injection
@@ -129,5 +145,58 @@ export class AppController {
   @Get('live')
   getLive() {
     return { status: 'alive', timestamp: new Date().toISOString() };
+  }
+
+  /**
+   * Warm-up endpoint to pre-initialize critical services
+   * This helps reduce cold start latency on Render by initializing
+   * services before they're needed
+   */
+  @Get('warmup')
+  async warmup() {
+    const startTime = Date.now();
+    const results: Record<string, { status: string; latency?: number }> = {};
+
+    // Warm up database connection
+    try {
+      const dbStart = Date.now();
+      if (this.mongooseConnection?.db) {
+        await this.mongooseConnection.db.admin().ping();
+        results.database = {
+          status: 'ready',
+          latency: Date.now() - dbStart,
+        };
+      } else {
+        results.database = { status: 'not_connected' };
+      }
+    } catch (error) {
+      this.logger.error('Database warm-up failed', error);
+      results.database = { status: 'error' };
+    }
+
+    // Warm up JWT service (if available)
+    try {
+      const jwtStart = Date.now();
+      // Just verify JWT_SECRET is set (lightweight check)
+      if (process.env.JWT_SECRET) {
+        results.jwt = {
+          status: 'configured',
+          latency: Date.now() - jwtStart,
+        };
+      } else {
+        results.jwt = { status: 'not_configured' };
+      }
+    } catch (error) {
+      results.jwt = { status: 'error' };
+    }
+
+    const totalLatency = Date.now() - startTime;
+
+    return {
+      status: 'warmed_up',
+      timestamp: new Date().toISOString(),
+      totalLatency,
+      services: results,
+    };
   }
 }
