@@ -46,6 +46,7 @@ export class UpsellsService {
         currency: 'EUR',
         category: 'airport_transfer',
         commissionRate: 12.0,
+        recommended: false,
         features: ['Aller-retour', 'Conducteur professionnel', 'Suivi en temps réel'],
       },
       {
@@ -56,6 +57,7 @@ export class UpsellsService {
         currency: 'EUR',
         category: 'car_rental',
         commissionRate: 15.0,
+        recommended: false,
         features: ['Assurance complète', 'Kilométrage illimité', 'GPS inclus'],
       },
       {
@@ -66,6 +68,7 @@ export class UpsellsService {
         currency: 'EUR',
         category: 'lounge_access',
         commissionRate: 25.0,
+        recommended: true,
         features: ['Repas inclus', 'Boissons illimitées', 'WiFi gratuit', 'Confort'],
       },
       {
@@ -76,6 +79,7 @@ export class UpsellsService {
         currency: 'EUR',
         category: 'wifi_data',
         commissionRate: 35.0,
+        recommended: true,
         features: ['10GB de données', '50+ pays', 'Vitesse 4G/5G', 'Valable 30 jours'],
       },
       {
@@ -86,6 +90,7 @@ export class UpsellsService {
         currency: 'EUR',
         category: 'seat_selection',
         commissionRate: 8.0,
+        recommended: false,
         features: ['Choix du siège', 'Réservation à l\'avance', 'Plus d\'espace'],
       },
     ];
