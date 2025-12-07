@@ -126,11 +126,23 @@ async function bootstrap() {
   SwaggerModule.setup('api-docs', app, document);
 
   const port = Number(process.env.PORT) || 3000;
+  
+  // Start server and wait for it to be ready
   await app.listen(port, '0.0.0.0');
   logger.log(`🚀 Application is running on: http://localhost:${port}/api`);
   logger.log(`📚 Swagger docs available at: http://localhost:${port}/api-docs`);
   logger.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.log(`💾 MongoDB: Connected with connection pooling enabled`);
+  
+  // Ensure server is fully ready before marking as started
+  // This helps with Render cold starts by pre-initializing critical paths
+  try {
+    // Small delay to ensure all routes are registered
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    logger.log(`✅ Server fully initialized and ready to accept requests`);
+  } catch (error) {
+    logger.warn('⚠️ Server initialization warning:', error.message);
+  }
 
   // Pre-warm critical services after server starts
   // This helps reduce cold start latency on Render

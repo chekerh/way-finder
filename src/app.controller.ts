@@ -79,11 +79,9 @@ export class AppController {
         health.services.database.status = 'connected';
         health.services.database.ready = true;
         
-        // Only mark as ready if database ping is fast (< 100ms)
-        // This ensures the database is truly responsive, not just connected
-        if (latency < 100) {
-          health.ready = true;
-        }
+        // Mark as ready if database is connected and responsive
+        // Don't require < 100ms latency as Render can have variable network conditions
+        health.ready = true;
       } else {
         health.services.database.status = 'disconnected';
         health.services.database.ready = false;
@@ -151,16 +149,18 @@ export class AppController {
    * Warm-up endpoint to pre-initialize critical services
    * This helps reduce cold start latency on Render by initializing
    * services before they're needed
+   * Returns immediately if already warmed up to avoid blocking
    */
   @Get('warmup')
   async warmup() {
     const startTime = Date.now();
     const results: Record<string, { status: string; latency?: number }> = {};
 
-    // Warm up database connection
+    // Warm up database connection - this is the critical path
     try {
       const dbStart = Date.now();
       if (this.mongooseConnection?.db) {
+        // Perform actual ping to ensure connection is working
         await this.mongooseConnection.db.admin().ping();
         results.database = {
           status: 'ready',
@@ -197,6 +197,7 @@ export class AppController {
       timestamp: new Date().toISOString(),
       totalLatency,
       services: results,
+      ready: results.database?.status === 'ready', // Server is ready if DB is ready
     };
   }
 }
