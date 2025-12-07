@@ -24,6 +24,7 @@ import {
   PaginationDto,
   createPaginatedResponse,
 } from '../common/dto/pagination.dto';
+import { RATE_LIMIT } from '../common/constants';
 
 /**
  * Booking Controller
@@ -58,9 +59,9 @@ export class BookingController {
 
   /**
    * Confirm a booking
-   * Rate limited: 10 requests per minute to prevent abuse
+   * Rate limited: 30 requests per minute to allow normal usage while preventing abuse
    */
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: RATE_LIMIT.BOOKING_CONFIRM, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @Post('confirm')
   @UsePipes(

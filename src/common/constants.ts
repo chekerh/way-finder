@@ -146,7 +146,7 @@ export const RATE_LIMIT = {
   FILE_UPLOAD: 5,
 
   /** Booking confirmation rate limit */
-  BOOKING_CONFIRM: 10,
+  BOOKING_CONFIRM: 30,
 
   /** Discussion post creation rate limit */
   DISCUSSION_POST: 10,

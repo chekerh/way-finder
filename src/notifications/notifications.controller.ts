@@ -10,6 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
 import {
@@ -47,10 +48,12 @@ export class NotificationsController {
 
   /**
    * Get user notifications with pagination
+   * Rate limited: 60 requests per minute to allow frequent polling
    * @query unreadOnly - Filter to unread notifications only (default: false)
    * @query page - Page number (default: 1)
    * @query limit - Items per page (default: 20, max: 100)
    */
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get()
   async getNotifications(
     @Req() req: any,
@@ -76,6 +79,11 @@ export class NotificationsController {
     return createPaginatedResponse(data, result.total, page, limit);
   }
 
+  /**
+   * Get unread notifications count
+   * Rate limited: 60 requests per minute to allow frequent polling
+   */
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get('unread-count')
   async getUnreadCount(@Req() req: any) {
     const count = await this.notificationsService.getUnreadCount(req.user.sub);
