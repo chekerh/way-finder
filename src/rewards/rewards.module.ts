@@ -3,6 +3,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { RewardsController } from './rewards.controller';
 import { RewardsService } from './rewards.service';
 import { RecalculatePointsService } from './recalculate-points.service';
+import { DiscountsController } from './discounts.controller';
+import { DiscountsService } from './discounts.service';
 import { PointsTransaction, PointsTransactionSchema } from './rewards.schema';
 import { UserModule } from '../user/user.module';
 import { Booking, BookingSchema } from '../booking/booking.schema';
@@ -35,8 +37,8 @@ import { User, UserSchema } from '../user/user.schema';
     // Don't import other modules to avoid circular dependencies
     // They import RewardsModule, so we can't import them back
   ],
-  controllers: [RewardsController],
-  providers: [RewardsService, RecalculatePointsService],
-  exports: [RewardsService, RecalculatePointsService],
+  controllers: [RewardsController, DiscountsController],
+  providers: [RewardsService, RecalculatePointsService, DiscountsService],
+  exports: [RewardsService, RecalculatePointsService, DiscountsService],
 })
 export class RewardsModule {}

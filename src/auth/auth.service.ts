@@ -77,7 +77,7 @@ export class AuthService {
       );
       throw new ConflictException('Username already exists');
     }
-
+    
     // Check if email already exists
     const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) {
@@ -88,7 +88,7 @@ export class AuthService {
       );
       throw new ConflictException('Email already exists');
     }
-
+    
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
 
@@ -99,12 +99,12 @@ export class AuthService {
       this.emailService.generateVerificationToken();
 
     try {
-      const user = await this.userService.create({
-        username,
-        email,
-        first_name: firstName,
-        last_name: lastName,
-        password: hash,
+    const user = await this.userService.create({
+      username,
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      password: hash,
         email_verified: false, // Email not verified yet
         email_verification_token: emailVerificationToken,
       });
@@ -124,8 +124,8 @@ export class AuthService {
         );
       }
 
-      const userObj = (user as any).toObject ? (user as any).toObject() : user;
-      const { password: _password, ...result } = userObj;
+    const userObj = (user as any).toObject ? (user as any).toObject() : user;
+    const { password: _password, ...result } = userObj;
       return {
         message:
           'User registered successfully. Please check your email to verify your account.',
@@ -761,7 +761,7 @@ export class AuthService {
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
     const { password: _password, ...userData } = userObj;
 
-    return {
+    return { 
       access_token: token,
       user: userData,
       onboarding_completed: user.onboarding_completed || false,
