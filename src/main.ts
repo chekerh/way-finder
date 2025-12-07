@@ -133,46 +133,39 @@ async function bootstrap() {
   logger.log(`💾 MongoDB: Connected with connection pooling enabled`);
 
   // Pre-warm critical services after server starts
-  // This helps reduce cold start latency on Render by initializing services early
-  try {
-    logger.log('🔥 Pre-warming critical services...');
-    const appController = app.get('AppController');
-    if (appController) {
-      // Small delay to ensure all modules are fully initialized
-      await new Promise((resolve) => setTimeout(resolve, 500));
+  // This helps reduce cold start latency on Render
+  // Note: Warm-up happens via HTTP call after server is listening
+  setImmediate(async () => {
+    try {
+      // Small delay to ensure server is fully ready
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       
-      // Trigger warm-up in background (don't block server start)
-      setImmediate(async () => {
-        try {
-          // Call warmup endpoint via HTTP to ensure full request pipeline is warmed
-          const http = await import('http');
-          const warmupUrl = `http://localhost:${port}/api/warmup`;
-          
-          http.get(warmupUrl, (res) => {
-            let data = '';
-            res.on('data', (chunk) => { data += chunk; });
-            res.on('end', () => {
-              try {
-                const result = JSON.parse(data);
-                logger.log(`✅ Services pre-warmed: ${JSON.stringify(result.services)}`);
-              } catch (e) {
-                // Ignore parse errors
-              }
-            });
-          }).on('error', (err) => {
-            // Ignore warm-up errors, server is still running
-            logger.warn('⚠️ Warm-up failed (non-critical):', err.message);
-          });
-        } catch (error) {
-          // Ignore warm-up errors, server is still running
-          logger.warn('⚠️ Could not pre-warm services (non-critical):', error.message);
-        }
+      // Call warmup endpoint via HTTP to ensure full request pipeline is warmed
+      const http = await import('http');
+      const warmupUrl = `http://localhost:${port}/api/warmup`;
+      
+      logger.log('🔥 Pre-warming critical services...');
+      
+      http.get(warmupUrl, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            logger.log(`✅ Services pre-warmed: ${JSON.stringify(result.services)}`);
+          } catch (e) {
+            // Ignore parse errors
+          }
+        });
+      }).on('error', (err) => {
+        // Ignore warm-up errors, server is still running
+        logger.warn('⚠️ Warm-up failed (non-critical):', err.message);
       });
+    } catch (error) {
+      // Ignore warm-up errors, server is still running
+      logger.warn('⚠️ Could not pre-warm services (non-critical):', error.message);
     }
-  } catch (error) {
-    // Warm-up is optional, don't fail server start if it fails
-    logger.warn('⚠️ Could not pre-warm services (non-critical):', error.message);
-  }
+  });
 }
 
 bootstrap().catch((error) => {
