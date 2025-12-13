@@ -7,9 +7,15 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  UseInterceptors,
+  UploadedFile,
+  UploadedFiles,
 } from '@nestjs/common';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AiTravelVideoService } from './ai-travel-video.service';
+import { ImgBBService } from '../journey/imgbb.service';
 
 /**
  * DTO for video generation request
@@ -42,7 +48,10 @@ class TravelPlanQueryDto {
  */
 @Controller('ai-video')
 export class AiTravelVideoController {
-  constructor(private readonly aiTravelVideoService: AiTravelVideoService) {}
+  constructor(
+    private readonly aiTravelVideoService: AiTravelVideoService,
+    private readonly imgbbService: ImgBBService,
+  ) {}
 
   /**
    * Check if AI video generation is available
@@ -234,6 +243,110 @@ export class AiTravelVideoController {
         estimatedTime: '1-3 minutes',
       },
     };
+  }
+
+  /**
+   * Upload a single image from phone to ImgBB
+   * Returns the URL that can be used for video generation
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('upload-image')
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+      limits: { fileSize: 32 * 1024 * 1024 }, // 32MB max
+    }),
+  )
+  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No image file provided');
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Allowed: JPEG, PNG, GIF, WebP');
+    }
+
+    try {
+      // Upload directly from buffer to ImgBB
+      const imageUrl = await this.imgbbService.uploadImageFromBuffer(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+      );
+
+      return {
+        success: true,
+        message: 'Image uploaded successfully',
+        data: {
+          url: imageUrl,
+          originalName: file.originalname,
+          size: file.size,
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException(`Failed to upload image: ${error.message}`);
+    }
+  }
+
+  /**
+   * Upload multiple images from phone to ImgBB
+   * Returns array of URLs that can be used for video generation
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('upload-images')
+  @UseInterceptors(
+    FilesInterceptor('images', 20, {
+      storage: memoryStorage(),
+      limits: { fileSize: 32 * 1024 * 1024 }, // 32MB max per file
+    }),
+  )
+  async uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No image files provided');
+    }
+
+    if (files.length > 20) {
+      throw new BadRequestException('Maximum 20 images allowed per upload');
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+
+    // Validate all files
+    for (const file of files) {
+      if (!allowedTypes.includes(file.mimetype)) {
+        throw new BadRequestException(`Invalid file type for ${file.originalname}. Allowed: JPEG, PNG, GIF, WebP`);
+      }
+    }
+
+    try {
+      const uploadedImages: { url: string; originalName: string }[] = [];
+
+      // Upload all images in parallel directly from buffers
+      const uploadPromises = files.map(async (file) => {
+        const url = await this.imgbbService.uploadImageFromBuffer(
+          file.buffer,
+          file.originalname,
+          file.mimetype,
+        );
+        return { url, originalName: file.originalname };
+      });
+
+      const results = await Promise.all(uploadPromises);
+      uploadedImages.push(...results);
+
+      return {
+        success: true,
+        message: `${uploadedImages.length} images uploaded successfully`,
+        data: {
+          images: uploadedImages,
+          count: uploadedImages.length,
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException(`Failed to upload images: ${error.message}`);
+    }
   }
 }
 
