@@ -19,6 +19,24 @@ class GenerateVideoDto {
 }
 
 /**
+ * DTO for video generation with images and music
+ */
+class GenerateVideoWithMediaDto {
+  prompt: string;
+  images?: string[];
+  musicTrackId?: string;
+}
+
+/**
+ * DTO for travel plan suggestions query
+ */
+class TravelPlanQueryDto {
+  tripType?: string;
+  duration?: string;
+  budget?: string;
+}
+
+/**
  * AI Travel Video Controller
  * Handles text-to-video generation for travel content
  */
@@ -148,6 +166,73 @@ export class AiTravelVideoController {
     return {
       original: prompt,
       enhanced,
+    };
+  }
+
+  /**
+   * Get available music tracks for video creation
+   * @returns list of music tracks
+   */
+  @Get('music-tracks')
+  getMusicTracks() {
+    return {
+      success: true,
+      tracks: this.aiTravelVideoService.getMusicTracks(),
+    };
+  }
+
+  /**
+   * Get AI-generated travel plan suggestions
+   * @returns list of travel plan suggestions with video prompts
+   */
+  @Get('travel-plans')
+  getTravelPlans(@Req() req: any) {
+    const query: TravelPlanQueryDto = {
+      tripType: req.query.tripType as string,
+      duration: req.query.duration as string,
+      budget: req.query.budget as string,
+    };
+
+    return {
+      success: true,
+      plans: this.aiTravelVideoService.getTravelPlanSuggestions(query),
+    };
+  }
+
+  /**
+   * Generate a travel video with images and music
+   * Allows users to upload their own photos and select background music
+   * @body prompt - Text description
+   * @body images - Array of image URLs
+   * @body musicTrackId - Selected music track ID
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('generate-with-media')
+  async generateVideoWithMedia(@Req() req: any, @Body() body: GenerateVideoWithMediaDto) {
+    const userId = req.user.sub;
+
+    if (!body.prompt || typeof body.prompt !== 'string') {
+      throw new BadRequestException('Prompt is required');
+    }
+
+    const result = await this.aiTravelVideoService.generateVideoWithMedia(
+      userId,
+      body.prompt,
+      body.images || [],
+      body.musicTrackId,
+    );
+
+    return {
+      success: true,
+      message: 'Video generation started',
+      data: {
+        predictionId: result.predictionId,
+        status: result.status,
+        originalPrompt: result.prompt,
+        enhancedPrompt: result.enhancedPrompt,
+        musicTrack: result.musicTrack,
+        estimatedTime: '1-3 minutes',
+      },
     };
   }
 }

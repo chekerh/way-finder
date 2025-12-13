@@ -1,7 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { firstValueFrom } from 'rxjs';
 
 /**
@@ -19,6 +18,32 @@ export interface GeneratedVideo {
   createdAt: Date;
   completedAt?: Date;
   error?: string;
+  images?: string[];
+  musicTrack?: string;
+}
+
+/**
+ * Music track options for video generation
+ */
+export interface MusicTrack {
+  id: string;
+  name: string;
+  genre: string;
+  duration: string;
+  previewUrl?: string;
+}
+
+/**
+ * AI Travel Plan suggestion
+ */
+export interface TravelPlanSuggestion {
+  id: string;
+  title: string;
+  description: string;
+  destinations: string[];
+  duration: string;
+  activities: string[];
+  videoPrompt: string;
 }
 
 /**
@@ -397,6 +422,260 @@ export class AiTravelVideoService {
       'A boat sailing through Venice canals',
       'Safari animals walking across the African savanna',
     ];
+  }
+
+  /**
+   * Get available music tracks for video creation
+   */
+  getMusicTracks(): MusicTrack[] {
+    return [
+      {
+        id: 'ambient-travel',
+        name: 'Wanderlust Dreams',
+        genre: 'Ambient',
+        duration: '3:30',
+        previewUrl: 'https://cdn.pixabay.com/audio/2024/ambient-travel.mp3',
+      },
+      {
+        id: 'upbeat-adventure',
+        name: 'Adventure Awaits',
+        genre: 'Upbeat',
+        duration: '2:45',
+        previewUrl: 'https://cdn.pixabay.com/audio/2024/upbeat-adventure.mp3',
+      },
+      {
+        id: 'cinematic-epic',
+        name: 'Epic Journey',
+        genre: 'Cinematic',
+        duration: '4:00',
+        previewUrl: 'https://cdn.pixabay.com/audio/2024/cinematic-epic.mp3',
+      },
+      {
+        id: 'tropical-vibes',
+        name: 'Tropical Paradise',
+        genre: 'Tropical',
+        duration: '3:15',
+        previewUrl: 'https://cdn.pixabay.com/audio/2024/tropical-vibes.mp3',
+      },
+      {
+        id: 'romantic-piano',
+        name: 'Romantic Sunset',
+        genre: 'Piano',
+        duration: '3:45',
+        previewUrl: 'https://cdn.pixabay.com/audio/2024/romantic-piano.mp3',
+      },
+      {
+        id: 'nature-sounds',
+        name: 'Nature Harmony',
+        genre: 'Nature',
+        duration: '5:00',
+        previewUrl: 'https://cdn.pixabay.com/audio/2024/nature-sounds.mp3',
+      },
+      {
+        id: 'electronic-chill',
+        name: 'Chill Explorer',
+        genre: 'Electronic',
+        duration: '3:20',
+        previewUrl: 'https://cdn.pixabay.com/audio/2024/electronic-chill.mp3',
+      },
+      {
+        id: 'world-music',
+        name: 'World Cultures',
+        genre: 'World',
+        duration: '4:15',
+        previewUrl: 'https://cdn.pixabay.com/audio/2024/world-music.mp3',
+      },
+    ];
+  }
+
+  /**
+   * Get AI-generated travel plan suggestions based on user preferences
+   */
+  getTravelPlanSuggestions(preferences?: {
+    tripType?: string;
+    duration?: string;
+    budget?: string;
+  }): TravelPlanSuggestion[] {
+    const plans: TravelPlanSuggestion[] = [
+      {
+        id: 'romantic-paris',
+        title: 'Romantic Week in Paris',
+        description: 'Experience the city of love with wine, art, and breathtaking views',
+        destinations: ['Paris', 'Versailles', 'Giverny'],
+        duration: '7 days',
+        activities: ['Eiffel Tower sunset', 'Louvre Museum', 'Seine River cruise', 'Montmartre walk'],
+        videoPrompt: 'Romantic couple walking through Paris streets at sunset, Eiffel Tower glowing, Seine River cruise under lights, French cafes and wine',
+      },
+      {
+        id: 'adventure-bali',
+        title: 'Bali Adventure Escape',
+        description: 'Temples, rice terraces, and tropical beaches await',
+        destinations: ['Ubud', 'Seminyak', 'Uluwatu', 'Nusa Penida'],
+        duration: '10 days',
+        activities: ['Temple hopping', 'Rice terrace trekking', 'Surfing', 'Snorkeling', 'Spa day'],
+        videoPrompt: 'Drone over Bali rice terraces at sunrise, ancient temples with incense, crystal blue waters of Nusa Penida, tropical jungle waterfalls',
+      },
+      {
+        id: 'safari-africa',
+        title: 'African Safari Adventure',
+        description: 'Witness the Big Five in their natural habitat',
+        destinations: ['Serengeti', 'Ngorongoro', 'Masai Mara'],
+        duration: '12 days',
+        activities: ['Game drives', 'Hot air balloon', 'Masai village visit', 'Sunset sundowners'],
+        videoPrompt: 'African safari lions at golden hour, elephants crossing savanna, hot air balloon over Serengeti, spectacular African sunset',
+      },
+      {
+        id: 'japan-culture',
+        title: 'Japan Cultural Immersion',
+        description: 'Ancient traditions meet modern marvels',
+        destinations: ['Tokyo', 'Kyoto', 'Osaka', 'Hakone'],
+        duration: '14 days',
+        activities: ['Temple visits', 'Tea ceremony', 'Cherry blossom viewing', 'Mount Fuji'],
+        videoPrompt: 'Cherry blossoms falling in Japanese garden, ancient Kyoto temples, Mount Fuji at sunrise, Tokyo neon lights at night',
+      },
+      {
+        id: 'iceland-nature',
+        title: 'Iceland Nature Wonders',
+        description: 'Fire and ice landscapes like nowhere else',
+        destinations: ['Reykjavik', 'Golden Circle', 'South Coast', 'Snæfellsnes'],
+        duration: '8 days',
+        activities: ['Northern lights', 'Glacier hiking', 'Hot springs', 'Whale watching'],
+        videoPrompt: 'Northern lights dancing over Iceland glacier, dramatic waterfall with rainbow, geothermal hot springs steam, black sand beaches',
+      },
+      {
+        id: 'maldives-relaxation',
+        title: 'Maldives Luxury Retreat',
+        description: 'Crystal clear waters and overwater bungalows',
+        destinations: ['Malé', 'Private Island Resort'],
+        duration: '7 days',
+        activities: ['Snorkeling', 'Spa treatments', 'Sunset dolphin cruise', 'Underwater dining'],
+        videoPrompt: 'Crystal clear turquoise Maldives water, overwater bungalow at sunset, tropical fish swimming, romantic beach dinner under stars',
+      },
+    ];
+
+    // Filter based on preferences if provided
+    if (preferences?.tripType) {
+      const tripType = preferences.tripType.toLowerCase();
+      if (tripType === 'romantic') {
+        return plans.filter(p => p.id.includes('romantic') || p.id.includes('maldives'));
+      }
+      if (tripType === 'adventure') {
+        return plans.filter(p => p.id.includes('adventure') || p.id.includes('iceland'));
+      }
+      if (tripType === 'cultural') {
+        return plans.filter(p => p.id.includes('culture') || p.id.includes('paris'));
+      }
+      if (tripType === 'relaxation') {
+        return plans.filter(p => p.id.includes('maldives') || p.id.includes('bali'));
+      }
+    }
+
+    return plans;
+  }
+
+  /**
+   * Generate video with images and music (montage style)
+   * Uses uploaded images to create a travel montage video
+   */
+  async generateVideoWithMedia(
+    userId: string,
+    prompt: string,
+    images: string[],
+    musicTrackId?: string,
+  ): Promise<{
+    predictionId: string;
+    status: string;
+    prompt: string;
+    enhancedPrompt: string;
+    musicTrack?: MusicTrack;
+  }> {
+    if (!this.replicateApiToken) {
+      throw new BadRequestException(
+        'AI video generation is not configured. Please set REPLICATE_API_TOKEN.',
+      );
+    }
+
+    // Validate images
+    if (images && images.length > 0) {
+      if (images.length > 20) {
+        throw new BadRequestException('Maximum 20 images allowed per video.');
+      }
+
+      // Validate image URLs
+      for (const img of images) {
+        if (!img.startsWith('http://') && !img.startsWith('https://')) {
+          throw new BadRequestException('Invalid image URL format.');
+        }
+      }
+    }
+
+    // Get music track if specified
+    const musicTrack = musicTrackId
+      ? this.getMusicTracks().find((t) => t.id === musicTrackId)
+      : undefined;
+
+    // Enhance prompt with image context
+    let enhancedPrompt = this.enhancePrompt(prompt.trim());
+    if (images && images.length > 0) {
+      enhancedPrompt += ` Using ${images.length} travel photos as reference.`;
+    }
+    if (musicTrack) {
+      enhancedPrompt += ` Music style: ${musicTrack.genre.toLowerCase()}, ${musicTrack.name.toLowerCase()} mood.`;
+    }
+
+    // For image-based videos, we'll use Stable Video Diffusion with the first image
+    if (images && images.length > 0) {
+      try {
+        // Use img2vid model for image-to-video generation
+        const response = await firstValueFrom(
+          this.httpService.post(
+            `${this.replicateApiUrl}/predictions`,
+            {
+              version: 'dc6b8e5e60a8738aa0dd71e62b80b1aba1c72ab6a9d4e595e73d05ef7b0e01f3', // img2vid-xt
+              input: {
+                image: images[0],
+                motion_bucket_id: 127,
+                fps: 8,
+                cond_aug: 0.02,
+                decoding_t: 14,
+                video_length: 25,
+              },
+            },
+            {
+              headers: {
+                Authorization: `Token ${this.replicateApiToken}`,
+                'Content-Type': 'application/json',
+              },
+              timeout: 30000,
+            },
+          ),
+        );
+
+        const prediction = response.data;
+
+        this.logger.log(
+          `✅ Image-to-video generation started with prediction ID: ${prediction.id}`,
+        );
+
+        return {
+          predictionId: prediction.id,
+          status: prediction.status,
+          prompt: prompt.trim(),
+          enhancedPrompt,
+          musicTrack,
+        };
+      } catch (error: any) {
+        this.logger.warn(`Image-to-video failed: ${error.message}, falling back to text-to-video`);
+        // Fall back to regular text-to-video
+      }
+    }
+
+    // Fall back to regular text-to-video generation
+    const result = await this.generateVideo(userId, prompt);
+    return {
+      ...result,
+      musicTrack,
+    };
   }
 }
 
