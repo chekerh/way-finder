@@ -74,7 +74,7 @@ export class HotelsService {
 
       this.cachedToken = response.data.access_token;
       this.tokenExpiry = Date.now() + response.data.expires_in * 1000;
-      return this.cachedToken;
+      return this.cachedToken as string;
     } catch (error) {
       this.logger.error('Failed to fetch Amadeus token', error);
       throw new InternalServerErrorException('Failed to authenticate with Amadeus');
