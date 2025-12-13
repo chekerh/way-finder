@@ -372,6 +372,26 @@ export class CatalogService {
     return `catalog:${type}${userPart}:${paramsHash}`;
   }
 
+  /**
+   * Get continent for a destination code
+   * @param code - Airport code
+   * @returns Continent name (europe, asia, americas)
+   */
+  private getContinentForDestination(code: string): string {
+    const upperCode = code.toUpperCase();
+    // Europe destinations
+    const europeCodes = ['CDG', 'ORY', 'FCO', 'BCN', 'MAD', 'LHR', 'AMS', 'ATH', 'IST'];
+    // Asia destinations
+    const asiaCodes = ['DXB', 'NRT', 'BKK', 'SIN', 'ICN'];
+    // Americas destinations
+    const americasCodes = ['JFK'];
+
+    if (europeCodes.includes(upperCode)) return 'europe';
+    if (asiaCodes.includes(upperCode)) return 'asia';
+    if (americasCodes.includes(upperCode)) return 'americas';
+    return 'unknown';
+  }
+
   private buildFallbackFlightResponse(
     preferredDestinations: string[],
     maxResults?: number,
@@ -410,16 +430,37 @@ export class CatalogService {
     // Ensure we return diverse destinations (at least one per unique destination code)
     const diverseFlights: typeof FALLBACK_FLIGHT_OFFERS = [];
     const seenDestinations = new Set<string>();
+    const seenContinents = new Set<string>();
 
-    // First pass: one flight per destination
-    for (const flight of flights) {
-      if (!seenDestinations.has(flight.destinationCode)) {
-        diverseFlights.push(flight);
-        seenDestinations.add(flight.destinationCode);
+    // First pass: ensure at least one destination from each continent (Europe, Asia, Americas)
+    const requiredContinents = ['europe', 'asia', 'americas'];
+    for (const continent of requiredContinents) {
+      const continentFlight = FALLBACK_FLIGHT_OFFERS.find(
+        (flight) =>
+          this.getContinentForDestination(flight.destinationCode) ===
+            continent && !seenDestinations.has(flight.destinationCode),
+      );
+      if (continentFlight) {
+        diverseFlights.push(continentFlight);
+        seenDestinations.add(continentFlight.destinationCode);
+        seenContinents.add(continent);
       }
     }
 
-    // Second pass: add more flights from same destinations if we have space
+    // Second pass: add flights matching preferences (one per destination)
+    for (const flight of flights) {
+      if (diverseFlights.length >= (maxResults ?? 15)) break;
+      if (!seenDestinations.has(flight.destinationCode)) {
+        diverseFlights.push(flight);
+        seenDestinations.add(flight.destinationCode);
+        const continent = this.getContinentForDestination(flight.destinationCode);
+        if (continent !== 'unknown') {
+          seenContinents.add(continent);
+        }
+      }
+    }
+
+    // Third pass: add more flights from same destinations if we have space
     for (const flight of flights) {
       if (diverseFlights.length >= (maxResults ?? 15)) break;
       if (
@@ -429,6 +470,23 @@ export class CatalogService {
         ).length < 2
       ) {
         diverseFlights.push(flight);
+      }
+    }
+
+    // Final pass: if we still don't have all continents, add them
+    for (const continent of requiredContinents) {
+      if (diverseFlights.length >= (maxResults ?? 15)) break;
+      if (!seenContinents.has(continent)) {
+        const continentFlight = FALLBACK_FLIGHT_OFFERS.find(
+          (flight) =>
+            this.getContinentForDestination(flight.destinationCode) ===
+              continent && !seenDestinations.has(flight.destinationCode),
+        );
+        if (continentFlight) {
+          diverseFlights.push(continentFlight);
+          seenDestinations.add(continentFlight.destinationCode);
+          seenContinents.add(continent);
+        }
       }
     }
 
@@ -445,6 +503,192 @@ export class CatalogService {
         return offer;
       }),
       meta: { fallback: true },
+    };
+  }
+
+  async searchHotels(params: {
+    cityCode: string;
+    checkInDate: string;
+    checkOutDate: string;
+    adults?: number;
+    tripType?: string;
+    ratings?: string;
+    limit?: number;
+    currency?: string;
+  }) {
+    // Generate a cache key
+    const cacheKey = `hotels_${params.cityCode}_${params.checkInDate}_${params.checkOutDate}_${params.tripType}_${params.limit}`;
+    
+    // Try cache first
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit for hotels: ${cacheKey}`);
+      return cached;
+    }
+
+    // Fallback hotel data - ensure all hotels have an 'id' field
+    const fallbackHotels = this.generateFallbackHotels(
+      params.cityCode,
+      params.tripType,
+      params.limit ?? 20,
+    );
+
+    const response = {
+      data: fallbackHotels,
+      meta: {
+        count: fallbackHotels.length,
+        source: 'fallback',
+      },
+    };
+
+    // Cache for 5 minutes
+    await this.cacheService.set(cacheKey, response, 300);
+    return response;
+  }
+
+  private generateFallbackHotels(
+    cityCode: string,
+    tripType?: string,
+    limit: number = 20,
+  ): any[] {
+    const baseHotels = [
+      {
+        id: `hotel_${cityCode}_1`,
+        hotelId: `HOTEL_${cityCode}_001`,
+        name: 'Grand Hotel Central',
+        cityCode: cityCode,
+        rating: 4.5,
+        type: tripType === 'business' ? 'business' : 'hotel',
+        pricePerNight: tripType === 'backpacking' ? 45 : tripType === 'business' ? 150 : 120,
+        currency: 'EUR',
+        amenities: ['wifi', 'pool', 'restaurant', 'parking'],
+        address: {
+          lines: ['123 Main Street'],
+          cityName: cityCode,
+          countryCode: 'FR',
+        },
+        geoCode: {
+          latitude: 48.8566,
+          longitude: 2.3522,
+        },
+        description: 'A comfortable hotel in the heart of the city',
+        media: [
+          { uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800', category: 'exterior' },
+        ],
+        googleRating: 4.5,
+        googleReviewCount: 1250,
+      },
+      {
+        id: `hotel_${cityCode}_2`,
+        hotelId: `HOTEL_${cityCode}_002`,
+        name: 'Boutique Hotel Paris',
+        cityCode: cityCode,
+        rating: 4.2,
+        type: tripType === 'honeymoon' ? 'boutique' : 'hotel',
+        pricePerNight: tripType === 'backpacking' ? 55 : 100,
+        currency: 'EUR',
+        amenities: ['wifi', 'spa', 'restaurant'],
+        address: {
+          lines: ['456 Avenue des Champs'],
+          cityName: cityCode,
+          countryCode: 'FR',
+        },
+        geoCode: {
+          latitude: 48.8606,
+          longitude: 2.3376,
+        },
+        description: 'Charming boutique hotel with modern amenities',
+        media: [
+          { uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800', category: 'exterior' },
+        ],
+        googleRating: 4.2,
+        googleReviewCount: 890,
+      },
+      {
+        id: `hotel_${cityCode}_3`,
+        hotelId: `HOTEL_${cityCode}_003`,
+        name: 'Budget Hostel Central',
+        cityCode: cityCode,
+        rating: 3.8,
+        type: tripType === 'backpacking' ? 'hostel' : 'hotel',
+        pricePerNight: 35,
+        currency: 'EUR',
+        amenities: ['wifi', 'breakfast'],
+        address: {
+          lines: ['789 Backpacker Street'],
+          cityName: cityCode,
+          countryCode: 'FR',
+        },
+        geoCode: {
+          latitude: 48.8526,
+          longitude: 2.3522,
+        },
+        description: 'Affordable accommodation for budget travelers',
+        media: [
+          { uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800', category: 'exterior' },
+        ],
+        googleRating: 3.8,
+        googleReviewCount: 450,
+      },
+    ];
+
+    // Filter by trip type if specified
+    let filtered = baseHotels;
+    if (tripType === 'backpacking') {
+      filtered = baseHotels.filter((h) => h.type === 'hostel' || h.pricePerNight < 60);
+    } else if (tripType === 'business') {
+      filtered = baseHotels.filter((h) => h.type === 'business' || h.amenities.includes('wifi'));
+    } else if (tripType === 'honeymoon') {
+      filtered = baseHotels.filter((h) => h.type === 'boutique' || h.rating >= 4.0);
+    }
+
+    // Repeat hotels to reach limit
+    const result: any[] = [];
+    while (result.length < limit) {
+      result.push(...filtered);
+    }
+
+    return result.slice(0, limit);
+  }
+
+  async getHotelOffers(params: {
+    hotelIds: string[];
+    checkInDate: string;
+    checkOutDate: string;
+    adults?: number;
+    currency?: string;
+  }) {
+    return {
+      data: params.hotelIds.map((hotelId) => ({
+        hotel: {
+          id: hotelId,
+          hotelId: hotelId,
+          name: 'Sample Hotel',
+        },
+        offers: [],
+      })),
+      meta: { count: params.hotelIds.length },
+    };
+  }
+
+  async getHotelById(hotelId: string) {
+    return {
+      hotel: {
+        id: hotelId,
+        hotelId: hotelId,
+        name: 'Sample Hotel',
+        rating: 4.5,
+        description: 'A sample hotel description',
+      },
+      reviews: [],
+      error: null,
+    };
+  }
+
+  async getHotelReviews(hotelId: string, placeId?: string) {
+    return {
+      reviews: [],
+      message: null,
     };
   }
 }
