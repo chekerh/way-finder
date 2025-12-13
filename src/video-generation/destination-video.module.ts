@@ -12,6 +12,8 @@ import { MusicSelectorService } from './music-selector.service';
 import { Journey, JourneySchema } from '../journey/journey.schema';
 import { ImgBBService } from '../journey/imgbb.service';
 import { VideoProcessingModule } from '../video-processing/video-processing.module';
+import { AiTravelVideoService } from './ai-travel-video.service';
+import { AiTravelVideoController } from './ai-travel-video.controller';
 
 @Module({
   imports: [
@@ -27,8 +29,9 @@ import { VideoProcessingModule } from '../video-processing/video-processing.modu
     ImageAggregatorService,
     MusicSelectorService,
     ImgBBService,
+    AiTravelVideoService,
   ],
-  controllers: [DestinationVideoController],
-  exports: [DestinationVideoService],
+  controllers: [DestinationVideoController, AiTravelVideoController],
+  exports: [DestinationVideoService, AiTravelVideoService],
 })
 export class DestinationVideoModule {}

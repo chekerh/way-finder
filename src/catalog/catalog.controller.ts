@@ -1,18 +1,23 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, Param, UseGuards } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
+import { HotelsService } from './hotels.service';
 import type { ActivityFeedResponse } from './activities.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { RecommendedQueryDto } from './dto/flight-search.dto';
 import type { ExploreSearchDto } from './dto/explore-search.dto';
 import type { ActivitySearchDto } from './dto/activity-search.dto';
+import type { HotelSearchDto, TripType } from './dto/hotel-search.dto';
 
 /**
  * Catalog Controller
- * Handles flight catalog, recommended flights, explore offers, and activities
+ * Handles flight catalog, recommended flights, explore offers, activities, and hotels
  */
 @Controller('catalog')
 export class CatalogController {
-  constructor(private readonly catalogService: CatalogService) {}
+  constructor(
+    private readonly catalogService: CatalogService,
+    private readonly hotelsService: HotelsService,
+  ) {}
 
   /**
    * Get personalized recommended flights for the authenticated user
@@ -73,5 +78,125 @@ export class CatalogController {
       limit: query.limit ? Number(query.limit) : undefined,
       radiusMeters: query.radiusMeters ? Number(query.radiusMeters) : undefined,
     });
+  }
+
+  // ==================== HOTELS ENDPOINTS ====================
+
+  /**
+   * Search for hotels by city
+   * @query cityCode - IATA city code (e.g., 'PAR' for Paris)
+   * @query checkInDate - Check-in date (YYYY-MM-DD)
+   * @query checkOutDate - Check-out date (YYYY-MM-DD)
+   * @query adults - Number of adults (default: 2)
+   * @query tripType - Trip type for smart filtering (business, honeymoon, family, etc.)
+   * @query ratings - Minimum star ratings (comma-separated, e.g., "3,4,5")
+   * @query limit - Maximum results to return
+   * @returns HotelSearchResponse with hotels matching criteria
+   */
+  @Get('hotels')
+  async searchHotels(
+    @Query('cityCode') cityCode: string,
+    @Query('checkInDate') checkInDate: string,
+    @Query('checkOutDate') checkOutDate: string,
+    @Query('adults') adults?: string,
+    @Query('tripType') tripType?: TripType,
+    @Query('ratings') ratings?: string,
+    @Query('limit') limit?: string,
+    @Query('currency') currency?: string,
+  ) {
+    const searchParams: HotelSearchDto = {
+      cityCode: cityCode?.toUpperCase() || 'PAR',
+      checkInDate: checkInDate || this.getDefaultCheckInDate(),
+      checkOutDate: checkOutDate || this.getDefaultCheckOutDate(),
+      adults: adults ? Number(adults) : 2,
+      tripType,
+      ratings,
+      limit: limit ? Number(limit) : 20,
+      currency: currency || 'EUR',
+    };
+
+    return this.hotelsService.searchHotels(searchParams);
+  }
+
+  /**
+   * Get hotel offers (rooms and prices) for specific hotels
+   * @query hotelIds - Comma-separated hotel IDs
+   * @query checkInDate - Check-in date (YYYY-MM-DD)
+   * @query checkOutDate - Check-out date (YYYY-MM-DD)
+   * @returns HotelOffersResponse with available rooms and prices
+   */
+  @Get('hotels/offers')
+  async getHotelOffers(
+    @Query('hotelIds') hotelIds: string,
+    @Query('checkInDate') checkInDate: string,
+    @Query('checkOutDate') checkOutDate: string,
+    @Query('adults') adults?: string,
+    @Query('currency') currency?: string,
+  ) {
+    const ids = hotelIds?.split(',').map((id) => id.trim()) || [];
+    
+    return this.hotelsService.getHotelOffers(
+      ids,
+      checkInDate || this.getDefaultCheckInDate(),
+      checkOutDate || this.getDefaultCheckOutDate(),
+      adults ? Number(adults) : 2,
+      currency || 'EUR',
+    );
+  }
+
+  /**
+   * Get detailed information for a specific hotel
+   * @param hotelId - Hotel ID
+   * @returns Hotel details with reviews (if available)
+   */
+  @Get('hotels/:hotelId')
+  async getHotelById(@Param('hotelId') hotelId: string) {
+    const hotel = await this.hotelsService.getHotelById(hotelId);
+    
+    if (!hotel) {
+      return { error: 'Hotel not found', hotelId };
+    }
+
+    // Enrich with Google Places data if available
+    const enrichedHotel = await this.hotelsService.enrichWithGooglePlaces(hotel);
+    
+    // Get reviews if we have a Google Place ID
+    let reviews: any[] = [];
+    if (enrichedHotel.googlePlaceId) {
+      reviews = await this.hotelsService.getHotelReviews(enrichedHotel.googlePlaceId);
+    }
+
+    return {
+      hotel: enrichedHotel,
+      reviews,
+    };
+  }
+
+  /**
+   * Get reviews for a hotel using Google Place ID
+   * @param placeId - Google Place ID
+   * @returns Array of reviews
+   */
+  @Get('hotels/:hotelId/reviews')
+  async getHotelReviews(@Query('placeId') placeId: string) {
+    if (!placeId) {
+      return { reviews: [], message: 'No Google Place ID provided' };
+    }
+
+    const reviews = await this.hotelsService.getHotelReviews(placeId);
+    return { reviews };
+  }
+
+  // Helper methods for default dates
+  private getDefaultCheckInDate(): string {
+    const date = new Date();
+    date.setDate(date.getDate() + 14); // 2 weeks from now
+    return date.toISOString().split('T')[0];
+  }
+
+  private getDefaultCheckOutDate(): string {
+    const date = new Date();
+    date.setDate(date.getDate() + 17); // 2 weeks + 3 days
+    return date.toISOString().split('T')[0];
   }
 }
