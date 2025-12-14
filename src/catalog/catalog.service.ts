@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { AmadeusService, AmadeusRateLimitError } from './amadeus.service';
+import { AmadeusService, AmadeusRateLimitError, AmadeusServerError } from './amadeus.service';
 import { ActivitiesService } from './activities.service';
 import type { ActivityFeedResponse } from './activities.service';
 import { FlightSearchDto, RecommendedQueryDto } from './dto/flight-search.dto';
@@ -17,6 +17,8 @@ import {
 export class CatalogService {
   private readonly logger = new Logger(CatalogService.name);
   private amadeusCooldownUntil = 0;
+  private consecutiveFailures = 0;
+  private lastFailureTime = 0;
 
   constructor(
     private readonly amadeus: AmadeusService,
@@ -24,6 +26,51 @@ export class CatalogService {
     private readonly userService: UserService,
     private readonly cacheService: CacheService,
   ) {}
+
+  /**
+   * Deduplicate flight offers based on key flight characteristics
+   */
+  private deduplicateFlights(flights: any[]): any[] {
+    const seen = new Set<string>();
+    const uniqueFlights: any[] = [];
+
+    for (const flight of flights) {
+      // Create a unique key based on key flight characteristics
+      const key = this.generateFlightKey(flight);
+
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueFlights.push(flight);
+      }
+    }
+
+    this.logger.debug(`Deduplicated ${flights.length} flights to ${uniqueFlights.length} unique offers`);
+    return uniqueFlights;
+  }
+
+  /**
+   * Generate a unique key for a flight offer based on its characteristics
+   */
+  private generateFlightKey(flight: any): string {
+    try {
+      const itinerary = flight.itineraries?.[0];
+      const segment = itinerary?.segments?.[0];
+
+      if (!segment) return `unknown_${Math.random()}`;
+
+      const departure = segment.departure?.iataCode;
+      const arrival = segment.arrival?.iataCode;
+      const carrier = segment.carrierCode;
+      const flightNumber = segment.number;
+      const departureTime = segment.departure?.at?.split('T')[0]; // Just the date
+
+      // Create a key that identifies unique flight combinations
+      return `${departure}_${arrival}_${carrier}${flightNumber}_${departureTime}_${flight.price?.total || 'unknown'}`;
+    } catch (error) {
+      // Fallback key if parsing fails
+      return `fallback_${Math.random()}`;
+    }
+  }
 
   async getRecommendedFlights(userId: string, overrides: RecommendedQueryDto) {
     // Generate cache key based on user and search parameters
@@ -79,9 +126,9 @@ export class CatalogService {
             return offer;
           });
           const enrichedResult = { ...result, data: enrichedData };
-          // Cache for 5 minutes
+          // Cache successful results for much longer (2 hours)
           try {
-            await this.cacheService.set(cacheKey, enrichedResult, 300);
+            await this.cacheService.set(cacheKey, enrichedResult, 7200);
           } catch (error) {
             // Cache failures shouldn't break the response
             this.logger.warn(`Failed to cache enriched result: ${error}`);
@@ -99,42 +146,52 @@ export class CatalogService {
       } catch (error) {
         if (error instanceof AmadeusRateLimitError) {
           this.registerAmadeusRateLimit();
+          // For rate limit errors, cache the fallback for much longer
+          const fallbackResult = this.buildFallbackFlightResponse(
+            [overrides.destinationLocationCode],
+            overrides.maxResults ?? 5,
+          );
+          try {
+            await this.cacheService.set(cacheKey, fallbackResult, 3600); // 1 hour (increased from 10 minutes)
+          } catch (cacheError) {
+            this.logger.warn(`Failed to cache rate-limited fallback result: ${cacheError}`);
+          }
+          return fallbackResult;
+        } else if (error instanceof AmadeusServerError) {
+          this.registerAmadeusFailure();
+          // For server errors, cache fallback for longer time
+          const fallbackResult = this.buildFallbackFlightResponse(
+            [overrides.destinationLocationCode],
+            overrides.maxResults ?? 5,
+          );
+          try {
+            await this.cacheService.set(cacheKey, fallbackResult, 1800); // 30 minutes (increased from 5)
+          } catch (cacheError) {
+            this.logger.warn(`Failed to cache server error fallback result: ${cacheError}`);
+          }
+          return fallbackResult;
         } else {
           this.registerAmadeusFailure();
+          const fallbackResult = this.buildFallbackFlightResponse(
+            [overrides.destinationLocationCode],
+            overrides.maxResults ?? 5,
+          );
+          try {
+            await this.cacheService.set(cacheKey, fallbackResult, 900); // 15 minutes (increased from 2)
+          } catch (cacheError) {
+            this.logger.warn(`Failed to cache fallback result: ${cacheError}`);
+          }
+          return fallbackResult;
         }
-        const fallbackResult = this.buildFallbackFlightResponse(
-          [overrides.destinationLocationCode],
-          overrides.maxResults ?? 5,
-        );
-        // Cache fallback for shorter time (2 minutes)
-        try {
-          await this.cacheService.set(cacheKey, fallbackResult, 120);
-        } catch (error) {
-          // Cache failures shouldn't break the response
-          this.logger.warn(`Failed to cache fallback result: ${error}`);
-        }
-        return fallbackResult;
       }
     }
 
     // Otherwise, search for multiple popular destinations to provide variety
-    // Always include diverse destinations to avoid showing only one city
-    // Include destinations from different regions: Europe, Asia, Americas
+    // Prioritize European destinations first as they're more likely to have flights from Tunisia
+    // Include diverse destinations but be more conservative with API calls
     const defaultDestinations = [
-      'CDG',
-      'FCO',
-      'BCN',
-      'DXB',
-      'JFK',
-      'LHR',
-      'MAD',
-      'AMS',
-      'ATH',
-      'IST',
-      'NRT',
-      'BKK',
-      'SIN',
-      'ICN',
+      'CDG', 'ORY', 'FCO', 'BCN', 'MAD', 'LHR', 'AMS', 'ATH', // Europe (high priority)
+      'IST', 'DXB', 'JFK', 'NRT', 'BKK', 'SIN', 'ICN',        // Other regions (lower priority)
     ];
     const popularDestinations =
       preferences.destination_preferences?.length > 0
@@ -146,10 +203,10 @@ export class CatalogService {
 
     const allFlights: any[] = [];
     const totalRequested = overrides.maxResults ?? 15;
-    // Increase number of destinations to search for more variety
-    const numDestinations = Math.min(5, popularDestinations.length); // Search up to 5 different destinations
+    // Be extremely conservative with API calls - search only 2 destinations max
+    const numDestinations = Math.min(2, popularDestinations.length); // Search up to 2 destinations max (reduced from 3)
     const maxPerDestination = Math.max(
-      2,
+      1,
       Math.floor(totalRequested / numDestinations),
     );
 
@@ -158,9 +215,9 @@ export class CatalogService {
         popularDestinations,
         totalRequested,
       );
-      // Cache fallback for shorter time (2 minutes)
+      // Cache fallback for longer time (30 minutes)
       try {
-        await this.cacheService.set(cacheKey, fallbackResult, 120);
+        await this.cacheService.set(cacheKey, fallbackResult, 1800);
       } catch (error) {
         // Cache failures shouldn't break the response
         this.logger.warn(`Failed to cache fallback result: ${error}`);
@@ -170,9 +227,11 @@ export class CatalogService {
 
     let hadSuccessfulExternalCall = false;
 
+    this.logger.debug(`Searching ${numDestinations} destinations for ${maxPerDestination} flights each (total requested: ${totalRequested})`);
+
     const searchPromises = popularDestinations
       .slice(0, numDestinations)
-      .map(async (dest) => {
+      .map(async (dest, index) => {
         try {
           const search: FlightSearchDto = {
             originLocationCode: origin,
@@ -214,8 +273,13 @@ export class CatalogService {
         } catch (error) {
           if (error instanceof AmadeusRateLimitError) {
             this.registerAmadeusRateLimit();
+            this.logger.warn(`Rate limit hit for destination ${dest} (attempt ${index + 1}/${numDestinations})`);
+          } else if (error instanceof AmadeusServerError) {
+            this.registerAmadeusFailure();
+            this.logger.warn(`Server error for destination ${dest} (attempt ${index + 1}/${numDestinations})`);
           } else {
             this.registerAmadeusFailure();
+            this.logger.warn(`Unknown error for destination ${dest} (attempt ${index + 1}/${numDestinations}): ${error.message}`);
           }
           return [];
         }
@@ -233,9 +297,9 @@ export class CatalogService {
         popularDestinations,
         totalRequested,
       );
-      // Cache fallback for shorter time (2 minutes)
+      // Cache fallback for longer time (30 minutes)
       try {
-        await this.cacheService.set(cacheKey, fallbackResult, 120);
+        await this.cacheService.set(cacheKey, fallbackResult, 1800);
       } catch (error) {
         // Cache failures shouldn't break the response
         this.logger.warn(`Failed to cache fallback result: ${error}`);
@@ -247,12 +311,14 @@ export class CatalogService {
       this.registerAmadeusSuccess();
     }
 
-    const result = { data: allFlights.slice(0, totalRequested), meta: {} };
+    // Deduplicate flights before returning
+    const deduplicatedFlights = this.deduplicateFlights(allFlights);
+    const result = { data: deduplicatedFlights.slice(0, totalRequested), meta: {} };
 
-    // Cache the result for 5 minutes (300 seconds)
+    // Cache the deduplicated result for much longer time (2 hours)
     try {
-      await this.cacheService.set(cacheKey, result, 300);
-      this.logger.debug(`Cached recommended flights: ${cacheKey}`);
+      await this.cacheService.set(cacheKey, result, 7200);
+      this.logger.debug(`Cached recommended flights: ${cacheKey} (${result.data.length} unique offers)`);
     } catch (error) {
       // Cache failures shouldn't break the response
       this.logger.warn(`Failed to cache recommended flights: ${error}`);
@@ -299,9 +365,9 @@ export class CatalogService {
       source: 'fallback',
     };
 
-    // Cache for 10 minutes (600 seconds)
+    // Cache explore offers for much longer (2 hours)
     try {
-      await this.cacheService.set(cacheKey, result, 600);
+      await this.cacheService.set(cacheKey, result, 7200);
       this.logger.debug(`Cached explore offers: ${cacheKey}`);
     } catch (error) {
       // Cache failures shouldn't break the response
@@ -336,23 +402,86 @@ export class CatalogService {
   }
 
   private shouldUseFallbackFlights(): boolean {
-    return (
-      !this.amadeus.isConfigured() || Date.now() < this.amadeusCooldownUntil
-    );
+    // Always use fallback if not configured
+    if (!this.amadeus.isConfigured()) {
+      return true;
+    }
+
+    // Check circuit breaker status from Amadeus service
+    const circuitStatus = this.amadeus.getCircuitStatus();
+    if (circuitStatus.state === 'OPEN') {
+      this.logger.warn('Using fallback: Amadeus circuit breaker is OPEN');
+      return true;
+    }
+
+    // Use fallback if in cooldown period
+    if (Date.now() < this.amadeusCooldownUntil) {
+      this.logger.debug(`Using fallback: in cooldown until ${new Date(this.amadeusCooldownUntil).toISOString()}`);
+      return true;
+    }
+
+    // Use fallback if we have ANY consecutive failures (more aggressive)
+    if (this.consecutiveFailures >= 1) {
+      this.logger.warn(`Using fallback due to ${this.consecutiveFailures} consecutive Amadeus failures`);
+      return true;
+    }
+
+    // If last failure was recent (within 30 minutes), be more conservative
+    const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+    if (timeSinceLastFailure < 30 * 60 * 1000 && this.consecutiveFailures > 0) {
+      this.logger.debug('Recent Amadeus failure detected, using fallback to be safe');
+      return true;
+    }
+
+    // Use fallback if circuit breaker is in half-open state (testing recovery)
+    if (circuitStatus.state === 'HALF_OPEN') {
+      this.logger.debug('Using fallback: Circuit breaker in HALF_OPEN state (testing recovery)');
+      return true;
+    }
+
+    return false;
   }
 
   private registerAmadeusFailure() {
-    // Regular failure: 5 minute cooldown
-    this.amadeusCooldownUntil = Date.now() + 5 * 60 * 1000;
+    this.consecutiveFailures++;
+    this.lastFailureTime = Date.now();
+
+    // More aggressive exponential backoff: base 5 minutes, double each failure, max 60 minutes
+    const baseCooldown = 5 * 60 * 1000; // 5 minutes (increased from 2)
+    const exponentialCooldown = Math.min(
+      baseCooldown * Math.pow(2, Math.min(this.consecutiveFailures - 1, 4)), // Cap at 2^4 = 16x
+      60 * 60 * 1000 // Max 60 minutes (increased from 30)
+    );
+
+    this.amadeusCooldownUntil = Date.now() + exponentialCooldown;
+    this.logger.warn(`Amadeus failure #${this.consecutiveFailures}, cooldown: ${Math.round(exponentialCooldown / 1000 / 60)} minutes`);
   }
 
   private registerAmadeusRateLimit() {
-    // Rate limit (429): 30 minute cooldown to avoid hitting limits again
-    this.amadeusCooldownUntil = Date.now() + 30 * 60 * 1000;
+    this.consecutiveFailures++;
+    this.lastFailureTime = Date.now();
+
+    // Rate limit (429): Start with 15 minutes, exponential backoff, max 120 minutes (2 hours)
+    const baseCooldown = 15 * 60 * 1000; // 15 minutes (increased from 10)
+    const exponentialCooldown = Math.min(
+      baseCooldown * Math.pow(1.5, Math.min(this.consecutiveFailures - 1, 4)), // Slightly more aggressive
+      120 * 60 * 1000 // Max 120 minutes (2 hours, increased from 60)
+    );
+
+    this.amadeusCooldownUntil = Date.now() + exponentialCooldown;
+    this.logger.warn(`Amadeus rate limit #${this.consecutiveFailures}, cooldown: ${Math.round(exponentialCooldown / 1000 / 60)} minutes`);
   }
 
   private registerAmadeusSuccess() {
+    // Reset failure count on success
+    this.consecutiveFailures = 0;
     this.amadeusCooldownUntil = 0;
+
+    // If it was a long time since last failure, we can be more aggressive
+    const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+    if (timeSinceLastFailure > 60 * 60 * 1000) { // 1 hour
+      this.logger.debug('Long time since last Amadeus failure, system appears stable');
+    }
   }
 
   /**

@@ -1,6 +1,7 @@
 import { Controller, Get, Query, Req, Param, UseGuards } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { HotelsService } from './hotels.service';
+import { AmadeusService } from './amadeus.service';
 import type { ActivityFeedResponse } from './activities.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { RecommendedQueryDto } from './dto/flight-search.dto';
@@ -17,6 +18,7 @@ export class CatalogController {
   constructor(
     private readonly catalogService: CatalogService,
     private readonly hotelsService: HotelsService,
+    private readonly amadeusService: AmadeusService,
   ) {}
 
   /**
@@ -198,5 +200,49 @@ export class CatalogController {
     const date = new Date();
     date.setDate(date.getDate() + 17); // 2 weeks + 3 days
     return date.toISOString().split('T')[0];
+  }
+
+  /**
+   * Health check for Amadeus API service
+   * @returns Health status and circuit breaker information
+   */
+  @Get('health/amadeus')
+  async getAmadeusHealth() {
+    return await this.amadeusService.healthCheck();
+  }
+
+  /**
+   * Reset Amadeus circuit breaker (admin use)
+   */
+  @Get('admin/reset-circuit')
+  async resetCircuitBreaker() {
+    this.amadeusService.resetCircuitBreaker();
+    return { message: 'Circuit breaker reset successfully' };
+  }
+
+  /**
+   * Clear Amadeus flight cache (admin use)
+   */
+  @Get('admin/clear-cache')
+  async clearFlightCache() {
+    this.amadeusService.clearFlightCache();
+    return { message: 'Flight cache cleared successfully' };
+  }
+
+  /**
+   * Get detailed Amadeus service statistics
+   */
+  @Get('admin/stats')
+  async getAmadeusStats() {
+    const health = await this.amadeusService.healthCheck();
+    const circuitStatus = this.amadeusService.getCircuitStatus();
+    const cacheStats = this.amadeusService.getCacheStats();
+
+    return {
+      health,
+      circuitStatus,
+      cacheStats,
+      timestamp: new Date().toISOString()
+    };
   }
 }
