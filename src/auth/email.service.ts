@@ -534,4 +534,98 @@ export class EmailService {
       );
     }
   }
+
+  /**
+   * Send refund email when booking is cancelled
+   */
+  async sendRefundEmail(
+    email: string,
+    firstName: string,
+    confirmationNumber: string,
+    totalPrice: number,
+    currency: string,
+    destination: string,
+  ): Promise<void> {
+    const fromEmail =
+      process.env.EMAIL_FROM || `WayFinder <${process.env.EMAIL_USER}>`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Remboursement de réservation</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #4A90E2; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Remboursement de votre réservation 🎫</h1>
+        </div>
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Bonjour ${firstName},</p>
+          <p>Nous vous informons que votre réservation a été annulée et que le remboursement a été initié.</p>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4A90E2;">
+            <h3 style="margin-top: 0; color: #4A90E2;">Détails de la réservation annulée</h3>
+            <p><strong>Numéro de confirmation:</strong> ${confirmationNumber}</p>
+            <p><strong>Destination:</strong> ${destination}</p>
+            <p><strong>Montant remboursé:</strong> ${totalPrice} ${currency}</p>
+          </div>
+          
+          <p><strong>Informations importantes:</strong></p>
+          <ul>
+            <li>Le remboursement sera traité dans les 5 à 10 jours ouvrables</li>
+            <li>Le montant sera crédité sur le même moyen de paiement utilisé lors de la réservation</li>
+            <li>Vous recevrez une confirmation par email une fois le remboursement effectué</li>
+          </ul>
+          
+          <p>Si vous avez des questions concernant ce remboursement, n'hésitez pas à nous contacter.</p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          <p style="font-size: 12px; color: #777;">Cordialement,<br>L'équipe WayFinder</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      Remboursement de votre réservation
+      
+      Bonjour ${firstName},
+      
+      Nous vous informons que votre réservation a été annulée et que le remboursement a été initié.
+      
+      Détails de la réservation annulée:
+      - Numéro de confirmation: ${confirmationNumber}
+      - Destination: ${destination}
+      - Montant remboursé: ${totalPrice} ${currency}
+      
+      Informations importantes:
+      - Le remboursement sera traité dans les 5 à 10 jours ouvrables
+      - Le montant sera crédité sur le même moyen de paiement utilisé lors de la réservation
+      - Vous recevrez une confirmation par email une fois le remboursement effectué
+      
+      Si vous avez des questions concernant ce remboursement, n'hésitez pas à nous contacter.
+      
+      Cordialement,
+      L'équipe WayFinder
+    `;
+
+    if (this.useMailjet) {
+      await this.sendViaMailjet(
+        email,
+        'Remboursement de votre réservation WayFinder',
+        htmlContent,
+        textContent,
+      );
+    } else {
+      await this.sendViaSMTP(
+        email,
+        'Remboursement de votre réservation WayFinder',
+        htmlContent,
+        textContent,
+        fromEmail,
+      );
+    }
+  }
 }

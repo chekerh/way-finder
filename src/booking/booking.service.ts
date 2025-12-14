@@ -18,6 +18,7 @@ import { RewardsService } from '../rewards/rewards.service';
 import { PointsSource } from '../rewards/rewards.dto';
 import { UserService } from '../user/user.service';
 import { CommissionService } from '../commission/commission.service';
+import { EmailService } from '../auth/email.service';
 
 /**
  * Booking Service
@@ -34,6 +35,7 @@ export class BookingService {
     private readonly rewardsService: RewardsService,
     private readonly userService: UserService,
     private readonly commissionService: CommissionService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -568,6 +570,38 @@ export class BookingService {
       // log but don't fail the cancellation
       this.logger.error(
         `Error creating cancellation notification: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    // Send refund email to user
+    try {
+      const user = await this.userService.findById(userId);
+      if (user && user.email) {
+        const firstName = user.first_name || 'Utilisateur';
+        const totalPrice = booking.total_price || 0;
+        const currency = booking.currency || 'EUR';
+        
+        await this.emailService.sendRefundEmail(
+          user.email,
+          firstName,
+          booking.confirmation_number,
+          totalPrice,
+          currency,
+          destinationName,
+        );
+        this.logger.log(
+          `Refund email sent successfully to ${user.email} for booking ${booking.confirmation_number}`,
+        );
+      } else {
+        this.logger.warn(
+          `Could not send refund email: user not found or email missing for userId ${userId}`,
+        );
+      }
+    } catch (error: any) {
+      // Log error but don't fail the cancellation if email fails
+      this.logger.error(
+        `Error sending refund email: ${error.message}`,
         error.stack,
       );
     }
