@@ -99,8 +99,8 @@ export class CatalogController {
   async searchHotels(
     @Query('cityCode') cityCode?: string,
     @Query('cityName') cityName?: string,
-    @Query('checkInDate') checkInDate: string,
-    @Query('checkOutDate') checkOutDate: string,
+    @Query('checkInDate') checkInDate?: string,
+    @Query('checkOutDate') checkOutDate?: string,
     @Query('adults') adults?: string,
     @Query('tripType') tripType?: TripType,
     @Query('accommodationType') accommodationType?: string,

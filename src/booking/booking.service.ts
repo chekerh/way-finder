@@ -580,8 +580,14 @@ export class BookingService {
       if (user && user.email) {
         const firstName = user.first_name || 'Utilisateur';
         const totalPrice = booking.total_price || 0;
-        const currency = booking.currency || 'EUR';
-        
+        // Try to infer currency from accommodation or upsells, otherwise default to EUR
+        const currency =
+          (booking.accommodation as any)?.currency ||
+          (Array.isArray(booking.upsells) && booking.upsells.length > 0
+            ? (booking.upsells[0] as any).currency
+            : undefined) ||
+          'EUR';
+
         await this.emailService.sendRefundEmail(
           user.email,
           firstName,

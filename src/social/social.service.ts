@@ -671,8 +671,7 @@ export class SocialService {
       'barcelona spain': 'Spain',
       'rome, italy': 'Italy',
       'rome italy': 'Italy',
-      'paris, france': 'France',
-      'paris france': 'France',
+      // paris keys already defined above, avoid duplicates
       'london, uk': 'United Kingdom',
       'london uk': 'United Kingdom',
       'london, england': 'United Kingdom',
