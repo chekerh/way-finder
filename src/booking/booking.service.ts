@@ -18,6 +18,7 @@ import { RewardsService } from '../rewards/rewards.service';
 import { PointsSource } from '../rewards/rewards.dto';
 import { UserService } from '../user/user.service';
 import { CommissionService } from '../commission/commission.service';
+import { EmailService } from '../auth/email.service';
 
 /**
  * Booking Service
@@ -34,6 +35,7 @@ export class BookingService {
     private readonly rewardsService: RewardsService,
     private readonly userService: UserService,
     private readonly commissionService: CommissionService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -301,7 +303,7 @@ export class BookingService {
       const points = this.rewardsService.getPointsForAction(
         PointsSource.BOOKING,
       );
-      await this.rewardsService.awardPoints({
+        await this.rewardsService.awardPoints({
         userId,
         points,
         source: PointsSource.BOOKING,
@@ -568,6 +570,73 @@ export class BookingService {
       // log but don't fail the cancellation
       this.logger.error(
         `Error creating cancellation notification: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    // Send refund email to user
+    try {
+      const user = await this.userService.findById(userId);
+      if (user && user.email) {
+        const firstName = user.first_name || 'Utilisateur';
+        const totalPrice = booking.total_price || 0;
+        // Try to infer currency from accommodation or upsells, otherwise default to EUR
+        const currency =
+          (booking.accommodation as any)?.currency ||
+          (Array.isArray(booking.upsells) && booking.upsells.length > 0
+            ? (booking.upsells[0] as any).currency
+            : undefined) ||
+          'EUR';
+
+        await this.emailService.sendRefundEmail(
+          user.email,
+          firstName,
+          booking.confirmation_number,
+          totalPrice,
+          currency,
+          destinationName,
+        );
+        this.logger.log(
+          `Refund email sent successfully to ${user.email} for booking ${booking.confirmation_number}`,
+        );
+      } else {
+        this.logger.warn(
+          `Could not send refund email: user not found or email missing for userId ${userId}`,
+        );
+      }
+    } catch (error: any) {
+      // Log error but don't fail the cancellation if email fails
+      this.logger.error(
+        `Error sending refund email: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    // Also notify customer support team about the refund request
+    try {
+      const user = await this.userService.findById(userId);
+      const customerEmail = user?.email ?? 'unknown';
+      const customerName = user?.first_name
+        ? `${user.first_name} ${user.last_name ?? ''}`.trim()
+        : 'Client WayFinder';
+
+      await this.emailService.sendRefundSupportNotification({
+        customerEmail,
+        customerName,
+        bookingId: booking._id.toString(),
+        confirmationNumber: booking.confirmation_number,
+        amount: booking.total_price,
+        currency:
+          (booking.accommodation as any)?.currency ||
+          (Array.isArray(booking.upsells) && booking.upsells.length > 0
+            ? (booking.upsells[0] as any).currency
+            : 'EUR'),
+        destination: destinationName,
+      });
+    } catch (error: any) {
+      // Ne pas bloquer l'annulation si l'email support échoue
+      this.logger.error(
+        `Error sending refund support notification for booking ${booking._id.toString()}: ${error.message}`,
         error.stack,
       );
     }

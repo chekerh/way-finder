@@ -464,12 +464,16 @@ export class SocialService {
       'http://localhost:3000'
     ).replace(/\/$/, '');
 
+    this.logger.debug(`Getting map memories for user ${userId}`);
+
     // Get all shared trips for the user
     const sharedTripsRaw = await this.sharedTripModel
       .find({ userId, isVisible: true })
       .populate('userId', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
+
+    this.logger.debug(`Found ${sharedTripsRaw.length} shared trips for user ${userId}`);
 
     // Format shared trips with full image URLs
     const sharedTrips = sharedTripsRaw.map((trip: any) => {
@@ -571,17 +575,25 @@ export class SocialService {
       lyon: 'France',
       marseille: 'France',
       nice: 'France',
+      toulouse: 'France',
+      bordeaux: 'France',
+      strasbourg: 'France',
+      nantes: 'France',
       // Italy
       rome: 'Italy',
       milan: 'Italy',
       venice: 'Italy',
       florence: 'Italy',
       naples: 'Italy',
+      turin: 'Italy',
+      palermo: 'Italy',
       // Spain
       madrid: 'Spain',
       barcelona: 'Spain',
       seville: 'Spain',
       valencia: 'Spain',
+      bilbao: 'Spain',
+      granada: 'Spain',
       // Brazil
       'rio de janeiro': 'Brazil',
       rio: 'Brazil',
@@ -593,27 +605,39 @@ export class SocialService {
       'los angeles': 'United States',
       chicago: 'United States',
       miami: 'United States',
+      'san francisco': 'United States',
+      boston: 'United States',
+      washington: 'United States',
+      'las vegas': 'United States',
       // UAE
       dubai: 'United Arab Emirates',
       'dubai, uae': 'United Arab Emirates',
       'dubai uae': 'United Arab Emirates',
       'dubai, united arab emirates': 'United Arab Emirates',
       uae: 'United Arab Emirates',
+      'abu dhabi': 'United Arab Emirates',
       // United Kingdom
       london: 'United Kingdom',
       'london, united kingdom': 'United Kingdom',
       'london united kingdom': 'United Kingdom',
       manchester: 'United Kingdom',
       edinburgh: 'United Kingdom',
+      birmingham: 'United Kingdom',
+      liverpool: 'United Kingdom',
       // Germany
       berlin: 'Germany',
       munich: 'Germany',
       hamburg: 'Germany',
+      frankfurt: 'Germany',
+      cologne: 'Germany',
       // Other
       istanbul: 'Turkey',
+      ankara: 'Turkey',
       tokyo: 'Japan',
       'tokyo, japan': 'Japan',
       'tokyo japan': 'Japan',
+      osaka: 'Japan',
+      kyoto: 'Japan',
       seoul: 'South Korea',
       'seoul, south korea': 'South Korea',
       'seoul south korea': 'South Korea',
@@ -625,6 +649,17 @@ export class SocialService {
       'singapore singapore': 'Singapore',
       sydney: 'Australia',
       melbourne: 'Australia',
+      // Tunisia
+      tunis: 'Tunisia',
+      'tunis, tunisia': 'Tunisia',
+      'tunis tunisia': 'Tunisia',
+      sousse: 'Tunisia',
+      sfax: 'Tunisia',
+      // Morocco
+      casablanca: 'Morocco',
+      rabat: 'Morocco',
+      marrakech: 'Morocco',
+      fez: 'Morocco',
       // Additional cities from reservations
       'new york, united states': 'United States',
       'new york united states': 'United States',
@@ -632,6 +667,15 @@ export class SocialService {
       'new york usa': 'United States',
       'madrid, spain': 'Spain',
       'madrid spain': 'Spain',
+      'barcelona, spain': 'Spain',
+      'barcelona spain': 'Spain',
+      'rome, italy': 'Italy',
+      'rome italy': 'Italy',
+      // paris keys already defined above, avoid duplicates
+      'london, uk': 'United Kingdom',
+      'london uk': 'United Kingdom',
+      'london, england': 'United Kingdom',
+      'london england': 'United Kingdom',
     };
 
     // Country coordinates mapping (capital city coordinates)
@@ -686,7 +730,15 @@ export class SocialService {
     // Helper function to extract country from text
     const extractCountryFromText = (text: string): string | null => {
       if (!text) return null;
-      const lowerText = text.toLowerCase().trim();
+      
+      // Normalize text: remove extra spaces, convert to lowercase, trim
+      const normalizedText = text
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/[^\w\s,]/g, ''); // Remove special characters except commas
+
+      this.logger.debug(`Extracting country from text: "${text}" (normalized: "${normalizedText}")`);
 
       // First, try to find city and map to country (more specific, check this first)
       // Sort by length (longest first) to match "paris, france" before just "paris"
@@ -694,8 +746,9 @@ export class SocialService {
         (a, b) => b[0].length - a[0].length,
       );
       for (const [city, country] of sortedCities) {
-        if (lowerText.includes(city)) {
-          this.logger.debug(`City "${city}" found in text -> ${country}`);
+        // Check if the normalized text contains the city (as whole word or part)
+        if (normalizedText.includes(city)) {
+          this.logger.debug(`City "${city}" found in text "${text}" -> ${country}`);
           return country;
         }
       }
@@ -705,52 +758,90 @@ export class SocialService {
         const lowerCountryName = countryName.toLowerCase();
         // Check for exact match or contains match
         if (
-          lowerText === lowerCountryName ||
-          lowerText.includes(lowerCountryName)
+          normalizedText === lowerCountryName ||
+          normalizedText.includes(lowerCountryName)
         ) {
-          this.logger.debug(`Country "${countryName}" found in text`);
+          this.logger.debug(`Country "${countryName}" found in text "${text}"`);
           return countryName;
         }
       }
 
-      // Country not found in text - will be handled later
+      // Try to extract country from common patterns like "City, Country" or "City Country"
+      // Extract the part after comma or the last word
+      const parts = normalizedText.split(',').map(p => p.trim());
+      if (parts.length > 1) {
+        // If there's a comma, check the part after comma as country
+        const possibleCountry = parts[parts.length - 1];
+        for (const [countryName, _] of Object.entries(countryCoordinates)) {
+          const lowerCountryName = countryName.toLowerCase();
+          if (possibleCountry === lowerCountryName || possibleCountry.includes(lowerCountryName)) {
+            this.logger.debug(`Country "${countryName}" extracted from pattern in text "${text}"`);
+            return countryName;
+          }
+        }
+      }
+
+      // Country not found in text
+      this.logger.warn(`No country found in text: "${text}"`);
       return null;
     };
 
     trips.forEach((trip: any) => {
       const tripObj = trip.toObject ? trip.toObject() : trip;
 
+      this.logger.debug(`Processing trip ${tripObj._id}: title="${tripObj.title}", destination="${tripObj.destination}", metadata=${JSON.stringify(tripObj.metadata)}`);
+
       // Processing trip for country extraction
 
       // Extract country from multiple sources
       let country: string | null = null;
+      let source = '';
 
       // 1. Check metadata.country
       if (tripObj.metadata?.country) {
         country = tripObj.metadata.country;
-        // Country found in metadata
+        source = 'metadata.country';
+        this.logger.debug(`Country found in metadata.country: ${country}`);
       }
       // 2. Check destination field directly (for Journey objects)
       else if (tripObj.destination) {
         country = extractCountryFromText(tripObj.destination);
+        source = 'destination';
+        if (country) {
+          this.logger.debug(`Country extracted from destination: ${country}`);
+        }
       }
       // 3. Check metadata.destination
       else if (tripObj.metadata?.destination) {
         country = extractCountryFromText(tripObj.metadata.destination);
+        source = 'metadata.destination';
+        if (country) {
+          this.logger.debug(`Country extracted from metadata.destination: ${country}`);
+        }
       }
       // 4. Check title
       else if (tripObj.title) {
         country = extractCountryFromText(tripObj.title);
+        source = 'title';
+        if (country) {
+          this.logger.debug(`Country extracted from title: ${country}`);
+        }
       }
       // 5. Check description
       else if (tripObj.description) {
         country = extractCountryFromText(tripObj.description);
+        source = 'description';
+        if (country) {
+          this.logger.debug(`Country extracted from description: ${country}`);
+        }
       }
       // 6. Check tags
       else if (tripObj.tags && tripObj.tags.length > 0) {
         for (const tag of tripObj.tags) {
           country = extractCountryFromText(tag);
           if (country) {
+            source = `tags[${tripObj.tags.indexOf(tag)}]`;
+            this.logger.debug(`Country extracted from tag: ${country}`);
             break;
           }
         }
@@ -758,16 +849,25 @@ export class SocialService {
 
       // If no country found, skip this trip
       if (!country) {
-        // Log for debugging
-        this.logger.warn(`No country found for trip: ${tripObj._id}`);
+        // Log for debugging with all available information
+        this.logger.warn(
+          `No country found for trip ${tripObj._id}. ` +
+          `Title: "${tripObj.title}", ` +
+          `Destination: "${tripObj.destination}", ` +
+          `Metadata: ${JSON.stringify(tripObj.metadata)}, ` +
+          `Description: "${tripObj.description}", ` +
+          `Tags: ${JSON.stringify(tripObj.tags)}`
+        );
         return;
       }
 
       // Country successfully detected
+      this.logger.debug(`Country "${country}" found for trip ${tripObj._id} from source: ${source}`);
 
       // Get coordinates for country
       const coords = countryCoordinates[country];
       if (!coords) {
+        this.logger.warn(`Country "${country}" found but no coordinates available in mapping for trip ${tripObj._id}`);
         return; // Skip if country not in our mapping
       }
 
@@ -780,11 +880,13 @@ export class SocialService {
           trips: [],
           count: 0,
         });
+        this.logger.debug(`Created new country entry for ${country} at (${coords.lat}, ${coords.lng})`);
       }
 
       const countryData = countryMap.get(country)!;
       countryData.trips.push(tripObj);
       countryData.count = countryData.trips.length;
+      this.logger.debug(`Added trip ${tripObj._id} to country ${country}. Total trips for this country: ${countryData.count}`);
     });
 
     // Convert map to array
