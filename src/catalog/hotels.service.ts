@@ -117,8 +117,25 @@ export class HotelsService {
         }),
       );
 
-      let hotels: Hotel[] = hotelListResponse.data?.data || [];
+      const rawHotels = hotelListResponse.data?.data || [];
       
+      // Map Amadeus hotels to ensure they have 'id' field (required by Android)
+      let hotels: Hotel[] = rawHotels.map((hotel: any) => ({
+        ...hotel,
+        id: hotel.id || hotel.hotelId || `hotel-${hotel.hotelId || Date.now()}-${Math.random()}`,
+        hotelId: hotel.hotelId || hotel.id || '',
+        // Set default type if missing (Amadeus doesn't provide type, default to HOTEL)
+        type: hotel.type || 'HOTEL',
+        // Set default pricePerNight if missing (for fallback compatibility)
+        pricePerNight: hotel.pricePerNight || (hotel.price?.base ? parseFloat(hotel.price.base) : undefined),
+        currency: hotel.currency || hotel.price?.currency || 'EUR',
+      }));
+      
+      // Apply accommodation type filtering (hotel, airbnb, hostel, resort, apartment)
+      if (params.accommodationType) {
+        hotels = this.filterByAccommodationType(hotels, params.accommodationType);
+      }
+
       // Apply trip type filtering
       if (params.tripType) {
         hotels = this.filterByTripType(hotels, params.tripType);
@@ -145,10 +162,17 @@ export class HotelsService {
         return fallbackResult;
       }
 
+      // Ensure all hotels have required 'id' field before returning
+      const mappedHotels: Hotel[] = hotels.map((h) => ({
+        ...h,
+        id: h.id || h.hotelId || `hotel-${h.hotelId || Date.now()}-${Math.random()}`,
+        hotelId: h.hotelId || h.id || '',
+      }));
+
       const result: HotelSearchResponse = {
-        data: hotels,
+        data: mappedHotels,
         meta: {
-          count: hotels.length,
+          count: mappedHotels.length,
           source: 'amadeus',
         },
       };
@@ -318,6 +342,47 @@ export class HotelsService {
   }
 
   /**
+   * Filter hotels by accommodation type (hotel, airbnb, hostel, resort, apartment)
+   */
+  private filterByAccommodationType(hotels: Hotel[], accommodationType: string): Hotel[] {
+    const typeMap: Record<string, string[]> = {
+      hotel: ['HOTEL'],
+      airbnb: ['APARTMENT', 'HOTEL'], // Airbnb-like properties are often apartments or small hotels
+      hostel: ['HOSTEL'],
+      resort: ['RESORT'],
+      apartment: ['APARTMENT'],
+    };
+
+    const allowedTypes = typeMap[accommodationType.toLowerCase()] || ['HOTEL'];
+    
+    return hotels.filter((h) => {
+      // Check if hotel has type property (from fallback data)
+      const hotelType = (h as any).type;
+      if (hotelType) {
+        return allowedTypes.includes(hotelType);
+      }
+      // If no type property, default behavior:
+      // - For airbnb/apartment: include hotels with apartment-like amenities
+      // - For hostel: include budget hotels (rating <= 3)
+      // - For resort: include hotels with resort amenities (POOL, SPA, etc.)
+      // - For hotel: include all
+      if (accommodationType.toLowerCase() === 'airbnb' || accommodationType.toLowerCase() === 'apartment') {
+        return allowedTypes.includes('APARTMENT') || allowedTypes.includes('HOTEL');
+      }
+      if (accommodationType.toLowerCase() === 'hostel') {
+        return (h.rating || 0) <= 3 || h.amenities?.some((a) => 
+          ['SHARED_KITCHEN', 'DORMITORY'].includes(a));
+      }
+      if (accommodationType.toLowerCase() === 'resort') {
+        return h.amenities?.some((a) => 
+          ['POOL', 'SPA', 'BEACH_ACCESS', 'GOLF'].includes(a)) || (h.rating || 0) >= 4;
+      }
+      // Default: include all for 'hotel'
+      return true;
+    });
+  }
+
+  /**
    * Filter hotels by trip type
    * Made less strict to avoid filtering out all hotels
    */
@@ -386,14 +451,39 @@ export class HotelsService {
       hotels = FALLBACK_HOTELS.slice(0, params.limit || 10);
     }
 
+    if (params.accommodationType) {
+      hotels = this.filterByAccommodationType(hotels, params.accommodationType) as FallbackHotel[];
+    }
+
     if (params.tripType) {
       hotels = this.filterByTripType(hotels, params.tripType) as FallbackHotel[];
     }
 
+    // Explicitly map to ensure all required fields are present (especially 'id')
+    const mappedHotels: Hotel[] = hotels.slice(0, params.limit || 20).map((h) => ({
+      id: h.id || h.hotelId || `fallback-${h.hotelId}`,
+      hotelId: h.hotelId,
+      name: h.name,
+      cityCode: h.cityCode,
+      address: h.address,
+      geoCode: h.geoCode,
+      rating: h.rating,
+      amenities: h.amenities,
+      media: h.media,
+      description: h.description,
+      googleRating: h.googleRating,
+      googleReviewCount: h.googleReviewCount,
+      googlePlaceId: h.googlePlaceId,
+      // Include fallback-specific fields
+      type: (h as any).type || 'HOTEL',
+      pricePerNight: (h as any).pricePerNight,
+      currency: (h as any).currency || 'EUR',
+    }));
+
     return {
-      data: hotels.slice(0, params.limit || 20),
+      data: mappedHotels,
       meta: {
-        count: hotels.length,
+        count: mappedHotels.length,
         source: 'fallback',
       },
     };
@@ -709,8 +799,133 @@ const FALLBACK_HOTELS: FallbackHotel[] = [
     },
     geoCode: { latitude: 51.5139, longitude: -0.0753 },
     description: 'Reliable comfort in the City of London',
-    googleRating: 4.2,
-    googleReviewCount: 1800,
+    googleRating: 4.0,
+    googleReviewCount: 3200,
+  },
+  // Paris Apartments
+  {
+    id: 'PAR-005',
+    hotelId: 'HLPAR005',
+    name: 'Le Marais Apartment',
+    cityCode: 'PAR',
+    rating: 4,
+    type: 'APARTMENT',
+    pricePerNight: 120,
+    currency: 'EUR',
+    amenities: ['WIFI', 'KITCHEN', 'WASHING_MACHINE', 'AIR_CONDITIONING'],
+    address: {
+      lines: ['22 Rue des Rosiers'],
+      cityName: 'Paris',
+      countryCode: 'FR',
+    },
+    geoCode: { latitude: 48.8575, longitude: 2.3614 },
+    description: 'Stylish apartment in historic Le Marais',
+    googleRating: 4.6,
+    googleReviewCount: 450,
+  },
+  {
+    id: 'PAR-006',
+    hotelId: 'HLPAR006',
+    name: 'Montmartre Studio',
+    cityCode: 'PAR',
+    rating: 3,
+    type: 'APARTMENT',
+    pricePerNight: 75,
+    currency: 'EUR',
+    amenities: ['WIFI', 'KITCHEN', 'AIR_CONDITIONING'],
+    address: {
+      lines: ['12 Rue Lepic'],
+      cityName: 'Paris',
+      countryCode: 'FR',
+    },
+    geoCode: { latitude: 48.8842, longitude: 2.3387 },
+    description: 'Cozy studio with Sacré-Cœur views',
+    googleRating: 4.3,
+    googleReviewCount: 280,
+  },
+  // Rome Apartments
+  {
+    id: 'ROM-003',
+    hotelId: 'HLROM003',
+    name: 'Trastevere Apartment',
+    cityCode: 'ROM',
+    rating: 4,
+    type: 'APARTMENT',
+    pricePerNight: 110,
+    currency: 'EUR',
+    amenities: ['WIFI', 'KITCHEN', 'WASHING_MACHINE', 'TERRACE'],
+    address: {
+      lines: ['Via della Lungaretta 45'],
+      cityName: 'Rome',
+      countryCode: 'IT',
+    },
+    geoCode: { latitude: 41.8897, longitude: 12.4694 },
+    description: 'Charming apartment in vibrant Trastevere',
+    googleRating: 4.5,
+    googleReviewCount: 320,
+  },
+  // Barcelona Apartments
+  {
+    id: 'BCN-003',
+    hotelId: 'HLBCN003',
+    name: 'Gothic Quarter Apartment',
+    cityCode: 'BCN',
+    rating: 4,
+    type: 'APARTMENT',
+    pricePerNight: 95,
+    currency: 'EUR',
+    amenities: ['WIFI', 'KITCHEN', 'AIR_CONDITIONING'],
+    address: {
+      lines: ['Carrer del Call 12'],
+      cityName: 'Barcelona',
+      countryCode: 'ES',
+    },
+    geoCode: { latitude: 41.3802, longitude: 2.1734 },
+    description: 'Modern apartment in historic Gothic Quarter',
+    googleRating: 4.4,
+    googleReviewCount: 210,
+  },
+  // Dubai Apartments
+  {
+    id: 'DXB-003',
+    hotelId: 'HLDXB003',
+    name: 'Downtown Dubai Apartment',
+    cityCode: 'DXB',
+    rating: 4,
+    type: 'APARTMENT',
+    pricePerNight: 150,
+    currency: 'EUR',
+    amenities: ['WIFI', 'KITCHEN', 'POOL', 'GYM', 'AIR_CONDITIONING'],
+    address: {
+      lines: ['Business Bay'],
+      cityName: 'Dubai',
+      countryCode: 'AE',
+    },
+    geoCode: { latitude: 25.1972, longitude: 55.2744 },
+    description: 'Luxury apartment with Burj Khalifa views',
+    googleRating: 4.7,
+    googleReviewCount: 890,
+  },
+  // London Apartments
+  {
+    id: 'LON-003',
+    hotelId: 'HLLON003',
+    name: 'Shoreditch Loft',
+    cityCode: 'LON',
+    rating: 4,
+    type: 'APARTMENT',
+    pricePerNight: 180,
+    currency: 'GBP',
+    amenities: ['WIFI', 'KITCHEN', 'WASHING_MACHINE'],
+    address: {
+      lines: ['Rivington Street'],
+      cityName: 'London',
+      countryCode: 'GB',
+    },
+    geoCode: { latitude: 51.5238, longitude: -0.0794 },
+    description: 'Modern loft in trendy Shoreditch',
+    googleRating: 4.6,
+    googleReviewCount: 540,
   },
 ];
 

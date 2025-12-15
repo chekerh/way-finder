@@ -25,6 +25,8 @@ export interface HotelSearchDto {
   limit?: number;
   /** Trip type for smart filtering */
   tripType?: TripType;
+  /** Accommodation type filter (hotel, airbnb, hostel, resort, apartment) */
+  accommodationType?: string;
 }
 
 export type TripType =
