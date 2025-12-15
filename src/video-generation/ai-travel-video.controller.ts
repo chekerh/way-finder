@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { IsString, IsOptional, IsArray } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AiTravelVideoService } from './ai-travel-video.service';
 import { ImgBBService } from '../journey/imgbb.service';
@@ -21,6 +22,7 @@ import { ImgBBService } from '../journey/imgbb.service';
  * DTO for video generation request
  */
 class GenerateVideoDto {
+  @IsString()
   prompt: string;
 }
 
@@ -28,8 +30,16 @@ class GenerateVideoDto {
  * DTO for video generation with images and music
  */
 class GenerateVideoWithMediaDto {
+  @IsString()
   prompt: string;
+  
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   images?: string[];
+  
+  @IsOptional()
+  @IsString()
   musicTrackId?: string;
 }
 

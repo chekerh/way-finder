@@ -121,20 +121,36 @@ export class HotelsService {
       
       // Map Amadeus hotels to ensure they have 'id' field (required by Android)
       // Amadeus provides real hotel names and data, so we preserve them
-      let hotels: Hotel[] = rawHotels.map((hotel: any) => ({
-        ...hotel,
-        id: hotel.id || hotel.hotelId || `hotel-${hotel.hotelId || Date.now()}-${Math.random()}`,
-        hotelId: hotel.hotelId || hotel.id || '',
-        // Preserve real hotel name from Amadeus (don't override)
-        name: hotel.name || hotel.hotelName || `Hotel ${hotel.hotelId}`,
-        // Set default type if missing (Amadeus doesn't provide type, default to HOTEL)
-        type: hotel.type || 'HOTEL',
-        // Set default pricePerNight if missing (for fallback compatibility)
-        pricePerNight: hotel.pricePerNight || (hotel.price?.base ? parseFloat(hotel.price.base) : undefined),
-        currency: hotel.currency || hotel.price?.currency || 'EUR',
-        // Preserve any media/images from Amadeus if available
-        media: hotel.media || hotel.images || undefined,
-      }));
+      let hotels: Hotel[] = rawHotels.map((hotel: any) => {
+        const hotelName = (hotel.name || hotel.hotelName || `Hotel ${hotel.hotelId}`).toLowerCase();
+        
+        // Infer accommodation type from hotel name and characteristics
+        let inferredType = 'HOTEL'; // Default
+        if (hotelName.includes('resort') || hotelName.includes('spa') || hotelName.includes('beach')) {
+          inferredType = 'RESORT';
+        } else if (hotelName.includes('hostel') || hotelName.includes('backpacker')) {
+          inferredType = 'HOSTEL';
+        } else if (hotelName.includes('apartment') || hotelName.includes('apart') || hotelName.includes('suite')) {
+          inferredType = 'APARTMENT';
+        } else if (hotelName.includes('airbnb') || hotelName.includes('bnb')) {
+          inferredType = 'APARTMENT'; // Airbnb-like properties
+        }
+        
+        return {
+          ...hotel,
+          id: hotel.id || hotel.hotelId || `hotel-${hotel.hotelId || Date.now()}-${Math.random()}`,
+          hotelId: hotel.hotelId || hotel.id || '',
+          // Preserve real hotel name from Amadeus (don't override)
+          name: hotel.name || hotel.hotelName || `Hotel ${hotel.hotelId}`,
+          // Infer type from name or use provided type
+          type: hotel.type || inferredType,
+          // Set default pricePerNight if missing (for fallback compatibility)
+          pricePerNight: hotel.pricePerNight || (hotel.price?.base ? parseFloat(hotel.price.base) : undefined),
+          currency: hotel.currency || hotel.price?.currency || 'EUR',
+          // Preserve any media/images from Amadeus if available
+          media: hotel.media || hotel.images || undefined,
+        };
+      });
       
       // Apply accommodation type filtering (hotel, airbnb, hostel, resort, apartment)
       if (params.accommodationType) {
@@ -363,8 +379,10 @@ export class HotelsService {
 
   /**
    * Filter hotels by accommodation type (hotel, airbnb, hostel, resort, apartment)
+   * Improved filtering logic to better match each accommodation type
    */
   private filterByAccommodationType(hotels: Hotel[], accommodationType: string): Hotel[] {
+    const typeLower = accommodationType.toLowerCase();
     const typeMap: Record<string, string[]> = {
       hotel: ['HOTEL'],
       airbnb: ['APARTMENT', 'HOTEL'], // Airbnb-like properties are often apartments or small hotels
@@ -373,32 +391,75 @@ export class HotelsService {
       apartment: ['APARTMENT'],
     };
 
-    const allowedTypes = typeMap[accommodationType.toLowerCase()] || ['HOTEL'];
+    const allowedTypes = typeMap[typeLower] || ['HOTEL'];
     
     return hotels.filter((h) => {
-      // Check if hotel has type property (from fallback data)
-      const hotelType = (h as any).type;
-      if (hotelType) {
-        return allowedTypes.includes(hotelType);
+      const hotelType = (h as any).type?.toUpperCase();
+      const hotelName = (h.name || '').toLowerCase();
+      const rating = h.rating || 0;
+      const amenities = h.amenities || [];
+      
+      // First, check explicit type match
+      if (hotelType && allowedTypes.includes(hotelType)) {
+        return true;
       }
-      // If no type property, default behavior:
-      // - For airbnb/apartment: include hotels with apartment-like amenities
-      // - For hostel: include budget hotels (rating <= 3)
-      // - For resort: include hotels with resort amenities (POOL, SPA, etc.)
-      // - For hotel: include all
-      if (accommodationType.toLowerCase() === 'airbnb' || accommodationType.toLowerCase() === 'apartment') {
-        return allowedTypes.includes('APARTMENT') || allowedTypes.includes('HOTEL');
+      
+      // For each accommodation type, apply specific filtering logic
+      switch (typeLower) {
+        case 'hotel':
+          // Include all hotels (default)
+          return !hotelType || hotelType === 'HOTEL' || !['HOSTEL', 'RESORT', 'APARTMENT'].includes(hotelType);
+          
+        case 'airbnb':
+        case 'apartment':
+          // Include apartments, or hotels with apartment-like names/characteristics
+          if (hotelType === 'APARTMENT') return true;
+          if (hotelName.includes('apartment') || hotelName.includes('apart') || 
+              hotelName.includes('suite') || hotelName.includes('studio') ||
+              hotelName.includes('airbnb') || hotelName.includes('bnb')) {
+            return true;
+          }
+          // Include smaller hotels (lower rating might indicate smaller properties)
+          return rating <= 4 && rating > 0;
+          
+        case 'hostel':
+          // Include hostels, or budget hotels with shared facilities
+          if (hotelType === 'HOSTEL') return true;
+          if (hotelName.includes('hostel') || hotelName.includes('backpacker') ||
+              hotelName.includes('youth') || hotelName.includes('dormitory')) {
+            return true;
+          }
+          // Budget hotels (lower rating, lower price)
+          if (rating <= 3 && rating > 0) return true;
+          // Hotels with shared facilities
+          if (amenities.some((a: string) => 
+            ['SHARED_KITCHEN', 'DORMITORY', 'COMMON_ROOM'].includes(a.toUpperCase()))) {
+            return true;
+          }
+          return false;
+          
+        case 'resort':
+          // Include resorts, or hotels with resort-like amenities
+          if (hotelType === 'RESORT') return true;
+          if (hotelName.includes('resort') || hotelName.includes('spa') ||
+              hotelName.includes('beach') || hotelName.includes('golf')) {
+            return true;
+          }
+          // Hotels with resort amenities (pool, spa, beach access, etc.)
+          const resortAmenities = ['POOL', 'SPA', 'BEACH_ACCESS', 'GOLF', 'TENNIS', 
+                                   'FITNESS_CENTER', 'RESTAURANT', 'BAR'];
+          if (amenities.some((a: string) => 
+            resortAmenities.some(ra => a.toUpperCase().includes(ra)))) {
+            return true;
+          }
+          // Higher-rated hotels are more likely to be resorts
+          if (rating >= 4) return true;
+          return false;
+          
+        default:
+          // Default: include all
+          return true;
       }
-      if (accommodationType.toLowerCase() === 'hostel') {
-        return (h.rating || 0) <= 3 || h.amenities?.some((a) => 
-          ['SHARED_KITCHEN', 'DORMITORY'].includes(a));
-      }
-      if (accommodationType.toLowerCase() === 'resort') {
-        return h.amenities?.some((a) => 
-          ['POOL', 'SPA', 'BEACH_ACCESS', 'GOLF'].includes(a)) || (h.rating || 0) >= 4;
-      }
-      // Default: include all for 'hotel'
-      return true;
     });
   }
 
