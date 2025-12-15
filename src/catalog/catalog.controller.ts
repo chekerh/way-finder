@@ -97,7 +97,8 @@ export class CatalogController {
    */
   @Get('hotels')
   async searchHotels(
-    @Query('cityCode') cityCode: string,
+    @Query('cityCode') cityCode?: string,
+    @Query('cityName') cityName?: string,
     @Query('checkInDate') checkInDate: string,
     @Query('checkOutDate') checkOutDate: string,
     @Query('adults') adults?: string,
@@ -108,7 +109,8 @@ export class CatalogController {
     @Query('currency') currency?: string,
   ) {
     const searchParams: HotelSearchDto = {
-      cityCode: cityCode?.toUpperCase() || 'PAR',
+      cityCode: cityCode?.toUpperCase(),
+      cityName: cityName,
       checkInDate: checkInDate || this.getDefaultCheckInDate(),
       checkOutDate: checkOutDate || this.getDefaultCheckOutDate(),
       adults: adults ? Number(adults) : 2,

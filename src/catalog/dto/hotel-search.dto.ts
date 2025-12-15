@@ -3,8 +3,10 @@
  */
 
 export interface HotelSearchDto {
-  /** City code (e.g., 'PAR' for Paris) */
-  cityCode: string;
+  /** City code (e.g., 'PAR' for Paris) or city name (e.g., 'New York') */
+  cityCode?: string;
+  /** City name (e.g., 'New York', 'Paris') - used if cityCode is not provided */
+  cityName?: string;
   /** Check-in date (YYYY-MM-DD) */
   checkInDate: string;
   /** Check-out date (YYYY-MM-DD) */

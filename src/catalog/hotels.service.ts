@@ -47,6 +47,77 @@ export class HotelsService {
   }
 
   /**
+   * Convert city name to IATA city code
+   */
+  private cityNameToCode(cityName: string): string {
+    const cityMappings: Record<string, string> = {
+      'paris': 'PAR',
+      'london': 'LON',
+      'londres': 'LON',
+      'rome': 'ROM',
+      'roma': 'ROM',
+      'barcelona': 'BCN',
+      'barcelone': 'BCN',
+      'dubai': 'DXB',
+      'new york': 'NYC',
+      'new york city': 'NYC',
+      'nyc': 'NYC',
+      'tokyo': 'TYO',
+      'amsterdam': 'AMS',
+      'madrid': 'MAD',
+      'berlin': 'BER',
+      'munich': 'MUC',
+      'vienna': 'VIE',
+      'vienne': 'VIE',
+      'lisbon': 'LIS',
+      'lisbonne': 'LIS',
+      'athens': 'ATH',
+      'athènes': 'ATH',
+      'istanbul': 'IST',
+      'bangkok': 'BKK',
+      'singapore': 'SIN',
+      'singapour': 'SIN',
+      'tunis': 'TUN',
+      'tunisia': 'TUN',
+      'cairo': 'CAI',
+      'doha': 'DOH',
+      'abu dhabi': 'AUH',
+      'riyadh': 'RUH',
+      'jeddah': 'JED',
+      'mumbai': 'BOM',
+      'delhi': 'DEL',
+      'bangalore': 'BLR',
+      'sydney': 'SYD',
+      'melbourne': 'MEL',
+      'toronto': 'YYZ',
+      'montreal': 'YUL',
+      'vancouver': 'YVR',
+    };
+
+    const normalized = cityName.toLowerCase().trim();
+    
+    // Try exact match first
+    if (cityMappings[normalized]) {
+      return cityMappings[normalized];
+    }
+    
+    // Try partial match (contains)
+    for (const [key, code] of Object.entries(cityMappings)) {
+      if (normalized.includes(key) || key.includes(normalized)) {
+        return code;
+      }
+    }
+    
+    // If it's already a 3-letter code, return uppercase
+    if (normalized.length === 3 && /^[A-Za-z]{3}$/.test(normalized)) {
+      return normalized.toUpperCase();
+    }
+    
+    // Fallback to PAR
+    return 'PAR';
+  }
+
+  /**
    * Get Amadeus access token (cached)
    */
   private async getAccessToken(): Promise<string> {
@@ -86,18 +157,35 @@ export class HotelsService {
    * Uses Amadeus Hotel List API to find hotels in a city
    */
   async searchHotels(params: HotelSearchDto): Promise<HotelSearchResponse> {
-    const cacheKey = `hotels:search:${JSON.stringify(params)}`;
+    // Convert city name to city code if needed
+    let cityCode = params.cityCode;
+    if (!cityCode && params.cityName) {
+      cityCode = this.cityNameToCode(params.cityName);
+      this.logger.debug(`Converted city name "${params.cityName}" to city code "${cityCode}"`);
+    }
+    if (!cityCode) {
+      cityCode = 'PAR'; // Default fallback
+    }
+    
+    // Update params with resolved city code
+    const searchParams: HotelSearchDto = {
+      ...params,
+      cityCode: cityCode.toUpperCase(),
+      cityName: undefined, // Clear cityName since we're using cityCode
+    };
+    
+    const cacheKey = `hotels:search:${JSON.stringify(searchParams)}`;
     
     // Check cache first
     const cached = await this.cacheService.get<HotelSearchResponse>(cacheKey);
     if (cached) {
-      this.logger.debug(`Cache hit for hotel search: ${params.cityCode}`);
+      this.logger.debug(`Cache hit for hotel search: ${cityCode}`);
       return cached;
     }
 
     if (!this.isConfigured()) {
       this.logger.warn('Amadeus not configured, using fallback hotels');
-      return this.getFallbackHotels(params);
+      return this.getFallbackHotels(searchParams);
     }
 
     try {
@@ -109,7 +197,7 @@ export class HotelsService {
         this.http.get(hotelListUrl, {
           headers: { Authorization: `Bearer ${accessToken}` },
           params: {
-            cityCode: params.cityCode.toUpperCase(),
+            cityCode: cityCode.toUpperCase(),
             radius: 50,
             radiusUnit: 'KM',
             hotelSource: 'ALL',
@@ -193,7 +281,7 @@ export class HotelsService {
       // Enrich hotels with images from free APIs (Pixabay/Unsplash)
       this.logger.debug(`Enriching ${mappedHotels.length} hotels with images`);
       mappedHotels = await Promise.all(
-        mappedHotels.map((hotel) => this.enrichWithImages(hotel, params.cityCode))
+        mappedHotels.map((hotel) => this.enrichWithImages(hotel, cityCode))
       );
 
       const result: HotelSearchResponse = {
@@ -523,8 +611,9 @@ export class HotelsService {
    * Get fallback hotels when API is unavailable
    */
   private getFallbackHotels(params: HotelSearchDto): HotelSearchResponse {
+    const cityCode = params.cityCode || 'PAR';
     let hotels = FALLBACK_HOTELS.filter(
-      (h) => h.cityCode.toUpperCase() === params.cityCode.toUpperCase(),
+      (h) => h.cityCode.toUpperCase() === cityCode.toUpperCase(),
     );
 
     if (!hotels.length) {
