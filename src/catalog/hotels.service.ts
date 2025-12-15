@@ -32,7 +32,7 @@ export class HotelsService {
   private readonly clientSecret = process.env.AMADEUS_CLIENT_SECRET;
   private readonly host =
     process.env.AMADEUS_HOST ?? 'https://test.api.amadeus.com';
-  private readonly googlePlacesKey = process.env.GOOGLE_PLACES_API_KEY;
+  private readonly pixabayKey = process.env.PIXABAY_API_KEY;
 
   constructor(
     private readonly http: HttpService,
@@ -120,15 +120,20 @@ export class HotelsService {
       const rawHotels = hotelListResponse.data?.data || [];
       
       // Map Amadeus hotels to ensure they have 'id' field (required by Android)
+      // Amadeus provides real hotel names and data, so we preserve them
       let hotels: Hotel[] = rawHotels.map((hotel: any) => ({
         ...hotel,
         id: hotel.id || hotel.hotelId || `hotel-${hotel.hotelId || Date.now()}-${Math.random()}`,
         hotelId: hotel.hotelId || hotel.id || '',
+        // Preserve real hotel name from Amadeus (don't override)
+        name: hotel.name || hotel.hotelName || `Hotel ${hotel.hotelId}`,
         // Set default type if missing (Amadeus doesn't provide type, default to HOTEL)
         type: hotel.type || 'HOTEL',
         // Set default pricePerNight if missing (for fallback compatibility)
         pricePerNight: hotel.pricePerNight || (hotel.price?.base ? parseFloat(hotel.price.base) : undefined),
         currency: hotel.currency || hotel.price?.currency || 'EUR',
+        // Preserve any media/images from Amadeus if available
+        media: hotel.media || hotel.images || undefined,
       }));
       
       // Apply accommodation type filtering (hotel, airbnb, hostel, resort, apartment)
@@ -163,11 +168,17 @@ export class HotelsService {
       }
 
       // Ensure all hotels have required 'id' field before returning
-      const mappedHotels: Hotel[] = hotels.map((h) => ({
+      let mappedHotels: Hotel[] = hotels.map((h) => ({
         ...h,
         id: h.id || h.hotelId || `hotel-${h.hotelId || Date.now()}-${Math.random()}`,
         hotelId: h.hotelId || h.id || '',
       }));
+
+      // Enrich hotels with images from free APIs (Pixabay/Unsplash)
+      this.logger.debug(`Enriching ${mappedHotels.length} hotels with images`);
+      mappedHotels = await Promise.all(
+        mappedHotels.map((hotel) => this.enrichWithImages(hotel, params.cityCode))
+      );
 
       const result: HotelSearchResponse = {
         data: mappedHotels,
@@ -268,77 +279,86 @@ export class HotelsService {
   }
 
   /**
-   * Enrich hotel data with Google Places reviews
+   * Enrich hotel with images from free APIs (Pixabay, Unsplash)
    */
-  async enrichWithGooglePlaces(hotel: Hotel): Promise<Hotel> {
-    if (!this.googlePlacesKey) {
+  async enrichWithImages(hotel: Hotel, cityCode: string): Promise<Hotel> {
+    // If hotel already has media, keep it
+    if (hotel.media && hotel.media.length > 0) {
       return hotel;
     }
 
     try {
-      // Find place by name and location
-      const searchUrl = 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json';
-      const searchResponse = await lastValueFrom(
-        this.http.get(searchUrl, {
-          params: {
-            input: `${hotel.name} hotel ${hotel.address?.cityName || ''}`,
-            inputtype: 'textquery',
-            fields: 'place_id,rating,user_ratings_total',
-            key: this.googlePlacesKey,
-          },
-        }),
-      );
+      const cityName = hotel.address?.cityName || cityCode;
+      const searchQuery = `${hotel.name} ${cityName} hotel`.trim();
+      
+      // Try Pixabay first if API key is available
+      if (this.pixabayKey) {
+        try {
+          const pixabayUrl = 'https://pixabay.com/api/';
+          const pixabayResponse = await lastValueFrom(
+            this.http.get(pixabayUrl, {
+              params: {
+                key: this.pixabayKey,
+                q: searchQuery,
+                image_type: 'photo',
+                category: 'travel',
+                per_page: 5,
+                safesearch: 'true',
+              },
+            }),
+          );
 
-      const place = searchResponse.data?.candidates?.[0];
-      if (place) {
-        hotel.googlePlaceId = place.place_id;
-        hotel.googleRating = place.rating;
-        hotel.googleReviewCount = place.user_ratings_total;
+          const hits = pixabayResponse.data?.hits || [];
+          if (hits.length > 0) {
+            const media = hits.slice(0, 5).map((hit: any, index: number) => ({
+              uri: hit.largeImageURL || hit.webformatURL,
+              category: index === 0 ? 'EXTERIOR' : 'INTERIOR',
+            }));
+            hotel.media = media;
+            this.logger.debug(`Found ${media.length} images from Pixabay for ${hotel.name}`);
+            return hotel;
+          }
+        } catch (error) {
+          this.logger.debug('Pixabay API failed, trying Unsplash', error);
+        }
       }
+
+      // Fallback to Unsplash Source API (no API key needed)
+      // Use direct image URLs based on search terms
+      const imageKeywords = `${cityName} hotel luxury`.replace(/\s+/g, ',');
+      hotel.media = [
+        {
+          uri: `https://source.unsplash.com/800x600/?${imageKeywords}`,
+          category: 'EXTERIOR',
+        },
+        {
+          uri: `https://source.unsplash.com/800x600/?hotel,room,${cityName.replace(/\s+/g, ',')}`,
+          category: 'INTERIOR',
+        },
+      ];
 
       return hotel;
     } catch (error) {
-      this.logger.warn('Failed to enrich hotel with Google Places data', error);
+      this.logger.warn('Failed to enrich hotel with images', error);
+      // Return hotel with default image
+      if (!hotel.media || hotel.media.length === 0) {
+        const cityName = hotel.address?.cityName || 'hotel';
+        hotel.media = [{
+          uri: `https://source.unsplash.com/800x600/?hotel,${cityName.replace(/\s+/g, ',')}`,
+          category: 'EXTERIOR',
+        }];
+      }
       return hotel;
     }
   }
 
   /**
-   * Get reviews from Google Places for a hotel
+   * Get reviews for a hotel (placeholder - can be extended with other review sources)
    */
   async getHotelReviews(placeId: string): Promise<any[]> {
-    if (!this.googlePlacesKey || !placeId) {
-      return [];
-    }
-
-    const cacheKey = `hotels:reviews:${placeId}`;
-    const cached = await this.cacheService.get<any[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
-    try {
-      const detailsUrl = 'https://maps.googleapis.com/maps/api/place/details/json';
-      const response = await lastValueFrom(
-        this.http.get(detailsUrl, {
-          params: {
-            place_id: placeId,
-            fields: 'reviews,rating,user_ratings_total,photos',
-            key: this.googlePlacesKey,
-          },
-        }),
-      );
-
-      const reviews = response.data?.result?.reviews || [];
-      
-      // Cache for 1 hour
-      await this.cacheService.set(cacheKey, reviews, 3600);
-      
-      return reviews;
-    } catch (error) {
-      this.logger.warn('Failed to fetch Google Places reviews', error);
-      return [];
-    }
+    // Placeholder for future review integration
+    // Could use TripAdvisor API, Booking.com API, or other free sources
+    return [];
   }
 
   /**

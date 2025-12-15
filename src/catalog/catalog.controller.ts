@@ -161,14 +161,12 @@ export class CatalogController {
       return { error: 'Hotel not found', hotelId };
     }
 
-    // Enrich with Google Places data if available
-    const enrichedHotel = await this.hotelsService.enrichWithGooglePlaces(hotel);
+    // Enrich with images from free APIs
+    const cityCode = hotel.cityCode || 'PAR';
+    const enrichedHotel = await this.hotelsService.enrichWithImages(hotel, cityCode);
     
-    // Get reviews if we have a Google Place ID
-    let reviews: any[] = [];
-    if (enrichedHotel.googlePlaceId) {
-      reviews = await this.hotelsService.getHotelReviews(enrichedHotel.googlePlaceId);
-    }
+    // Get reviews (placeholder for future integration)
+    const reviews: any[] = [];
 
     return {
       hotel: enrichedHotel,
