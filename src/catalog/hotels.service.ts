@@ -134,6 +134,17 @@ export class HotelsService {
       const limit = params.limit || 20;
       hotels = hotels.slice(0, limit);
 
+      // If no hotels found from Amadeus, fall back to mock data
+      if (hotels.length === 0) {
+        this.logger.warn(
+          `No hotels found from Amadeus for ${params.cityCode}, using fallback hotels`,
+        );
+        const fallbackResult = this.getFallbackHotels(params);
+        // Cache the fallback result instead of empty result
+        await this.cacheService.set(cacheKey, fallbackResult, 1800);
+        return fallbackResult;
+      }
+
       const result: HotelSearchResponse = {
         data: hotels,
         meta: {
@@ -142,7 +153,7 @@ export class HotelsService {
         },
       };
 
-      // Cache for 30 minutes
+      // Cache for 30 minutes (only cache non-empty results)
       await this.cacheService.set(cacheKey, result, 1800);
       
       return result;
@@ -308,25 +319,58 @@ export class HotelsService {
 
   /**
    * Filter hotels by trip type
+   * Made less strict to avoid filtering out all hotels
    */
   private filterByTripType(hotels: Hotel[], tripType: TripType): Hotel[] {
     const filters: Record<TripType, (h: Hotel) => boolean> = {
-      business: (h) => (h.rating || 0) >= 4 || h.amenities?.some((a) => 
-        ['BUSINESS_CENTER', 'WIFI', 'MEETING_ROOMS'].includes(a)),
-      honeymoon: (h) => (h.rating || 0) >= 4 || h.amenities?.some((a) => 
-        ['SPA', 'POOL', 'RESTAURANT'].includes(a)),
-      family: (h) => h.amenities?.some((a) => 
-        ['POOL', 'KIDS_CLUB', 'FAMILY_ROOMS'].includes(a)) ?? true,
+      business: (h) => {
+        // Less strict: rating >= 3 OR has business amenities OR has wifi
+        return (h.rating || 0) >= 3 || 
+               h.amenities?.some((a) => ['BUSINESS_CENTER', 'WIFI', 'MEETING_ROOMS'].includes(a)) ||
+               h.amenities?.some((a) => a.includes('WIFI')) ||
+               !h.rating; // Include hotels without rating
+      },
+      honeymoon: (h) => {
+        // Less strict: rating >= 3 OR has romantic amenities OR no rating
+        return (h.rating || 0) >= 3 || 
+               h.amenities?.some((a) => ['SPA', 'POOL', 'RESTAURANT'].includes(a)) ||
+               !h.rating;
+      },
+      family: (h) => {
+        // Include all hotels
+        return true;
+      },
       adventure: (h) => true, // All hotels
       leisure: (h) => true, // All hotels
-      solo: (h) => (h.rating || 0) >= 3,
-      wellness: (h) => h.amenities?.some((a) => 
-        ['SPA', 'GYM', 'POOL', 'SAUNA'].includes(a)) ?? false,
-      backpacking: (h) => (h.rating || 0) <= 3, // Budget options
+      solo: (h) => {
+        // Less strict: rating >= 2.5 or no rating
+        return (h.rating || 0) >= 2.5 || !h.rating;
+      },
+      wellness: (h) => {
+        // Less strict: has wellness amenities OR rating >= 3 OR no rating
+        return h.amenities?.some((a) => 
+          ['SPA', 'GYM', 'POOL', 'SAUNA'].includes(a)) || 
+          (h.rating || 0) >= 3 ||
+          !h.rating;
+      },
+      backpacking: (h) => {
+        // Less strict: rating <= 4 OR no rating (more budget options)
+        return (h.rating || 0) <= 4 || !h.rating;
+      },
     };
 
     const filterFn = filters[tripType] || (() => true);
-    return hotels.filter(filterFn);
+    const filtered = hotels.filter(filterFn);
+    
+    // If filtering results in empty list, return all hotels instead
+    if (filtered.length === 0 && hotels.length > 0) {
+      this.logger.warn(
+        `Trip type filter '${tripType}' filtered out all hotels, returning all hotels instead`,
+      );
+      return hotels;
+    }
+    
+    return filtered;
   }
 
   /**
