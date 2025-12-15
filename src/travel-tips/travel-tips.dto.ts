@@ -7,6 +7,7 @@ import {
   Max,
   IsNotEmpty,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum TravelTipCategory {
   GENERAL = 'general',
@@ -29,6 +30,7 @@ export class GetTravelTipsDto {
   category?: TravelTipCategory;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(50)
