@@ -303,7 +303,7 @@ export class BookingService {
       const points = this.rewardsService.getPointsForAction(
         PointsSource.BOOKING,
       );
-      await this.rewardsService.awardPoints({
+        await this.rewardsService.awardPoints({
         userId,
         points,
         source: PointsSource.BOOKING,
@@ -608,6 +608,35 @@ export class BookingService {
       // Log error but don't fail the cancellation if email fails
       this.logger.error(
         `Error sending refund email: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    // Also notify customer support team about the refund request
+    try {
+      const user = await this.userService.findById(userId);
+      const customerEmail = user?.email ?? 'unknown';
+      const customerName = user?.first_name
+        ? `${user.first_name} ${user.last_name ?? ''}`.trim()
+        : 'Client WayFinder';
+
+      await this.emailService.sendRefundSupportNotification({
+        customerEmail,
+        customerName,
+        bookingId: booking._id.toString(),
+        confirmationNumber: booking.confirmation_number,
+        amount: booking.total_price,
+        currency:
+          (booking.accommodation as any)?.currency ||
+          (Array.isArray(booking.upsells) && booking.upsells.length > 0
+            ? (booking.upsells[0] as any).currency
+            : 'EUR'),
+        destination: destinationName,
+      });
+    } catch (error: any) {
+      // Ne pas bloquer l'annulation si l'email support échoue
+      this.logger.error(
+        `Error sending refund support notification for booking ${booking._id.toString()}: ${error.message}`,
         error.stack,
       );
     }

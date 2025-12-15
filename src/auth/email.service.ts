@@ -628,4 +628,106 @@ export class EmailService {
       );
     }
   }
+
+  /**
+   * Notify customer support that a refund has been requested so they can
+   * manually verify and confirm the refund within 2 days.
+   */
+  async sendRefundSupportNotification(options: {
+    supportEmail?: string;
+    customerEmail: string;
+    customerName: string;
+    bookingId: string;
+    confirmationNumber: string;
+    amount: number;
+    currency: string;
+    destination: string;
+  }): Promise<void> {
+    const {
+      supportEmail = process.env.SUPPORT_EMAIL || 'sarra.chmek@esprit.tn',
+      customerEmail,
+      customerName,
+      bookingId,
+      confirmationNumber,
+      amount,
+      currency,
+      destination,
+    } = options;
+
+    if (!supportEmail) {
+      this.logger.warn(
+        '[Refund Support Notification] SUPPORT_EMAIL not configured, skipping support notification',
+      );
+      return;
+    }
+
+    const fromEmail =
+      process.env.EMAIL_FROM || `WayFinder <${process.env.EMAIL_USER}>`;
+
+    const subject = `Nouvelle demande de remboursement - ${confirmationNumber}`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Notification de remboursement</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px;">
+        <h2>Nouvelle demande de remboursement à traiter</h2>
+        <p>Une réservation a été annulée dans l'application WayFinder et un email de confirmation de remboursement a été envoyé au client.</p>
+        <h3>Détails de la réservation</h3>
+        <ul>
+          <li><strong>ID de réservation (DB):</strong> ${bookingId}</li>
+          <li><strong>Numéro de confirmation:</strong> ${confirmationNumber}</li>
+          <li><strong>Client:</strong> ${customerName} (${customerEmail})</li>
+          <li><strong>Destination:</strong> ${destination}</li>
+          <li><strong>Montant à rembourser:</strong> ${amount.toFixed(2)} ${currency}</li>
+        </ul>
+        <h3>Action attendue</h3>
+        <p>
+          Merci de vérifier et de traiter le remboursement dans un délai de <strong>2 jours ouvrables</strong>.
+          Une fois le remboursement effectué, veuillez confirmer l'opération auprès du client par email.
+        </p>
+        <p style="margin-top: 24px;">Cordialement,<br/>Système WayFinder – Notification automatique</p>
+      </body>
+      </html>
+    `;
+
+    const text = `
+Nouvelle demande de remboursement à traiter
+
+ID de réservation (DB) : ${bookingId}
+Numéro de confirmation : ${confirmationNumber}
+Client : ${customerName} (${customerEmail})
+Destination : ${destination}
+Montant à rembourser : ${amount.toFixed(2)} ${currency}
+
+Merci de vérifier et de traiter le remboursement dans les 2 prochains jours ouvrables
+et de confirmer au client par email une fois le remboursement effectué.
+`;
+
+    try {
+      if (this.useMailjet) {
+        await this.sendViaMailjet(supportEmail, subject, html, text);
+      } else {
+        await this.sendViaSMTP(
+          supportEmail,
+          subject,
+          html,
+          text,
+          fromEmail,
+        );
+      }
+      this.logger.log(
+        `[Refund Support Notification] Email sent to support: ${supportEmail} for booking ${bookingId}`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `[Refund Support Notification] Failed to send email to ${supportEmail}:`,
+        error?.message || error,
+      );
+    }
+  }
 }
