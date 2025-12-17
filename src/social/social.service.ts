@@ -336,7 +336,7 @@ export class SocialService {
   }
 
   /**
-   * Get paginated user shared trips
+   * Get paginated user shared trips (includes both SharedTrips and Journeys)
    * @param userId - User ID
    * @param page - Page number (1-based)
    * @param limit - Items per page
@@ -348,20 +348,121 @@ export class SocialService {
     limit: number,
   ) {
     const skip = (page - 1) * limit;
-    const query = { userId, isVisible: true };
+    const publicBaseUrl = (
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
 
-    const [data, total] = await Promise.all([
+    // Get SharedTrips
+    const sharedTripsQuery = { userId, isVisible: true };
+    const [sharedTrips, sharedTripsTotal] = await Promise.all([
       this.sharedTripModel
-        .find(query)
+        .find(sharedTripsQuery)
         .populate('userId', 'username first_name last_name profile_image_url')
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
         .exec(),
-      this.sharedTripModel.countDocuments(query).exec(),
+      this.sharedTripModel.countDocuments(sharedTripsQuery).exec(),
     ]);
 
-    return { data, total };
+    // Get Journeys (these are also shared trips)
+    const journeysQuery = { user_id: userId, is_visible: true, is_public: true };
+    const [journeys, journeysTotal] = await Promise.all([
+      this.journeyModel
+        .find(journeysQuery)
+        .populate('user_id', 'username first_name last_name profile_image_url')
+        .sort({ createdAt: -1 })
+        .exec(),
+      this.journeyModel.countDocuments(journeysQuery).exec(),
+    ]);
+
+    // Format shared trips with full image URLs
+    const formattedSharedTrips = sharedTrips.map((trip: any) => {
+      const tripObj = trip.toObject ? trip.toObject() : trip;
+      return {
+        ...tripObj,
+        images: (tripObj.images || []).map((url: string) => {
+          return url.startsWith('http')
+            ? url
+            : `${publicBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+        }),
+      };
+    });
+
+    // Convert journeys to shared trip format
+    const journeyAsTrips = journeys.map((journey: any) => {
+      const journeyObj = journey.toObject ? journey.toObject() : journey;
+      // Get images from slides or image_urls and ensure full URLs
+      let images: string[] = [];
+      if (journeyObj.slides && journeyObj.slides.length > 0) {
+        images = journeyObj.slides.map((slide: any) => {
+          const imageUrl = slide.imageUrl || slide.image_url || '';
+          return imageUrl.startsWith('http')
+            ? imageUrl
+            : `${publicBaseUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        });
+      } else if (journeyObj.image_urls && journeyObj.image_urls.length > 0) {
+        images = journeyObj.image_urls.map((url: string) => {
+          return url.startsWith('http')
+            ? url
+            : `${publicBaseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+        });
+      }
+
+      // Get user info from populated user_id
+      const userIdObj =
+        journeyObj.user_id && typeof journeyObj.user_id === 'object'
+          ? journeyObj.user_id
+          : {
+              _id: journeyObj.user_id,
+              username: '',
+              first_name: '',
+              last_name: '',
+              profile_image_url: '',
+            };
+
+      return {
+        _id: journeyObj._id,
+        userId: userIdObj,
+        title:
+          journeyObj.destination || journeyObj.caption_text || 'My Journey',
+        description: journeyObj.description || journeyObj.caption_text || null,
+        tripType: 'custom',
+        tripId: journeyObj.booking_id ? journeyObj.booking_id.toString() : null,
+        images: images,
+        tags: journeyObj.tags || [],
+        destination: journeyObj.destination,
+        metadata: {
+          ...journeyObj.metadata,
+          destination: journeyObj.destination,
+          country: journeyObj.metadata?.country || null,
+        },
+        likesCount: journeyObj.likes_count || 0,
+        commentsCount: journeyObj.comments_count || 0,
+        sharesCount: 0,
+        isPublic: journeyObj.is_public !== false,
+        isVisible: journeyObj.is_visible !== false,
+        createdAt: journeyObj.createdAt
+          ? new Date(journeyObj.createdAt).toISOString()
+          : new Date().toISOString(),
+        updatedAt: journeyObj.updatedAt
+          ? new Date(journeyObj.updatedAt).toISOString()
+          : new Date().toISOString(),
+      };
+    });
+
+    // Combine and sort by creation date
+    const allTrips = [...formattedSharedTrips, ...journeyAsTrips].sort(
+      (a, b) =>
+        new Date(b.createdAt || b.created_at || 0).getTime() -
+        new Date(a.createdAt || a.created_at || 0).getTime(),
+    );
+
+    // Apply pagination
+    const total = sharedTripsTotal + journeysTotal;
+    const paginatedData = allTrips.slice(skip, skip + limit);
+
+    return { data: paginatedData, total };
   }
 
   /**
