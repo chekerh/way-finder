@@ -354,8 +354,19 @@ export class SocialService {
       'http://localhost:3000'
     ).replace(/\/$/, '');
 
+    this.logger.log(`[getUserSharedTripsPaginated] Fetching trips for user: ${userId}, page: ${page}, limit: ${limit}`);
+
+    // Convert userId to ObjectId for queries
+    let userIdObjectId: any;
+    try {
+      userIdObjectId = new this.sharedTripModel.db.base.Types.ObjectId(userId);
+    } catch (error) {
+      this.logger.error(`[getUserSharedTripsPaginated] Invalid userId format: ${userId}`);
+      return { data: [], total: 0 };
+    }
+
     // Get SharedTrips
-    const sharedTripsQuery = { userId, isVisible: true };
+    const sharedTripsQuery = { userId: userIdObjectId, isVisible: true };
     const [sharedTrips, sharedTripsTotal] = await Promise.all([
       this.sharedTripModel
         .find(sharedTripsQuery)
@@ -365,8 +376,10 @@ export class SocialService {
       this.sharedTripModel.countDocuments(sharedTripsQuery).exec(),
     ]);
 
+    this.logger.log(`[getUserSharedTripsPaginated] Found ${sharedTrips.length} SharedTrips (total: ${sharedTripsTotal})`);
+
     // Get Journeys (these are also shared trips)
-    const journeysQuery = { user_id: userId, is_visible: true, is_public: true };
+    const journeysQuery = { user_id: userIdObjectId, is_visible: true, is_public: true };
     const [journeys, journeysTotal] = await Promise.all([
       this.journeyModel
         .find(journeysQuery)
@@ -375,6 +388,8 @@ export class SocialService {
         .exec(),
       this.journeyModel.countDocuments(journeysQuery).exec(),
     ]);
+
+    this.logger.log(`[getUserSharedTripsPaginated] Found ${journeys.length} Journeys (total: ${journeysTotal})`);
 
     // Format shared trips with full image URLs
     const formattedSharedTrips = sharedTrips.map((trip: any) => {
@@ -461,6 +476,8 @@ export class SocialService {
     // Apply pagination
     const total = sharedTripsTotal + journeysTotal;
     const paginatedData = allTrips.slice(skip, skip + limit);
+
+    this.logger.log(`[getUserSharedTripsPaginated] Returning ${paginatedData.length} trips (total: ${total}, skip: ${skip}, limit: ${limit})`);
 
     return { data: paginatedData, total };
   }
