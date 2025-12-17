@@ -209,6 +209,7 @@ export class HotelsService {
       
       // Map Amadeus hotels to ensure they have 'id' field (required by Android)
       // Amadeus provides real hotel names and data, so we preserve them
+      // Map and normalize Amadeus hotels
       let hotels: Hotel[] = rawHotels.map((hotel: any) => {
         const hotelName = (hotel.name || hotel.hotelName || `Hotel ${hotel.hotelId}`).toLowerCase();
         
@@ -238,6 +239,12 @@ export class HotelsService {
           // Preserve any media/images from Amadeus if available
           media: hotel.media || hotel.images || undefined,
         };
+      });
+
+      // Filter out obvious test/sandbox properties from Amadeus (e.g. "HN TEST PROPERTY1 FOR E2E TESTING")
+      hotels = hotels.filter((h) => {
+        const name = (h.name || '').toLowerCase();
+        return !name.includes('test property') && !name.includes('e2e testing') && !name.includes('sandbox');
       });
       
       // Apply accommodation type filtering (hotel, airbnb, hostel, resort, apartment)

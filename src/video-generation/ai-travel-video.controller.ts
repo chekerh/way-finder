@@ -30,8 +30,9 @@ class GenerateVideoDto {
  * DTO for video generation with images and music
  */
 class GenerateVideoWithMediaDto {
+  @IsOptional()
   @IsString()
-  prompt: string;
+  prompt?: string;
   
   @IsOptional()
   @IsArray()
@@ -230,13 +231,22 @@ export class AiTravelVideoController {
   async generateVideoWithMedia(@Req() req: any, @Body() body: GenerateVideoWithMediaDto) {
     const userId = req.user.sub;
 
-    if (!body.prompt || typeof body.prompt !== 'string') {
-      throw new BadRequestException('Prompt is required');
+    const hasImages = Array.isArray(body.images) && body.images.length > 0;
+
+    if ((!body.prompt || typeof body.prompt !== 'string' || body.prompt.trim().length === 0) && !hasImages) {
+      throw new BadRequestException('Please provide a prompt or at least one image.');
     }
+
+    const promptToUse =
+      body.prompt && body.prompt.trim().length > 0
+        ? body.prompt
+        : hasImages
+        ? `Travel memories video created from ${body.images!.length} personal photos.`
+        : body.prompt || '';
 
     const result = await this.aiTravelVideoService.generateVideoWithMedia(
       userId,
-      body.prompt,
+      promptToUse,
       body.images || [],
       body.musicTrackId,
     );

@@ -609,13 +609,25 @@ export class AiTravelVideoService {
       }
     }
 
+    // If no prompt or too short but we have images, build a default prompt
+    let finalPrompt = (prompt || '').trim();
+    if (!finalPrompt || finalPrompt.length < 5) {
+      if (images && images.length > 0) {
+        finalPrompt = `Travel memories video created from ${images.length} personal photos.`;
+      } else {
+        throw new BadRequestException(
+          'Prompt must be at least 5 characters long, or provide at least one image.',
+        );
+      }
+    }
+
     // Get music track if specified
     const musicTrack = musicTrackId
       ? this.getMusicTracks().find((t) => t.id === musicTrackId)
       : undefined;
 
-    // Enhance prompt with image context
-    let enhancedPrompt = this.enhancePrompt(prompt.trim());
+    // Enhance prompt with image and music context
+    let enhancedPrompt = this.enhancePrompt(finalPrompt);
     if (images && images.length > 0) {
       enhancedPrompt += ` Using ${images.length} travel photos as reference.`;
     }
@@ -660,18 +672,20 @@ export class AiTravelVideoService {
         return {
           predictionId: prediction.id,
           status: prediction.status,
-          prompt: prompt.trim(),
+          prompt: finalPrompt,
           enhancedPrompt,
           musicTrack,
         };
       } catch (error: any) {
-        this.logger.warn(`Image-to-video failed: ${error.message}, falling back to text-to-video`);
+        this.logger.warn(
+          `Image-to-video failed: ${error.message}, falling back to text-to-video`,
+        );
         // Fall back to regular text-to-video
       }
     }
 
-    // Fall back to regular text-to-video generation
-    const result = await this.generateVideo(userId, prompt);
+    // Fall back to regular text-to-video generation (prompt-only mode)
+    const result = await this.generateVideo(userId, finalPrompt);
     return {
       ...result,
       musicTrack,
