@@ -10,6 +10,7 @@ import { BookingModule } from './booking/booking.module';
 import { PaymentModule } from './payment/payment.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { VideoGenerationModule } from './video-generation/video-generation.module';
 import { RealTimeGateway } from './real-time/real-time.gateway';
 
 @Module({
@@ -22,6 +23,7 @@ import { RealTimeGateway } from './real-time/real-time.gateway';
     PaymentModule,
     OnboardingModule,
     RecommendationsModule,
+    VideoGenerationModule,
   ],
   controllers: [AppController],
   providers: [
