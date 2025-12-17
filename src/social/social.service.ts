@@ -564,9 +564,18 @@ export class SocialService {
     // Combine shared trips and journeys
     const trips = [...sharedTrips, ...journeyAsTrips];
 
-    this.logger.debug(
-      `Total trips found: ${trips.length} (${sharedTrips.length} shared trips + ${journeyAsTrips.length} journeys)`,
+    this.logger.log(
+      `[MapMemories] Total trips found: ${trips.length} (${sharedTrips.length} shared trips + ${journeyAsTrips.length} journeys)`,
     );
+    
+    if (trips.length === 0) {
+      this.logger.warn(`[MapMemories] No trips found for user ${userId}. This may be normal if the user has not shared any trips yet.`);
+      return {
+        countries: [],
+        totalCountries: 0,
+        totalMemories: 0,
+      };
+    }
 
     // City to Country mapping (popular cities)
     const cityToCountry: Record<string, string> = {
@@ -813,7 +822,7 @@ export class SocialService {
     trips.forEach((trip: any) => {
       const tripObj = trip.toObject ? trip.toObject() : trip;
 
-      this.logger.debug(`Processing trip ${tripObj._id}: title="${tripObj.title}", destination="${tripObj.destination}", metadata=${JSON.stringify(tripObj.metadata)}`);
+      this.logger.log(`[MapMemories] Processing trip ${tripObj._id}: title="${tripObj.title}", destination="${tripObj.destination}", metadata=${JSON.stringify(tripObj.metadata)}`);
 
       // Processing trip for country extraction
 
@@ -891,7 +900,7 @@ export class SocialService {
       if (!country) {
         // Log for debugging with all available information
         this.logger.warn(
-          `No country found for trip ${tripObj._id}. ` +
+          `[MapMemories] No country found for trip ${tripObj._id}. ` +
           `Title: "${tripObj.title}", ` +
           `Destination: "${tripObj.destination}", ` +
           `Metadata: ${JSON.stringify(tripObj.metadata)}, ` +
@@ -902,7 +911,7 @@ export class SocialService {
       }
 
       // Country successfully detected
-      this.logger.debug(`Country "${country}" found for trip ${tripObj._id} from source: ${source}`);
+      this.logger.log(`[MapMemories] Country "${country}" found for trip ${tripObj._id} from source: ${source}`);
 
       // Get coordinates for country
       const coords = countryCoordinates[country];
@@ -931,6 +940,10 @@ export class SocialService {
 
     // Convert map to array
     const result = Array.from(countryMap.values());
+
+    this.logger.log(
+      `[MapMemories] Final result: ${result.length} countries, ${trips.length} total memories processed`,
+    );
 
     return {
       countries: result,
