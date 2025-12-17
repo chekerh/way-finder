@@ -1056,16 +1056,64 @@ export class SocialService {
       this.logger.debug(`Added trip ${tripObj._id} to country ${country}. Total trips for this country: ${countryData.count}`);
     });
 
-    // Convert map to array
-    const result = Array.from(countryMap.values());
+    // Convert map to array (for backward compatibility - grouped by country)
+    const countriesResult = Array.from(countryMap.values());
+
+    // Also create individual memories (Snapchat style - one marker per trip)
+    const individualMemories = trips
+      .map((trip: any) => {
+        const tripObj = trip.toObject ? trip.toObject() : trip;
+        
+        // Extract country from trip
+        let country: string | null = null;
+        
+        // 1. Check metadata.country
+        if (tripObj.metadata?.country) {
+          country = tripObj.metadata.country;
+        }
+        // 2. Check destination field directly
+        else if (tripObj.destination) {
+          country = extractCountryFromText(tripObj.destination);
+        }
+        // 3. Check metadata.destination
+        else if (tripObj.metadata?.destination) {
+          country = extractCountryFromText(tripObj.metadata.destination);
+        }
+        // 4. Check title
+        else if (tripObj.title) {
+          country = extractCountryFromText(tripObj.title);
+        }
+        
+        if (!country) {
+          return null;
+        }
+        
+        // Get coordinates for country
+        const coords = countryCoordinates[country];
+        if (!coords) {
+          return null;
+        }
+        
+        // Return memory with trip data embedded
+        return {
+          _id: tripObj._id || tripObj.id,
+          lat: coords.lat,
+          lng: coords.lng,
+          country: country,
+          // Include all trip fields at root level for easier decoding
+          ...tripObj,
+        };
+      })
+      .filter((memory: any) => memory !== null);
 
     this.logger.log(
-      `[MapMemories] Final result: ${result.length} countries, ${trips.length} total memories processed`,
+      `[MapMemories] Final result: ${countriesResult.length} countries, ${individualMemories.length} individual memories, ${trips.length} total memories processed`,
     );
 
     return {
-      countries: result,
-      totalCountries: result.length,
+      countries: countriesResult,
+      memories: individualMemories, // Individual memories for Snapchat-style display
+      totalCountries: countriesResult.length,
       totalMemories: trips.length,
     };
   }
