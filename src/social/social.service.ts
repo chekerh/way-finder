@@ -584,15 +584,29 @@ export class SocialService {
 
     this.logger.debug(`Getting map memories for user ${userId}`);
 
+    // Convert userId to ObjectId for queries
+    let userIdObjectId: any;
+    try {
+      userIdObjectId = new this.sharedTripModel.db.base.Types.ObjectId(userId);
+    } catch (error) {
+      this.logger.error(`[getMapMemories] Invalid userId format: ${userId}`);
+      return {
+        countries: [],
+        memories: [],
+        totalCountries: 0,
+        totalMemories: 0,
+      };
+    }
+
     // Get all shared trips for the user
-    // Get only public and visible shared trips for map display
+    // Get all visible shared trips (not just public ones) for map display
     const sharedTripsRaw = await this.sharedTripModel
-      .find({ userId, isVisible: true, isPublic: true })
+      .find({ userId: userIdObjectId, isVisible: true })
       .populate('userId', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
 
-    this.logger.debug(`Found ${sharedTripsRaw.length} shared trips for user ${userId}`);
+    this.logger.debug(`Found ${sharedTripsRaw.length} shared trips for user ${userId} (query: { userId: ${userIdObjectId}, isVisible: true })`);
 
     // Format shared trips with full image URLs
     const sharedTrips = sharedTripsRaw.map((trip: any) => {
@@ -608,14 +622,14 @@ export class SocialService {
     });
 
     // Get all journeys for the user (these are the shared journeys)
-    // Only get public and visible journeys for map display
+    // Get all visible journeys (not just public ones) for map display
     const journeys = await this.journeyModel
-      .find({ user_id: userId, is_visible: true, is_public: true })
+      .find({ user_id: userIdObjectId, is_visible: true })
       .populate('user_id', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
 
-    this.logger.debug(`Found ${journeys.length} journeys for user ${userId}`);
+    this.logger.debug(`Found ${journeys.length} journeys for user ${userId} (query: { user_id: ${userIdObjectId}, is_visible: true })`);
 
     // Convert journeys to shared trip format for processing
     const journeyAsTrips = journeys.map((journey: any) => {
