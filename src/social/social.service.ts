@@ -467,8 +467,9 @@ export class SocialService {
     this.logger.debug(`Getting map memories for user ${userId}`);
 
     // Get all shared trips for the user
+    // Get only public and visible shared trips for map display
     const sharedTripsRaw = await this.sharedTripModel
-      .find({ userId, isVisible: true })
+      .find({ userId, isVisible: true, isPublic: true })
       .populate('userId', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
@@ -489,8 +490,9 @@ export class SocialService {
     });
 
     // Get all journeys for the user (these are the shared journeys)
+    // Only get public and visible journeys for map display
     const journeys = await this.journeyModel
-      .find({ user_id: userId, is_visible: true })
+      .find({ user_id: userId, is_visible: true, is_public: true })
       .populate('user_id', 'username first_name last_name profile_image_url')
       .sort({ createdAt: -1 })
       .exec();
@@ -772,10 +774,32 @@ export class SocialService {
       if (parts.length > 1) {
         // If there's a comma, check the part after comma as country
         const possibleCountry = parts[parts.length - 1];
+        // First try exact match
         for (const [countryName, _] of Object.entries(countryCoordinates)) {
           const lowerCountryName = countryName.toLowerCase();
-          if (possibleCountry === lowerCountryName || possibleCountry.includes(lowerCountryName)) {
-            this.logger.debug(`Country "${countryName}" extracted from pattern in text "${text}"`);
+          if (possibleCountry === lowerCountryName) {
+            this.logger.debug(`Country "${countryName}" extracted from pattern (exact match) in text "${text}"`);
+            return countryName;
+          }
+        }
+        // Then try contains match
+        for (const [countryName, _] of Object.entries(countryCoordinates)) {
+          const lowerCountryName = countryName.toLowerCase();
+          if (possibleCountry.includes(lowerCountryName) || lowerCountryName.includes(possibleCountry)) {
+            this.logger.debug(`Country "${countryName}" extracted from pattern (contains match) in text "${text}"`);
+            return countryName;
+          }
+        }
+      }
+      
+      // Also try to find country in the last word if no comma found
+      const words = normalizedText.split(/\s+/);
+      if (words.length > 1) {
+        const lastWord = words[words.length - 1];
+        for (const [countryName, _] of Object.entries(countryCoordinates)) {
+          const lowerCountryName = countryName.toLowerCase();
+          if (lastWord === lowerCountryName || lowerCountryName.includes(lastWord) || lastWord.includes(lowerCountryName)) {
+            this.logger.debug(`Country "${countryName}" extracted from last word "${lastWord}" in text "${text}"`);
             return countryName;
           }
         }
@@ -805,10 +829,26 @@ export class SocialService {
       }
       // 2. Check destination field directly (for Journey objects)
       else if (tripObj.destination) {
+        // Try to extract country from destination
         country = extractCountryFromText(tripObj.destination);
         source = 'destination';
         if (country) {
-          this.logger.debug(`Country extracted from destination: ${country}`);
+          this.logger.debug(`Country extracted from destination "${tripObj.destination}": ${country}`);
+        } else {
+          // If extraction failed, try to extract country name directly from "City, Country" format
+          const destinationParts = tripObj.destination.split(',').map(p => p.trim());
+          if (destinationParts.length > 1) {
+            const possibleCountry = destinationParts[destinationParts.length - 1];
+            // Check if the country name exists in our mapping
+            for (const [countryName, _] of Object.entries(countryCoordinates)) {
+              if (countryName.toLowerCase() === possibleCountry.toLowerCase()) {
+                country = countryName;
+                source = 'destination (direct country match)';
+                this.logger.debug(`Country "${country}" found directly in destination "${tripObj.destination}"`);
+                break;
+              }
+            }
+          }
         }
       }
       // 3. Check metadata.destination
