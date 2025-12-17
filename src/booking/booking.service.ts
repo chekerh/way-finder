@@ -303,7 +303,7 @@ export class BookingService {
       const points = this.rewardsService.getPointsForAction(
         PointsSource.BOOKING,
       );
-        await this.rewardsService.awardPoints({
+      await this.rewardsService.awardPoints({
         userId,
         points,
         source: PointsSource.BOOKING,
@@ -612,36 +612,106 @@ export class BookingService {
       );
     }
 
-    // Also notify customer support team about the refund request
-    try {
-      const user = await this.userService.findById(userId);
-      const customerEmail = user?.email ?? 'unknown';
-      const customerName = user?.first_name
-        ? `${user.first_name} ${user.last_name ?? ''}`.trim()
-        : 'Client WayFinder';
+    return booking;
+  }
 
-      await this.emailService.sendRefundSupportNotification({
-        customerEmail,
-        customerName,
-        bookingId: booking._id.toString(),
-        confirmationNumber: booking.confirmation_number,
-        amount: booking.total_price,
-        currency:
-          (booking.accommodation as any)?.currency ||
-          (Array.isArray(booking.upsells) && booking.upsells.length > 0
-            ? (booking.upsells[0] as any).currency
-            : 'EUR'),
-        destination: destinationName,
-      });
+  /**
+   * Request to rebook a cancelled booking
+   * Sends emails to customer support and user
+   */
+  async requestRebooking(userId: string, bookingId: string) {
+    const booking = await this.bookingModel
+      .findOne({
+        _id: this.toObjectId(bookingId, 'booking id'),
+        user_id: this.toObjectId(userId, 'user id'),
+      })
+      .exec();
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    // Check if booking is cancelled
+    if (booking.status !== BookingStatus.CANCELLED) {
+      throw new BadRequestException(
+        'Only cancelled bookings can be rebooked',
+      );
+    }
+
+    const destinationName =
+      booking.trip_details?.destination ||
+      booking.trip_details?.origin ||
+      'votre destination';
+
+    // Get user information
+    const user = await this.userService.findById(userId);
+    if (!user || !user.email) {
+      throw new NotFoundException('User not found or email missing');
+    }
+
+    const firstName = user.first_name || 'Utilisateur';
+    const lastName = user.last_name || '';
+    const userName = `${firstName} ${lastName}`.trim() || firstName;
+
+    // Try to infer currency from accommodation or upsells, otherwise default to EUR
+    const currency =
+      (booking.accommodation as any)?.currency ||
+      (Array.isArray(booking.upsells) && booking.upsells.length > 0
+        ? (booking.upsells[0] as any).currency
+        : undefined) ||
+      'EUR';
+
+    // Send email to customer support
+    try {
+      await this.emailService.sendRebookingRequestEmail(
+        user.email,
+        userName,
+        booking.confirmation_number,
+        booking._id.toString(),
+        destinationName,
+        booking.total_price || 0,
+        currency,
+        booking.trip_details,
+      );
+      this.logger.log(
+        `Rebooking request email sent to support for booking ${booking.confirmation_number}`,
+      );
     } catch (error: any) {
-      // Ne pas bloquer l'annulation si l'email support échoue
+      // Log error but don't fail the request if email fails
       this.logger.error(
-        `Error sending refund support notification for booking ${booking._id.toString()}: ${error.message}`,
+        `Error sending rebooking request email to support: ${error.message}`,
         error.stack,
       );
     }
 
-    return booking;
+    // Send confirmation email to user
+    try {
+      await this.emailService.sendRebookingConfirmationEmail(
+        user.email,
+        firstName,
+        booking.confirmation_number,
+        destinationName,
+      );
+      this.logger.log(
+        `Rebooking confirmation email sent to ${user.email} for booking ${booking.confirmation_number}`,
+      );
+    } catch (error: any) {
+      // Log error but don't fail the request if email fails
+      this.logger.error(
+        `Error sending rebooking confirmation email to user: ${error.message}`,
+        error.stack,
+      );
+    }
+
+    return {
+      message: 'Rebooking request submitted successfully',
+      booking: {
+        id: booking._id.toString(),
+        confirmation_number: booking.confirmation_number,
+        destination: destinationName,
+        status: booking.status,
+      },
+    };
   }
 
   async delete(userId: string, bookingId: string): Promise<void> {

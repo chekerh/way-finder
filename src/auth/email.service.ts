@@ -630,103 +630,202 @@ export class EmailService {
   }
 
   /**
-   * Notify customer support that a refund has been requested so they can
-   * manually verify and confirm the refund within 2 days.
+   * Send email to customer support when user requests to rebook a cancelled booking
    */
-  async sendRefundSupportNotification(options: {
-    supportEmail?: string;
-    customerEmail: string;
-    customerName: string;
-    bookingId: string;
-    confirmationNumber: string;
-    amount: number;
-    currency: string;
-    destination: string;
-  }): Promise<void> {
-    const {
-      supportEmail = process.env.SUPPORT_EMAIL || 'sarra.chmek@esprit.tn',
-      customerEmail,
-      customerName,
-      bookingId,
-      confirmationNumber,
-      amount,
-      currency,
-      destination,
-    } = options;
-
-    if (!supportEmail) {
-      this.logger.warn(
-        '[Refund Support Notification] SUPPORT_EMAIL not configured, skipping support notification',
-      );
-      return;
-    }
+  async sendRebookingRequestEmail(
+    userEmail: string,
+    userName: string,
+    confirmationNumber: string,
+    bookingId: string,
+    destination: string,
+    totalPrice: number,
+    currency: string,
+    tripDetails?: any,
+  ): Promise<void> {
+    const supportEmail =
+      process.env.SUPPORT_EMAIL ||
+      process.env.CUSTOMER_SUPPORT_EMAIL ||
+      process.env.EMAIL_USER ||
+      'support@wayfinder.com';
 
     const fromEmail =
       process.env.EMAIL_FROM || `WayFinder <${process.env.EMAIL_USER}>`;
 
-    const subject = `Nouvelle demande de remboursement - ${confirmationNumber}`;
-
-    const html = `
+    const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Notification de remboursement</title>
+        <title>Demande de ré-réservation</title>
       </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px;">
-        <h2>Nouvelle demande de remboursement à traiter</h2>
-        <p>Une réservation a été annulée dans l'application WayFinder et un email de confirmation de remboursement a été envoyé au client.</p>
-        <h3>Détails de la réservation</h3>
-        <ul>
-          <li><strong>ID de réservation (DB):</strong> ${bookingId}</li>
-          <li><strong>Numéro de confirmation:</strong> ${confirmationNumber}</li>
-          <li><strong>Client:</strong> ${customerName} (${customerEmail})</li>
-          <li><strong>Destination:</strong> ${destination}</li>
-          <li><strong>Montant à rembourser:</strong> ${amount.toFixed(2)} ${currency}</li>
-        </ul>
-        <h3>Action attendue</h3>
-        <p>
-          Merci de vérifier et de traiter le remboursement dans un délai de <strong>2 jours ouvrables</strong>.
-          Une fois le remboursement effectué, veuillez confirmer l'opération auprès du client par email.
-        </p>
-        <p style="margin-top: 24px;">Cordialement,<br/>Système WayFinder – Notification automatique</p>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #FF6B6B; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Demande de ré-réservation 🔄</h1>
+        </div>
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Bonjour équipe support,</p>
+          <p>Un utilisateur souhaite réserver à nouveau un voyage précédemment annulé.</p>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #FF6B6B;">
+            <h3 style="margin-top: 0; color: #FF6B6B;">Informations de l'utilisateur</h3>
+            <p><strong>Nom:</strong> ${userName}</p>
+            <p><strong>Email:</strong> ${userEmail}</p>
+          </div>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4A90E2;">
+            <h3 style="margin-top: 0; color: #4A90E2;">Détails de la réservation annulée</h3>
+            <p><strong>ID de réservation:</strong> ${bookingId}</p>
+            <p><strong>Numéro de confirmation:</strong> ${confirmationNumber}</p>
+            <p><strong>Destination:</strong> ${destination}</p>
+            <p><strong>Montant original:</strong> ${totalPrice} ${currency}</p>
+            ${tripDetails?.departure_date ? `<p><strong>Date de départ:</strong> ${tripDetails.departure_date}</p>` : ''}
+            ${tripDetails?.return_date ? `<p><strong>Date de retour:</strong> ${tripDetails.return_date}</p>` : ''}
+            ${tripDetails?.travel_class ? `<p><strong>Classe:</strong> ${tripDetails.travel_class}</p>` : ''}
+          </div>
+          
+          <div style="background-color: #FFF3CD; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #FFC107;">
+            <p style="margin: 0;"><strong>⚠️ Action requise:</strong> Veuillez contacter l'utilisateur pour confirmer la disponibilité et procéder à la nouvelle réservation.</p>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          <p style="font-size: 12px; color: #777;">Cet email a été généré automatiquement par le système WayFinder.</p>
+        </div>
       </body>
       </html>
     `;
 
-    const text = `
-Nouvelle demande de remboursement à traiter
+    const textContent = `
+      Demande de ré-réservation
+      
+      Bonjour équipe support,
+      
+      Un utilisateur souhaite réserver à nouveau un voyage précédemment annulé.
+      
+      Informations de l'utilisateur:
+      - Nom: ${userName}
+      - Email: ${userEmail}
+      
+      Détails de la réservation annulée:
+      - ID de réservation: ${bookingId}
+      - Numéro de confirmation: ${confirmationNumber}
+      - Destination: ${destination}
+      - Montant original: ${totalPrice} ${currency}
+      ${tripDetails?.departure_date ? `- Date de départ: ${tripDetails.departure_date}` : ''}
+      ${tripDetails?.return_date ? `- Date de retour: ${tripDetails.return_date}` : ''}
+      ${tripDetails?.travel_class ? `- Classe: ${tripDetails.travel_class}` : ''}
+      
+      Action requise: Veuillez contacter l'utilisateur pour confirmer la disponibilité et procéder à la nouvelle réservation.
+      
+      Cet email a été généré automatiquement par le système WayFinder.
+    `;
 
-ID de réservation (DB) : ${bookingId}
-Numéro de confirmation : ${confirmationNumber}
-Client : ${customerName} (${customerEmail})
-Destination : ${destination}
-Montant à rembourser : ${amount.toFixed(2)} ${currency}
-
-Merci de vérifier et de traiter le remboursement dans les 2 prochains jours ouvrables
-et de confirmer au client par email une fois le remboursement effectué.
-`;
-
-    try {
-      if (this.useMailjet) {
-        await this.sendViaMailjet(supportEmail, subject, html, text);
-      } else {
-        await this.sendViaSMTP(
-          supportEmail,
-          subject,
-          html,
-          text,
-          fromEmail,
-        );
-      }
-      this.logger.log(
-        `[Refund Support Notification] Email sent to support: ${supportEmail} for booking ${bookingId}`,
+    if (this.useMailjet) {
+      await this.sendViaMailjet(
+        supportEmail,
+        `[WayFinder] Demande de ré-réservation - ${confirmationNumber}`,
+        htmlContent,
+        textContent,
       );
-    } catch (error: any) {
-      this.logger.error(
-        `[Refund Support Notification] Failed to send email to ${supportEmail}:`,
-        error?.message || error,
+    } else {
+      await this.sendViaSMTP(
+        supportEmail,
+        `[WayFinder] Demande de ré-réservation - ${confirmationNumber}`,
+        htmlContent,
+        textContent,
+        fromEmail,
+      );
+    }
+  }
+
+  /**
+   * Send confirmation email to user when they request to rebook a cancelled booking
+   */
+  async sendRebookingConfirmationEmail(
+    email: string,
+    firstName: string,
+    confirmationNumber: string,
+    destination: string,
+  ): Promise<void> {
+    const fromEmail =
+      process.env.EMAIL_FROM || `WayFinder <${process.env.EMAIL_USER}>`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Confirmation de demande de ré-réservation</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #4A90E2; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Demande de ré-réservation reçue ✅</h1>
+        </div>
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Bonjour ${firstName},</p>
+          <p>Nous avons bien reçu votre demande de ré-réservation pour votre voyage précédemment annulé.</p>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4A90E2;">
+            <h3 style="margin-top: 0; color: #4A90E2;">Détails de votre demande</h3>
+            <p><strong>Numéro de confirmation (annulé):</strong> ${confirmationNumber}</p>
+            <p><strong>Destination:</strong> ${destination}</p>
+          </div>
+          
+          <div style="background-color: #E8F5E9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4CAF50;">
+            <p style="margin: 0;"><strong>📧 Prochaines étapes:</strong></p>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+              <li>Notre équipe support va examiner votre demande</li>
+              <li>Nous vérifierons la disponibilité pour votre destination</li>
+              <li>Vous recevrez un email de confirmation dans les 24-48 heures</li>
+            </ul>
+          </div>
+          
+          <p>Si vous avez des questions ou souhaitez modifier votre demande, n'hésitez pas à nous contacter.</p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          <p style="font-size: 12px; color: #777;">Cordialement,<br>L'équipe WayFinder</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      Confirmation de demande de ré-réservation
+      
+      Bonjour ${firstName},
+      
+      Nous avons bien reçu votre demande de ré-réservation pour votre voyage précédemment annulé.
+      
+      Détails de votre demande:
+      - Numéro de confirmation (annulé): ${confirmationNumber}
+      - Destination: ${destination}
+      
+      Prochaines étapes:
+      - Notre équipe support va examiner votre demande
+      - Nous vérifierons la disponibilité pour votre destination
+      - Vous recevrez un email de confirmation dans les 24-48 heures
+      
+      Si vous avez des questions ou souhaitez modifier votre demande, n'hésitez pas à nous contacter.
+      
+      Cordialement,
+      L'équipe WayFinder
+    `;
+
+    if (this.useMailjet) {
+      await this.sendViaMailjet(
+        email,
+        'Confirmation de demande de ré-réservation WayFinder',
+        htmlContent,
+        textContent,
+      );
+    } else {
+      await this.sendViaSMTP(
+        email,
+        'Confirmation de demande de ré-réservation WayFinder',
+        htmlContent,
+        textContent,
+        fromEmail,
       );
     }
   }
