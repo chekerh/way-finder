@@ -701,9 +701,45 @@ export class SocialService {
     );
     
     if (trips.length === 0) {
-      this.logger.warn(`[MapMemories] No trips found for user ${userId}. This may be normal if the user has not shared any trips yet.`);
+      this.logger.warn(`[MapMemories] No trips found for user ${userId}. Checking database...`);
+      
+      // Debug: Check if there are any trips at all for this user (without filters)
+      const allSharedTrips = await this.sharedTripModel.find({ userId: userIdObjectId }).exec();
+      const allJourneys = await this.journeyModel.find({ user_id: userIdObjectId }).exec();
+      
+      this.logger.warn(
+        `[MapMemories] Debug - Total shared trips (no filters): ${allSharedTrips.length}, Total journeys (no filters): ${allJourneys.length}`,
+      );
+      
+      if (allSharedTrips.length > 0) {
+        this.logger.warn(
+          `[MapMemories] Debug - Shared trips details: ${JSON.stringify(
+            allSharedTrips.map((t: any) => ({
+              id: t._id,
+              isVisible: t.isVisible,
+              isPublic: t.isPublic,
+              userId: t.userId,
+            })),
+          )}`,
+        );
+      }
+      
+      if (allJourneys.length > 0) {
+        this.logger.warn(
+          `[MapMemories] Debug - Journeys details: ${JSON.stringify(
+            allJourneys.map((j: any) => ({
+              id: j._id,
+              is_visible: j.is_visible,
+              is_public: j.is_public,
+              user_id: j.user_id,
+            })),
+          )}`,
+        );
+      }
+      
       return {
         countries: [],
+        memories: [],
         totalCountries: 0,
         totalMemories: 0,
       };
