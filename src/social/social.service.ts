@@ -906,9 +906,82 @@ export class SocialService {
       }
     >();
 
+    // Helper function to convert destination code (e.g., "WF-BCN-001") to country
+    const convertDestinationCodeToCountry = (code: string): string | null => {
+      if (!code || !code.startsWith('WF-')) return null;
+      
+      // Extract airport code from format "WF-XXX-001"
+      const parts = code.split('-');
+      if (parts.length < 2) return null;
+      
+      const airportCode = parts[1].toUpperCase();
+      
+      // Mapping airport codes to countries (matching iOS DestinationHelper)
+      const airportToCountry: Record<string, string> = {
+        // Spain
+        BCN: 'Spain', // Barcelona
+        MAD: 'Spain', // Madrid
+        // France
+        CDG: 'France', // Paris
+        ORY: 'France', // Paris
+        // United Kingdom
+        LHR: 'United Kingdom', // London
+        LGW: 'United Kingdom', // London
+        // United States
+        JFK: 'United States', // New York
+        LGA: 'United States', // New York
+        LAX: 'United States', // Los Angeles
+        // UAE
+        DXB: 'United Arab Emirates', // Dubai
+        // Italy
+        FCO: 'Italy', // Rome
+        // Netherlands
+        AMS: 'Netherlands', // Amsterdam
+        // Germany
+        FRA: 'Germany', // Frankfurt
+        MUC: 'Germany', // Munich
+        // Turkey
+        IST: 'Turkey', // Istanbul
+        // Egypt
+        CAI: 'Egypt', // Cairo
+        // Tunisia
+        TUN: 'Tunisia', // Tunis
+        // Japan
+        NRT: 'Japan', // Tokyo
+        HND: 'Japan', // Tokyo
+        // South Korea
+        ICN: 'South Korea', // Seoul
+        // China
+        PEK: 'China', // Beijing
+        PKX: 'China', // Beijing
+        PVG: 'China', // Shanghai
+        // Singapore
+        SIN: 'Singapore', // Singapore
+        // Thailand
+        BKK: 'Thailand', // Bangkok
+        // Australia
+        SYD: 'Australia', // Sydney
+        MEL: 'Australia', // Melbourne
+      };
+      
+      const country = airportToCountry[airportCode];
+      if (country) {
+        this.logger.debug(`Converted destination code "${code}" (airport: ${airportCode}) to country: ${country}`);
+        return country;
+      }
+      
+      return null;
+    };
+
     // Helper function to extract country from text
     const extractCountryFromText = (text: string): string | null => {
       if (!text) return null;
+      
+      // First, check if it's a destination code (e.g., "WF-BCN-001")
+      const countryFromCode = convertDestinationCodeToCountry(text);
+      if (countryFromCode) {
+        return countryFromCode;
+      }
       
       // Normalize text: remove extra spaces, convert to lowercase, trim
       const normalizedText = text
