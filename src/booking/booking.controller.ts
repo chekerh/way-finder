@@ -137,6 +137,16 @@ export class BookingController {
     return this.bookingService.cancel(req.user.sub, id);
   }
 
+  /**
+   * Request to rebook a cancelled booking
+   * Sends emails to customer support and user
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/rebook')
+  async requestRebooking(@Req() req: any, @Param('id') id: string) {
+    return this.bookingService.requestRebooking(req.user.sub, id);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Delete(':id/permanent')
   async delete(@Req() req: any, @Param('id') id: string) {
