@@ -71,7 +71,8 @@ export class AuthService {
     // Check if username already exists
     const existing = await this.userService.findByUsername(username);
     if (existing) {
-      const userId = (existing as any)._id || (existing as any).id || 'unknown';
+      const userId =
+        (existing as any)._id?.toString() || existing.username || 'unknown';
       this.logger.warn(
         `Username conflict: ${username} already exists (user ID: ${userId})`,
       );
@@ -82,7 +83,9 @@ export class AuthService {
     const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) {
       const userId =
-        (existingEmail as any)._id || (existingEmail as any).id || 'unknown';
+        (existingEmail as any)._id?.toString() ||
+        existingEmail.username ||
+        'unknown';
       this.logger.warn(
         `Email conflict: ${email} already exists (user ID: ${userId})`,
       );
@@ -125,26 +128,27 @@ export class AuthService {
       }
 
       const userObj = (user as any).toObject ? (user as any).toObject() : user;
-      const { password: _password, ...result } = userObj;
+      const { password, ...result } = userObj;
       return {
         message:
           'User registered successfully. Please check your email to verify your account.',
         user: result,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle MongoDB duplicate key errors
-      if (error.code === 11000) {
+      const errorObj = error as any; // Type assertion for MongoDB error
+      if (errorObj?.code === 11000) {
         // MongoDB duplicate key error
         let duplicateField: string | null = null;
 
         // Try to get the field from keyPattern
-        if (error.keyPattern) {
-          duplicateField = Object.keys(error.keyPattern)[0];
+        if (errorObj.keyPattern) {
+          duplicateField = Object.keys(errorObj.keyPattern)[0];
         }
 
         // If not found, try to extract from error message
-        if (!duplicateField && error.message) {
-          const message = error.message.toLowerCase();
+        if (!duplicateField && errorObj.message) {
+          const message = errorObj.message.toLowerCase();
           if (message.includes('email') || message.includes('email_1')) {
             duplicateField = 'email';
           } else if (

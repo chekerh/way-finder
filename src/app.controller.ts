@@ -186,7 +186,7 @@ export class AppController {
       } else {
         results.jwt = { status: 'not_configured' };
       }
-    } catch (error) {
+    } catch {
       results.jwt = { status: 'error' };
     }
 
