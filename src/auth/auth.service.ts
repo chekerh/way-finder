@@ -119,15 +119,18 @@ export class AuthService {
           emailVerificationToken,
           firstName,
         );
-      } catch (error) {
+      } catch (error: unknown) {
         // Log error but don't fail registration if email fails
-        this.logger.error(
-          'Failed to send verification email',
-          error.stack || error,
-        );
+        const errorMessage =
+          error instanceof Error ? error.stack || error.message : String(error);
+        this.logger.error('Failed to send verification email', errorMessage);
       }
 
-      const userObj = (user as any).toObject ? (user as any).toObject() : user;
+      // Safely extract user data without password
+      const userObj =
+        typeof (user as any).toObject === 'function'
+          ? (user as any).toObject()
+          : user;
       const { password, ...result } = userObj;
       return {
         message:
