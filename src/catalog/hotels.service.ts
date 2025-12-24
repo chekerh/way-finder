@@ -51,68 +51,68 @@ export class HotelsService {
    */
   private cityNameToCode(cityName: string): string {
     const cityMappings: Record<string, string> = {
-      'paris': 'PAR',
-      'london': 'LON',
-      'londres': 'LON',
-      'rome': 'ROM',
-      'roma': 'ROM',
-      'barcelona': 'BCN',
-      'barcelone': 'BCN',
-      'dubai': 'DXB',
+      paris: 'PAR',
+      london: 'LON',
+      londres: 'LON',
+      rome: 'ROM',
+      roma: 'ROM',
+      barcelona: 'BCN',
+      barcelone: 'BCN',
+      dubai: 'DXB',
       'new york': 'NYC',
       'new york city': 'NYC',
-      'nyc': 'NYC',
-      'tokyo': 'TYO',
-      'amsterdam': 'AMS',
-      'madrid': 'MAD',
-      'berlin': 'BER',
-      'munich': 'MUC',
-      'vienna': 'VIE',
-      'vienne': 'VIE',
-      'lisbon': 'LIS',
-      'lisbonne': 'LIS',
-      'athens': 'ATH',
-      'athènes': 'ATH',
-      'istanbul': 'IST',
-      'bangkok': 'BKK',
-      'singapore': 'SIN',
-      'singapour': 'SIN',
-      'tunis': 'TUN',
-      'tunisia': 'TUN',
-      'cairo': 'CAI',
-      'doha': 'DOH',
+      nyc: 'NYC',
+      tokyo: 'TYO',
+      amsterdam: 'AMS',
+      madrid: 'MAD',
+      berlin: 'BER',
+      munich: 'MUC',
+      vienna: 'VIE',
+      vienne: 'VIE',
+      lisbon: 'LIS',
+      lisbonne: 'LIS',
+      athens: 'ATH',
+      athènes: 'ATH',
+      istanbul: 'IST',
+      bangkok: 'BKK',
+      singapore: 'SIN',
+      singapour: 'SIN',
+      tunis: 'TUN',
+      tunisia: 'TUN',
+      cairo: 'CAI',
+      doha: 'DOH',
       'abu dhabi': 'AUH',
-      'riyadh': 'RUH',
-      'jeddah': 'JED',
-      'mumbai': 'BOM',
-      'delhi': 'DEL',
-      'bangalore': 'BLR',
-      'sydney': 'SYD',
-      'melbourne': 'MEL',
-      'toronto': 'YYZ',
-      'montreal': 'YUL',
-      'vancouver': 'YVR',
+      riyadh: 'RUH',
+      jeddah: 'JED',
+      mumbai: 'BOM',
+      delhi: 'DEL',
+      bangalore: 'BLR',
+      sydney: 'SYD',
+      melbourne: 'MEL',
+      toronto: 'YYZ',
+      montreal: 'YUL',
+      vancouver: 'YVR',
     };
 
     const normalized = cityName.toLowerCase().trim();
-    
+
     // Try exact match first
     if (cityMappings[normalized]) {
       return cityMappings[normalized];
     }
-    
+
     // Try partial match (contains)
     for (const [key, code] of Object.entries(cityMappings)) {
       if (normalized.includes(key) || key.includes(normalized)) {
         return code;
       }
     }
-    
+
     // If it's already a 3-letter code, return uppercase
     if (normalized.length === 3 && /^[A-Za-z]{3}$/.test(normalized)) {
       return normalized.toUpperCase();
     }
-    
+
     // Fallback to PAR
     return 'PAR';
   }
@@ -138,9 +138,13 @@ export class HotelsService {
 
     try {
       const response = await lastValueFrom(
-        this.http.post(`${this.host}/v1/security/oauth2/token`, body.toString(), {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        }),
+        this.http.post(
+          `${this.host}/v1/security/oauth2/token`,
+          body.toString(),
+          {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          },
+        ),
       );
 
       this.cachedToken = response.data.access_token;
@@ -148,7 +152,9 @@ export class HotelsService {
       return this.cachedToken as string;
     } catch (error) {
       this.logger.error('Failed to fetch Amadeus token', error);
-      throw new InternalServerErrorException('Failed to authenticate with Amadeus');
+      throw new InternalServerErrorException(
+        'Failed to authenticate with Amadeus',
+      );
     }
   }
 
@@ -161,21 +167,23 @@ export class HotelsService {
     let cityCode = params.cityCode;
     if (!cityCode && params.cityName) {
       cityCode = this.cityNameToCode(params.cityName);
-      this.logger.debug(`Converted city name "${params.cityName}" to city code "${cityCode}"`);
+      this.logger.debug(
+        `Converted city name "${params.cityName}" to city code "${cityCode}"`,
+      );
     }
     if (!cityCode) {
       cityCode = 'PAR'; // Default fallback
     }
-    
+
     // Update params with resolved city code
     const searchParams: HotelSearchDto = {
       ...params,
       cityCode: cityCode.toUpperCase(),
       cityName: undefined, // Clear cityName since we're using cityCode
     };
-    
+
     const cacheKey = `hotels:search:${JSON.stringify(searchParams)}`;
-    
+
     // Check cache first
     const cached = await this.cacheService.get<HotelSearchResponse>(cacheKey);
     if (cached) {
@@ -190,7 +198,7 @@ export class HotelsService {
 
     try {
       const accessToken = await this.getAccessToken();
-      
+
       // Step 1: Get hotel IDs by city
       const hotelListUrl = `${this.host}/v1/reference-data/locations/hotels/by-city`;
       const hotelListResponse = await lastValueFrom(
@@ -206,35 +214,55 @@ export class HotelsService {
       );
 
       const rawHotels = hotelListResponse.data?.data || [];
-      
+
       // Map Amadeus hotels to ensure they have 'id' field (required by Android)
       // Amadeus provides real hotel names and data, so we preserve them
       // Map and normalize Amadeus hotels
       let hotels: Hotel[] = rawHotels.map((hotel: any) => {
-        const hotelName = (hotel.name || hotel.hotelName || `Hotel ${hotel.hotelId}`).toLowerCase();
-        
+        const hotelName = (
+          hotel.name ||
+          hotel.hotelName ||
+          `Hotel ${hotel.hotelId}`
+        ).toLowerCase();
+
         // Infer accommodation type from hotel name and characteristics
         let inferredType = 'HOTEL'; // Default
-        if (hotelName.includes('resort') || hotelName.includes('spa') || hotelName.includes('beach')) {
+        if (
+          hotelName.includes('resort') ||
+          hotelName.includes('spa') ||
+          hotelName.includes('beach')
+        ) {
           inferredType = 'RESORT';
-        } else if (hotelName.includes('hostel') || hotelName.includes('backpacker')) {
+        } else if (
+          hotelName.includes('hostel') ||
+          hotelName.includes('backpacker')
+        ) {
           inferredType = 'HOSTEL';
-        } else if (hotelName.includes('apartment') || hotelName.includes('apart') || hotelName.includes('suite')) {
+        } else if (
+          hotelName.includes('apartment') ||
+          hotelName.includes('apart') ||
+          hotelName.includes('suite')
+        ) {
           inferredType = 'APARTMENT';
         } else if (hotelName.includes('airbnb') || hotelName.includes('bnb')) {
           inferredType = 'APARTMENT'; // Airbnb-like properties
         }
-        
+
         return {
           ...hotel,
-          id: hotel.id || hotel.hotelId || `hotel-${hotel.hotelId || Date.now()}-${Math.random()}`,
+          id:
+            hotel.id ||
+            hotel.hotelId ||
+            `hotel-${hotel.hotelId || Date.now()}-${Math.random()}`,
           hotelId: hotel.hotelId || hotel.id || '',
           // Preserve real hotel name from Amadeus (don't override)
           name: hotel.name || hotel.hotelName || `Hotel ${hotel.hotelId}`,
           // Infer type from name or use provided type
           type: hotel.type || inferredType,
           // Set default pricePerNight if missing (for fallback compatibility)
-          pricePerNight: hotel.pricePerNight || (hotel.price?.base ? parseFloat(hotel.price.base) : undefined),
+          pricePerNight:
+            hotel.pricePerNight ||
+            (hotel.price?.base ? parseFloat(hotel.price.base) : undefined),
           currency: hotel.currency || hotel.price?.currency || 'EUR',
           // Preserve any media/images from Amadeus if available
           media: hotel.media || hotel.images || undefined,
@@ -244,12 +272,19 @@ export class HotelsService {
       // Filter out obvious test/sandbox properties from Amadeus (e.g. "HN TEST PROPERTY1 FOR E2E TESTING")
       hotels = hotels.filter((h) => {
         const name = (h.name || '').toLowerCase();
-        return !name.includes('test property') && !name.includes('e2e testing') && !name.includes('sandbox');
+        return (
+          !name.includes('test property') &&
+          !name.includes('e2e testing') &&
+          !name.includes('sandbox')
+        );
       });
-      
+
       // Apply accommodation type filtering (hotel, airbnb, hostel, resort, apartment)
       if (params.accommodationType) {
-        hotels = this.filterByAccommodationType(hotels, params.accommodationType);
+        hotels = this.filterByAccommodationType(
+          hotels,
+          params.accommodationType,
+        );
       }
 
       // Apply trip type filtering
@@ -281,14 +316,17 @@ export class HotelsService {
       // Ensure all hotels have required 'id' field before returning
       let mappedHotels: Hotel[] = hotels.map((h) => ({
         ...h,
-        id: h.id || h.hotelId || `hotel-${h.hotelId || Date.now()}-${Math.random()}`,
+        id:
+          h.id ||
+          h.hotelId ||
+          `hotel-${h.hotelId || Date.now()}-${Math.random()}`,
         hotelId: h.hotelId || h.id || '',
       }));
 
       // Enrich hotels with images from free APIs (Pixabay/Unsplash)
       this.logger.debug(`Enriching ${mappedHotels.length} hotels with images`);
       mappedHotels = await Promise.all(
-        mappedHotels.map((hotel) => this.enrichWithImages(hotel, cityCode))
+        mappedHotels.map((hotel) => this.enrichWithImages(hotel, cityCode)),
       );
 
       const result: HotelSearchResponse = {
@@ -301,7 +339,7 @@ export class HotelsService {
 
       // Cache for 30 minutes (only cache non-empty results)
       await this.cacheService.set(cacheKey, result, 1800);
-      
+
       return result;
     } catch (error) {
       this.logger.error('Failed to search hotels from Amadeus', error);
@@ -321,7 +359,7 @@ export class HotelsService {
     currency: string = 'EUR',
   ): Promise<HotelOffersResponse> {
     const cacheKey = `hotels:offers:${hotelIds.join(',')}:${checkInDate}:${checkOutDate}`;
-    
+
     const cached = await this.cacheService.get<HotelOffersResponse>(cacheKey);
     if (cached) {
       return cached;
@@ -333,7 +371,7 @@ export class HotelsService {
 
     try {
       const accessToken = await this.getAccessToken();
-      
+
       const offersUrl = `${this.host}/v3/shopping/hotel-offers`;
       const response = await lastValueFrom(
         this.http.get(offersUrl, {
@@ -359,7 +397,7 @@ export class HotelsService {
 
       // Cache for 15 minutes (prices change frequently)
       await this.cacheService.set(cacheKey, result, 900);
-      
+
       return result;
     } catch (error) {
       this.logger.error('Failed to get hotel offers from Amadeus', error);
@@ -372,7 +410,7 @@ export class HotelsService {
    */
   async getHotelById(hotelId: string): Promise<Hotel | null> {
     const cacheKey = `hotels:detail:${hotelId}`;
-    
+
     const cached = await this.cacheService.get<Hotel>(cacheKey);
     if (cached) {
       return cached;
@@ -401,7 +439,7 @@ export class HotelsService {
     try {
       const cityName = hotel.address?.cityName || cityCode;
       const searchQuery = `${hotel.name} ${cityName} hotel`.trim();
-      
+
       // Try Pixabay first if API key is available
       if (this.pixabayKey) {
         try {
@@ -426,7 +464,9 @@ export class HotelsService {
               category: index === 0 ? 'EXTERIOR' : 'INTERIOR',
             }));
             hotel.media = media;
-            this.logger.debug(`Found ${media.length} images from Pixabay for ${hotel.name}`);
+            this.logger.debug(
+              `Found ${media.length} images from Pixabay for ${hotel.name}`,
+            );
             return hotel;
           }
         } catch (error) {
@@ -454,10 +494,12 @@ export class HotelsService {
       // Return hotel with default image
       if (!hotel.media || hotel.media.length === 0) {
         const cityName = hotel.address?.cityName || 'hotel';
-        hotel.media = [{
-          uri: `https://source.unsplash.com/800x600/?hotel,${cityName.replace(/\s+/g, ',')}`,
-          category: 'EXTERIOR',
-        }];
+        hotel.media = [
+          {
+            uri: `https://source.unsplash.com/800x600/?hotel,${cityName.replace(/\s+/g, ',')}`,
+            category: 'EXTERIOR',
+          },
+        ];
       }
       return hotel;
     }
@@ -476,7 +518,10 @@ export class HotelsService {
    * Filter hotels by accommodation type (hotel, airbnb, hostel, resort, apartment)
    * Improved filtering logic to better match each accommodation type
    */
-  private filterByAccommodationType(hotels: Hotel[], accommodationType: string): Hotel[] {
+  private filterByAccommodationType(
+    hotels: Hotel[],
+    accommodationType: string,
+  ): Hotel[] {
     const typeLower = accommodationType.toLowerCase();
     const typeMap: Record<string, string[]> = {
       hotel: ['HOTEL'],
@@ -487,70 +532,103 @@ export class HotelsService {
     };
 
     const allowedTypes = typeMap[typeLower] || ['HOTEL'];
-    
+
     return hotels.filter((h) => {
       const hotelType = (h as any).type?.toUpperCase();
       const hotelName = (h.name || '').toLowerCase();
       const rating = h.rating || 0;
       const amenities = h.amenities || [];
-      
+
       // First, check explicit type match
       if (hotelType && allowedTypes.includes(hotelType)) {
         return true;
       }
-      
+
       // For each accommodation type, apply specific filtering logic
       switch (typeLower) {
         case 'hotel':
           // Include all hotels (default)
-          return !hotelType || hotelType === 'HOTEL' || !['HOSTEL', 'RESORT', 'APARTMENT'].includes(hotelType);
-          
+          return (
+            !hotelType ||
+            hotelType === 'HOTEL' ||
+            !['HOSTEL', 'RESORT', 'APARTMENT'].includes(hotelType)
+          );
+
         case 'airbnb':
         case 'apartment':
           // Include apartments, or hotels with apartment-like names/characteristics
           if (hotelType === 'APARTMENT') return true;
-          if (hotelName.includes('apartment') || hotelName.includes('apart') || 
-              hotelName.includes('suite') || hotelName.includes('studio') ||
-              hotelName.includes('airbnb') || hotelName.includes('bnb')) {
+          if (
+            hotelName.includes('apartment') ||
+            hotelName.includes('apart') ||
+            hotelName.includes('suite') ||
+            hotelName.includes('studio') ||
+            hotelName.includes('airbnb') ||
+            hotelName.includes('bnb')
+          ) {
             return true;
           }
           // Include smaller hotels (lower rating might indicate smaller properties)
           return rating <= 4 && rating > 0;
-          
+
         case 'hostel':
           // Include hostels, or budget hotels with shared facilities
           if (hotelType === 'HOSTEL') return true;
-          if (hotelName.includes('hostel') || hotelName.includes('backpacker') ||
-              hotelName.includes('youth') || hotelName.includes('dormitory')) {
+          if (
+            hotelName.includes('hostel') ||
+            hotelName.includes('backpacker') ||
+            hotelName.includes('youth') ||
+            hotelName.includes('dormitory')
+          ) {
             return true;
           }
           // Budget hotels (lower rating, lower price)
           if (rating <= 3 && rating > 0) return true;
           // Hotels with shared facilities
-          if (amenities.some((a: string) => 
-            ['SHARED_KITCHEN', 'DORMITORY', 'COMMON_ROOM'].includes(a.toUpperCase()))) {
+          if (
+            amenities.some((a: string) =>
+              ['SHARED_KITCHEN', 'DORMITORY', 'COMMON_ROOM'].includes(
+                a.toUpperCase(),
+              ),
+            )
+          ) {
             return true;
           }
           return false;
-          
+
         case 'resort':
           // Include resorts, or hotels with resort-like amenities
           if (hotelType === 'RESORT') return true;
-          if (hotelName.includes('resort') || hotelName.includes('spa') ||
-              hotelName.includes('beach') || hotelName.includes('golf')) {
+          if (
+            hotelName.includes('resort') ||
+            hotelName.includes('spa') ||
+            hotelName.includes('beach') ||
+            hotelName.includes('golf')
+          ) {
             return true;
           }
           // Hotels with resort amenities (pool, spa, beach access, etc.)
-          const resortAmenities = ['POOL', 'SPA', 'BEACH_ACCESS', 'GOLF', 'TENNIS', 
-                                   'FITNESS_CENTER', 'RESTAURANT', 'BAR'];
-          if (amenities.some((a: string) => 
-            resortAmenities.some(ra => a.toUpperCase().includes(ra)))) {
+          const resortAmenities = [
+            'POOL',
+            'SPA',
+            'BEACH_ACCESS',
+            'GOLF',
+            'TENNIS',
+            'FITNESS_CENTER',
+            'RESTAURANT',
+            'BAR',
+          ];
+          if (
+            amenities.some((a: string) =>
+              resortAmenities.some((ra) => a.toUpperCase().includes(ra)),
+            )
+          ) {
             return true;
           }
           // Higher-rated hotels are more likely to be resorts
           if (rating >= 4) return true;
           return false;
-          
+
         default:
           // Default: include all
           return true;
@@ -566,16 +644,22 @@ export class HotelsService {
     const filters: Record<TripType, (h: Hotel) => boolean> = {
       business: (h) => {
         // Less strict: rating >= 3 OR has business amenities OR has wifi
-        return (h.rating || 0) >= 3 || 
-               h.amenities?.some((a) => ['BUSINESS_CENTER', 'WIFI', 'MEETING_ROOMS'].includes(a)) ||
-               h.amenities?.some((a) => a.includes('WIFI')) ||
-               !h.rating; // Include hotels without rating
+        return (
+          (h.rating || 0) >= 3 ||
+          h.amenities?.some((a) =>
+            ['BUSINESS_CENTER', 'WIFI', 'MEETING_ROOMS'].includes(a),
+          ) ||
+          h.amenities?.some((a) => a.includes('WIFI')) ||
+          !h.rating
+        ); // Include hotels without rating
       },
       honeymoon: (h) => {
         // Less strict: rating >= 3 OR has romantic amenities OR no rating
-        return (h.rating || 0) >= 3 || 
-               h.amenities?.some((a) => ['SPA', 'POOL', 'RESTAURANT'].includes(a)) ||
-               !h.rating;
+        return (
+          (h.rating || 0) >= 3 ||
+          h.amenities?.some((a) => ['SPA', 'POOL', 'RESTAURANT'].includes(a)) ||
+          !h.rating
+        );
       },
       family: (h) => {
         // Include all hotels
@@ -589,10 +673,13 @@ export class HotelsService {
       },
       wellness: (h) => {
         // Less strict: has wellness amenities OR rating >= 3 OR no rating
-        return h.amenities?.some((a) => 
-          ['SPA', 'GYM', 'POOL', 'SAUNA'].includes(a)) || 
+        return (
+          h.amenities?.some((a) =>
+            ['SPA', 'GYM', 'POOL', 'SAUNA'].includes(a),
+          ) ||
           (h.rating || 0) >= 3 ||
-          !h.rating;
+          !h.rating
+        );
       },
       backpacking: (h) => {
         // Less strict: rating <= 4 OR no rating (more budget options)
@@ -602,7 +689,7 @@ export class HotelsService {
 
     const filterFn = filters[tripType] || (() => true);
     const filtered = hotels.filter(filterFn);
-    
+
     // If filtering results in empty list, return all hotels instead
     if (filtered.length === 0 && hotels.length > 0) {
       this.logger.warn(
@@ -610,7 +697,7 @@ export class HotelsService {
       );
       return hotels;
     }
-    
+
     return filtered;
   }
 
@@ -629,33 +716,41 @@ export class HotelsService {
     }
 
     if (params.accommodationType) {
-      hotels = this.filterByAccommodationType(hotels, params.accommodationType) as FallbackHotel[];
+      hotels = this.filterByAccommodationType(
+        hotels,
+        params.accommodationType,
+      ) as FallbackHotel[];
     }
 
     if (params.tripType) {
-      hotels = this.filterByTripType(hotels, params.tripType) as FallbackHotel[];
+      hotels = this.filterByTripType(
+        hotels,
+        params.tripType,
+      ) as FallbackHotel[];
     }
 
     // Explicitly map to ensure all required fields are present (especially 'id')
-    const mappedHotels: Hotel[] = hotels.slice(0, params.limit || 20).map((h) => ({
-      id: h.id || h.hotelId || `fallback-${h.hotelId}`,
-      hotelId: h.hotelId,
-      name: h.name,
-      cityCode: h.cityCode,
-      address: h.address,
-      geoCode: h.geoCode,
-      rating: h.rating,
-      amenities: h.amenities,
-      media: h.media,
-      description: h.description,
-      googleRating: h.googleRating,
-      googleReviewCount: h.googleReviewCount,
-      googlePlaceId: h.googlePlaceId,
-      // Include fallback-specific fields
-      type: (h as any).type || 'HOTEL',
-      pricePerNight: (h as any).pricePerNight,
-      currency: (h as any).currency || 'EUR',
-    }));
+    const mappedHotels: Hotel[] = hotels
+      .slice(0, params.limit || 20)
+      .map((h) => ({
+        id: h.id || h.hotelId || `fallback-${h.hotelId}`,
+        hotelId: h.hotelId,
+        name: h.name,
+        cityCode: h.cityCode,
+        address: h.address,
+        geoCode: h.geoCode,
+        rating: h.rating,
+        amenities: h.amenities,
+        media: h.media,
+        description: h.description,
+        googleRating: h.googleRating,
+        googleReviewCount: h.googleReviewCount,
+        googlePlaceId: h.googlePlaceId,
+        // Include fallback-specific fields
+        type: (h as any).type || 'HOTEL',
+        pricePerNight: (h as any).pricePerNight,
+        currency: (h as any).currency || 'EUR',
+      }));
 
     return {
       data: mappedHotels,
@@ -675,46 +770,48 @@ export class HotelsService {
     checkOutDate: string,
   ): HotelOffersResponse {
     const nights = this.calculateNights(checkInDate, checkOutDate);
-    
-    const offers = hotelIds.map((hotelId) => {
-      const hotel = FALLBACK_HOTELS.find((h) => h.hotelId === hotelId);
-      if (!hotel) return null;
 
-      const basePrice = hotel.pricePerNight || 100;
-      const totalPrice = basePrice * nights;
+    const offers = hotelIds
+      .map((hotelId) => {
+        const hotel = FALLBACK_HOTELS.find((h) => h.hotelId === hotelId);
+        if (!hotel) return null;
 
-      return {
-        hotel,
-        offers: [
-          {
-            id: `offer-${hotelId}-1`,
-            hotelId,
-            roomType: 'STANDARD',
-            roomDescription: 'Standard Room with city view',
-            bedType: 'DOUBLE',
-            price: {
-              currency: hotel.currency || 'EUR',
-              base: basePrice.toFixed(2),
-              total: totalPrice.toFixed(2),
+        const basePrice = hotel.pricePerNight || 100;
+        const totalPrice = basePrice * nights;
+
+        return {
+          hotel,
+          offers: [
+            {
+              id: `offer-${hotelId}-1`,
+              hotelId,
+              roomType: 'STANDARD',
+              roomDescription: 'Standard Room with city view',
+              bedType: 'DOUBLE',
+              price: {
+                currency: hotel.currency || 'EUR',
+                base: basePrice.toFixed(2),
+                total: totalPrice.toFixed(2),
+              },
+              guests: { adults: 2 },
             },
-            guests: { adults: 2 },
-          },
-          {
-            id: `offer-${hotelId}-2`,
-            hotelId,
-            roomType: 'DELUXE',
-            roomDescription: 'Deluxe Room with premium amenities',
-            bedType: 'KING',
-            price: {
-              currency: hotel.currency || 'EUR',
-              base: (basePrice * 1.5).toFixed(2),
-              total: (totalPrice * 1.5).toFixed(2),
+            {
+              id: `offer-${hotelId}-2`,
+              hotelId,
+              roomType: 'DELUXE',
+              roomDescription: 'Deluxe Room with premium amenities',
+              bedType: 'KING',
+              price: {
+                currency: hotel.currency || 'EUR',
+                base: (basePrice * 1.5).toFixed(2),
+                total: (totalPrice * 1.5).toFixed(2),
+              },
+              guests: { adults: 2 },
             },
-            guests: { adults: 2 },
-          },
-        ] as HotelOffer[],
-      };
-    }).filter(Boolean);
+          ] as HotelOffer[],
+        };
+      })
+      .filter(Boolean);
 
     return {
       data: offers as any[],
@@ -744,7 +841,13 @@ const FALLBACK_HOTELS: FallbackHotel[] = [
     type: 'HOTEL',
     pricePerNight: 180,
     currency: 'EUR',
-    amenities: ['WIFI', 'RESTAURANT', 'BAR', 'ROOM_SERVICE', 'AIR_CONDITIONING'],
+    amenities: [
+      'WIFI',
+      'RESTAURANT',
+      'BAR',
+      'ROOM_SERVICE',
+      'AIR_CONDITIONING',
+    ],
     address: {
       lines: ['15 Rue de Rivoli'],
       cityName: 'Paris',
@@ -784,9 +887,17 @@ const FALLBACK_HOTELS: FallbackHotel[] = [
     type: 'RESORT',
     pricePerNight: 650,
     currency: 'EUR',
-    amenities: ['WIFI', 'POOL', 'SPA', 'RESTAURANT', 'BAR', 'GYM', 'ROOM_SERVICE'],
+    amenities: [
+      'WIFI',
+      'POOL',
+      'SPA',
+      'RESTAURANT',
+      'BAR',
+      'GYM',
+      'ROOM_SERVICE',
+    ],
     address: {
-      lines: ['10 Avenue d\'Iéna'],
+      lines: ["10 Avenue d'Iéna"],
       cityName: 'Paris',
       countryCode: 'FR',
     },
@@ -907,14 +1018,21 @@ const FALLBACK_HOTELS: FallbackHotel[] = [
     type: 'RESORT',
     pricePerNight: 1500,
     currency: 'EUR',
-    amenities: ['WIFI', 'POOL', 'SPA', 'RESTAURANT', 'BUTLER_SERVICE', 'HELIPAD'],
+    amenities: [
+      'WIFI',
+      'POOL',
+      'SPA',
+      'RESTAURANT',
+      'BUTLER_SERVICE',
+      'HELIPAD',
+    ],
     address: {
       lines: ['Jumeirah Beach Road'],
       cityName: 'Dubai',
       countryCode: 'AE',
     },
     geoCode: { latitude: 25.1412, longitude: 55.1852 },
-    description: 'The world\'s most luxurious hotel on its own island',
+    description: "The world's most luxurious hotel on its own island",
     googleRating: 4.8,
     googleReviewCount: 5600,
   },
@@ -948,7 +1066,15 @@ const FALLBACK_HOTELS: FallbackHotel[] = [
     type: 'HOTEL',
     pricePerNight: 550,
     currency: 'GBP',
-    amenities: ['WIFI', 'POOL', 'SPA', 'RESTAURANT', 'BAR', 'GYM', 'BUTLER_SERVICE'],
+    amenities: [
+      'WIFI',
+      'POOL',
+      'SPA',
+      'RESTAURANT',
+      'BAR',
+      'GYM',
+      'BUTLER_SERVICE',
+    ],
     address: {
       lines: ['Strand'],
       cityName: 'London',
@@ -1105,4 +1231,3 @@ const FALLBACK_HOTELS: FallbackHotel[] = [
     googleReviewCount: 540,
   },
 ];
-

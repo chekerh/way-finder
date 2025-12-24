@@ -163,4 +163,3 @@ export interface FallbackHotel extends Hotel {
   currency: string;
   type: 'HOTEL' | 'HOSTEL' | 'RESORT' | 'APARTMENT' | 'CAMPING';
 }
-

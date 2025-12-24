@@ -33,12 +33,12 @@ class GenerateVideoWithMediaDto {
   @IsOptional()
   @IsString()
   prompt?: string;
-  
+
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   images?: string[];
-  
+
   @IsOptional()
   @IsString()
   musicTrackId?: string;
@@ -228,21 +228,31 @@ export class AiTravelVideoController {
    */
   @UseGuards(JwtAuthGuard)
   @Post('generate-with-media')
-  async generateVideoWithMedia(@Req() req: any, @Body() body: GenerateVideoWithMediaDto) {
+  async generateVideoWithMedia(
+    @Req() req: any,
+    @Body() body: GenerateVideoWithMediaDto,
+  ) {
     const userId = req.user.sub;
 
     const hasImages = Array.isArray(body.images) && body.images.length > 0;
 
-    if ((!body.prompt || typeof body.prompt !== 'string' || body.prompt.trim().length === 0) && !hasImages) {
-      throw new BadRequestException('Please provide a prompt or at least one image.');
+    if (
+      (!body.prompt ||
+        typeof body.prompt !== 'string' ||
+        body.prompt.trim().length === 0) &&
+      !hasImages
+    ) {
+      throw new BadRequestException(
+        'Please provide a prompt or at least one image.',
+      );
     }
 
     const promptToUse =
       body.prompt && body.prompt.trim().length > 0
         ? body.prompt
         : hasImages
-        ? `Travel memories video created from ${body.images!.length} personal photos.`
-        : body.prompt || '';
+          ? `Travel memories video created from ${body.images!.length} personal photos.`
+          : body.prompt || '';
 
     const result = await this.aiTravelVideoService.generateVideoWithMedia(
       userId,
@@ -283,9 +293,17 @@ export class AiTravelVideoController {
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+    ];
     if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Invalid file type. Allowed: JPEG, PNG, GIF, WebP');
+      throw new BadRequestException(
+        'Invalid file type. Allowed: JPEG, PNG, GIF, WebP',
+      );
     }
 
     try {
@@ -331,12 +349,20 @@ export class AiTravelVideoController {
       throw new BadRequestException('Maximum 20 images allowed per upload');
     }
 
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+    ];
 
     // Validate all files
     for (const file of files) {
       if (!allowedTypes.includes(file.mimetype)) {
-        throw new BadRequestException(`Invalid file type for ${file.originalname}. Allowed: JPEG, PNG, GIF, WebP`);
+        throw new BadRequestException(
+          `Invalid file type for ${file.originalname}. Allowed: JPEG, PNG, GIF, WebP`,
+        );
       }
     }
 
@@ -365,8 +391,9 @@ export class AiTravelVideoController {
         },
       };
     } catch (error) {
-      throw new BadRequestException(`Failed to upload images: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to upload images: ${error.message}`,
+      );
     }
   }
 }
-

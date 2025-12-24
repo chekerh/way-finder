@@ -9,23 +9,29 @@ import { lastValueFrom } from 'rxjs';
 import { FlightSearchDto } from './dto/flight-search.dto';
 
 export class AmadeusRateLimitError extends Error {
-  constructor(message: string, public retryAfter?: number) {
+  constructor(
+    message: string,
+    public retryAfter?: number,
+  ) {
     super(message);
     this.name = 'AmadeusRateLimitError';
   }
 }
 
 export class AmadeusServerError extends Error {
-  constructor(message: string, public retryAfter?: number) {
+  constructor(
+    message: string,
+    public retryAfter?: number,
+  ) {
     super(message);
     this.name = 'AmadeusServerError';
   }
 }
 
 export enum CircuitState {
-  CLOSED = 'CLOSED',     // Normal operation
-  OPEN = 'OPEN',         // Circuit is open, failing fast
-  HALF_OPEN = 'HALF_OPEN' // Testing if service recovered
+  CLOSED = 'CLOSED', // Normal operation
+  OPEN = 'OPEN', // Circuit is open, failing fast
+  HALF_OPEN = 'HALF_OPEN', // Testing if service recovered
 }
 
 interface AmadeusAuthResponse {
@@ -88,9 +94,12 @@ export class AmadeusService {
 
   constructor(private readonly http: HttpService) {
     // Set up periodic cache cleanup every 10 minutes
-    setInterval(() => {
-      this.cleanupExpiredEntries();
-    }, 10 * 60 * 1000);
+    setInterval(
+      () => {
+        this.cleanupExpiredEntries();
+      },
+      10 * 60 * 1000,
+    );
   }
 
   isConfigured(): boolean {
@@ -112,7 +121,9 @@ export class AmadeusService {
       price: params.maxPrice,
       currency: params.currencyCode,
     });
-    return Buffer.from(key).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
+    return Buffer.from(key)
+      .toString('base64')
+      .replace(/[^a-zA-Z0-9]/g, '');
   }
 
   /**
@@ -137,7 +148,11 @@ export class AmadeusService {
   /**
    * Cache flight search result
    */
-  private setCachedResult(searchHash: string, data: any, isError = false): void {
+  private setCachedResult(
+    searchHash: string,
+    data: any,
+    isError = false,
+  ): void {
     const duration = isError ? this.ERROR_CACHE_DURATION : this.CACHE_DURATION;
 
     // Clean up expired entries more aggressively when cache gets large
@@ -148,13 +163,16 @@ export class AmadeusService {
     // Limit cache size to prevent memory issues
     if (this.flightCache.size > 200) {
       // Remove oldest entries (simple LRU-like behavior)
-      const entries = Array.from(this.flightCache.entries())
-        .sort(([,a], [,b]) => a.timestamp - b.timestamp);
+      const entries = Array.from(this.flightCache.entries()).sort(
+        ([, a], [, b]) => a.timestamp - b.timestamp,
+      );
 
       const toRemove = entries.slice(0, Math.floor(entries.length * 0.2)); // Remove 20% oldest
       toRemove.forEach(([key]) => this.flightCache.delete(key));
 
-      this.logger.debug(`Cleaned up cache, removed ${toRemove.length} old entries`);
+      this.logger.debug(
+        `Cleaned up cache, removed ${toRemove.length} old entries`,
+      );
     }
 
     this.flightCache.set(searchHash, {
@@ -163,7 +181,9 @@ export class AmadeusService {
       searchHash,
     });
 
-    this.logger.debug(`Cached flight search result: ${searchHash}, error: ${isError}, cache size: ${this.flightCache.size}`);
+    this.logger.debug(
+      `Cached flight search result: ${searchHash}, error: ${isError}, cache size: ${this.flightCache.size}`,
+    );
   }
 
   /**
@@ -196,23 +216,27 @@ export class AmadeusService {
 
     // Clean old timestamps
     this.requestTimestamps = this.requestTimestamps.filter(
-      timestamp => timestamp > oneHourAgo
+      (timestamp) => timestamp > oneHourAgo,
     );
 
     // Check per-minute limit
     const requestsLastMinute = this.requestTimestamps.filter(
-      timestamp => timestamp > oneMinuteAgo
+      (timestamp) => timestamp > oneMinuteAgo,
     ).length;
 
     if (requestsLastMinute >= this.MAX_REQUESTS_PER_MINUTE) {
-      this.logger.warn(`Rate limit: ${requestsLastMinute} requests in last minute (max: ${this.MAX_REQUESTS_PER_MINUTE})`);
+      this.logger.warn(
+        `Rate limit: ${requestsLastMinute} requests in last minute (max: ${this.MAX_REQUESTS_PER_MINUTE})`,
+      );
       return false;
     }
 
     // Check per-hour limit
     const requestsLastHour = this.requestTimestamps.length;
     if (requestsLastHour >= this.MAX_REQUESTS_PER_HOUR) {
-      this.logger.warn(`Rate limit: ${requestsLastHour} requests in last hour (max: ${this.MAX_REQUESTS_PER_HOUR})`);
+      this.logger.warn(
+        `Rate limit: ${requestsLastHour} requests in last hour (max: ${this.MAX_REQUESTS_PER_HOUR})`,
+      );
       return false;
     }
 
@@ -267,9 +291,13 @@ export class AmadeusService {
         this.circuitFailureCount = 0;
         this.circuitSuccessCount = 0;
         this.circuitState = CircuitState.CLOSED;
-        this.logger.log(`Circuit breaker CLOSED - service recovered after ${this.CIRCUIT_SUCCESS_THRESHOLD} successful requests`);
+        this.logger.log(
+          `Circuit breaker CLOSED - service recovered after ${this.CIRCUIT_SUCCESS_THRESHOLD} successful requests`,
+        );
       } else {
-        this.logger.debug(`Circuit breaker HALF_OPEN: ${this.circuitSuccessCount}/${this.CIRCUIT_SUCCESS_THRESHOLD} successful requests`);
+        this.logger.debug(
+          `Circuit breaker HALF_OPEN: ${this.circuitSuccessCount}/${this.CIRCUIT_SUCCESS_THRESHOLD} successful requests`,
+        );
       }
     } else if (this.circuitState === CircuitState.CLOSED) {
       // Reset failure count on success in closed state
@@ -291,12 +319,16 @@ export class AmadeusService {
       this.circuitSuccessCount = 0;
       this.circuitState = CircuitState.OPEN;
       this.circuitNextAttemptTime = Date.now() + this.CIRCUIT_TIMEOUT;
-      this.logger.warn('Circuit breaker returned to OPEN state after half-open failure');
+      this.logger.warn(
+        'Circuit breaker returned to OPEN state after half-open failure',
+      );
     } else if (this.circuitFailureCount >= this.CIRCUIT_FAILURE_THRESHOLD) {
       if (this.circuitState !== CircuitState.OPEN) {
         this.circuitState = CircuitState.OPEN;
         this.circuitNextAttemptTime = Date.now() + this.CIRCUIT_TIMEOUT;
-        this.logger.error(`Circuit breaker OPENED after ${this.circuitFailureCount} failures. Next attempt at ${new Date(this.circuitNextAttemptTime).toISOString()}`);
+        this.logger.error(
+          `Circuit breaker OPENED after ${this.circuitFailureCount} failures. Next attempt at ${new Date(this.circuitNextAttemptTime).toISOString()}`,
+        );
       }
     }
   }
@@ -311,7 +343,7 @@ export class AmadeusService {
       lastFailureTime: this.circuitLastFailureTime,
       nextAttemptTime: this.circuitNextAttemptTime,
       queueLength: this.requestQueue.length,
-      rateLimitCooldown: this.rateLimitCooldown
+      rateLimitCooldown: this.rateLimitCooldown,
     };
   }
 
@@ -342,7 +374,9 @@ export class AmadeusService {
     const now = Date.now();
     const entries = Array.from(this.flightCache.values());
     const totalEntries = entries.length;
-    const expiredEntries = entries.filter(entry => now - entry.timestamp > this.CACHE_DURATION).length;
+    const expiredEntries = entries.filter(
+      (entry) => now - entry.timestamp > this.CACHE_DURATION,
+    ).length;
     const validEntries = totalEntries - expiredEntries;
 
     return {
@@ -350,7 +384,7 @@ export class AmadeusService {
       validEntries,
       expiredEntries,
       cacheDuration: this.CACHE_DURATION,
-      errorCacheDuration: this.ERROR_CACHE_DURATION
+      errorCacheDuration: this.ERROR_CACHE_DURATION,
     };
   }
 
@@ -360,15 +394,18 @@ export class AmadeusService {
   private async executeWithRetry<T>(
     requestFn: () => Promise<T>,
     searchHash: string,
-    retryCount = 0
+    retryCount = 0,
   ): Promise<T> {
     try {
       return await requestFn();
     } catch (error) {
-      const axiosError = error as any;
+      const axiosError = error;
 
       // Don't retry for rate limiting or auth errors
-      if (axiosError?.response?.status === 429 || axiosError?.response?.status === 401) {
+      if (
+        axiosError?.response?.status === 429 ||
+        axiosError?.response?.status === 401
+      ) {
         throw error;
       }
 
@@ -382,9 +419,11 @@ export class AmadeusService {
       const jitter = Math.random() * this.RETRY_JITTER_MAX;
       const delay = baseDelay + jitter;
 
-      this.logger.warn(`Request failed, retrying in ${Math.round(delay)}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES + 1})`);
+      this.logger.warn(
+        `Request failed, retrying in ${Math.round(delay)}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES + 1})`,
+      );
 
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
 
       return this.executeWithRetry(requestFn, searchHash, retryCount + 1);
     }
@@ -397,7 +436,10 @@ export class AmadeusService {
     try {
       // Try a simple token refresh to check API connectivity
       if (!this.isConfigured()) {
-        return { status: 'error', details: 'Amadeus credentials not configured' };
+        return {
+          status: 'error',
+          details: 'Amadeus credentials not configured',
+        };
       }
 
       const token = await this.getAccessToken();
@@ -405,8 +447,10 @@ export class AmadeusService {
         const cacheStats = this.getCacheStats();
         const now = Date.now();
         const oneMinuteAgo = now - 60 * 1000;
-        const requestsLastMinute = this.requestTimestamps.filter(t => t > oneMinuteAgo).length;
-        
+        const requestsLastMinute = this.requestTimestamps.filter(
+          (t) => t > oneMinuteAgo,
+        ).length;
+
         return {
           status: 'healthy',
           details: {
@@ -421,9 +465,9 @@ export class AmadeusService {
               requestsLastMinute,
               maxPerMinute: this.MAX_REQUESTS_PER_MINUTE,
               requestsLastHour: this.requestTimestamps.length,
-              maxPerHour: this.MAX_REQUESTS_PER_HOUR
-            }
-          }
+              maxPerHour: this.MAX_REQUESTS_PER_HOUR,
+            },
+          },
         };
       } else {
         return { status: 'error', details: 'Failed to obtain access token' };
@@ -431,7 +475,7 @@ export class AmadeusService {
     } catch (error) {
       return {
         status: 'error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -447,22 +491,26 @@ export class AmadeusService {
     while (this.requestQueue.length > 0) {
       // Check circuit breaker first
       if (!this.canMakeRequest()) {
-        this.logger.warn(`Circuit breaker preventing request. State: ${this.circuitState}`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        this.logger.warn(
+          `Circuit breaker preventing request. State: ${this.circuitState}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         continue;
       }
 
       // Check rate limit cooldown
       if (Date.now() < this.rateLimitCooldown) {
         this.logger.warn(`Rate limit cooldown active, waiting...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
       }
 
       // Enforce minimum interval between requests
       const timeSinceLastRequest = Date.now() - this.lastRequestTime;
       if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
-        await new Promise(resolve => setTimeout(resolve, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest));
+        await new Promise((resolve) =>
+          setTimeout(resolve, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest),
+        );
       }
 
       const request = this.requestQueue.shift();
@@ -556,25 +604,31 @@ export class AmadeusService {
     // Check for duplicate pending request
     const pendingRequest = this.pendingRequests.get(searchHash);
     if (pendingRequest) {
-      this.logger.debug(`Deduplicating request: ${searchHash} - reusing pending request`);
+      this.logger.debug(
+        `Deduplicating request: ${searchHash} - reusing pending request`,
+      );
       return pendingRequest;
     }
 
     // Check circuit breaker
     if (!this.canMakeRequest()) {
-      this.logger.warn(`Circuit breaker blocking request. State: ${this.circuitState}`);
+      this.logger.warn(
+        `Circuit breaker blocking request. State: ${this.circuitState}`,
+      );
       throw new AmadeusRateLimitError(
         'Amadeus API circuit breaker is open. Service temporarily unavailable.',
-        Math.ceil((this.circuitNextAttemptTime - Date.now()) / 1000)
+        Math.ceil((this.circuitNextAttemptTime - Date.now()) / 1000),
       );
     }
 
     // Check if we're in rate limit cooldown
     if (Date.now() < this.rateLimitCooldown) {
-      this.logger.warn(`Rate limit cooldown active, using cached/fallback data`);
+      this.logger.warn(
+        `Rate limit cooldown active, using cached/fallback data`,
+      );
       throw new AmadeusRateLimitError(
         'Amadeus API rate limit exceeded. Please try again later.',
-        Math.ceil((this.rateLimitCooldown - Date.now()) / 1000)
+        Math.ceil((this.rateLimitCooldown - Date.now()) / 1000),
       );
     }
 
@@ -661,7 +715,6 @@ export class AmadeusService {
         // Cache successful result
         this.setCachedResult(searchHash, response.data, false);
         return response.data;
-
       } catch (error) {
         let isRateLimit = false;
         let retryAfter: number | undefined;
@@ -679,13 +732,13 @@ export class AmadeusService {
             }
 
             // Set rate limit cooldown - be more conservative
-            const cooldownDuration = retryAfter || (5 * 60 * 1000); // Default 5 minutes if no retry-after header
+            const cooldownDuration = retryAfter || 5 * 60 * 1000; // Default 5 minutes if no retry-after header
             this.rateLimitCooldown = Date.now() + cooldownDuration;
-            
+
             // Also increase circuit breaker timeout on rate limit
             this.circuitNextAttemptTime = Math.max(
               this.circuitNextAttemptTime,
-              Date.now() + cooldownDuration
+              Date.now() + cooldownDuration,
             );
 
             this.logger.warn(
@@ -710,12 +763,12 @@ export class AmadeusService {
         if (isRateLimit) {
           throw new AmadeusRateLimitError(
             'Amadeus API rate limit exceeded. Please try again later.',
-            retryAfter
+            retryAfter,
           );
-        } else if ((error as any)?.response?.status === 500) {
+        } else if (error?.response?.status === 500) {
           throw new AmadeusServerError(
             'Amadeus API server error. Please try again later.',
-            30000 // 30 seconds
+            30000, // 30 seconds
           );
         }
 

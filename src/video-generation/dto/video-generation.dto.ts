@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsArray, IsNotEmpty, MinLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsNotEmpty,
+  MinLength,
+} from 'class-validator';
 
 export class AiVideoGenerateRequest {
   @IsString()

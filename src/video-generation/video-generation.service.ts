@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { VideoGeneration, VideoGenerationDocument } from './schemas/video-generation.schema';
+import {
+  VideoGeneration,
+  VideoGenerationDocument,
+} from './schemas/video-generation.schema';
 import { MusicTrack, MusicTrackDocument } from './schemas/music-track.schema';
 import { TravelPlan, TravelPlanDocument } from './schemas/travel-plan.schema';
 import { VideoCompositionService } from './video-composition.service';
@@ -58,31 +61,36 @@ export class VideoGenerationService {
           name: 'Travel Adventure',
           genre: 'Electronic',
           duration: '3:45',
-          previewUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
+          previewUrl:
+            'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
         },
         {
           name: 'Peaceful Journey',
           genre: 'Ambient',
           duration: '4:12',
-          previewUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
+          previewUrl:
+            'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
         },
         {
           name: 'Urban Exploration',
           genre: 'Instrumental',
           duration: '3:28',
-          previewUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
+          previewUrl:
+            'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
         },
         {
           name: 'Nature Sounds',
           genre: 'World',
           duration: '5:01',
-          previewUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
+          previewUrl:
+            'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
         },
         {
           name: 'Epic Landscapes',
           genre: 'Cinematic',
           duration: '4:33',
-          previewUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
+          previewUrl:
+            'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Placeholder
         },
       ];
 
@@ -104,43 +112,76 @@ export class VideoGenerationService {
       const travelPlans = [
         {
           title: 'Mediterranean Escape',
-          description: 'Explore the stunning coastlines and ancient cities of the Mediterranean',
+          description:
+            'Explore the stunning coastlines and ancient cities of the Mediterranean',
           destinations: ['Santorini', 'Rome', 'Barcelona', 'Athens'],
           duration: '10 days',
-          activities: ['Beach hopping', 'Historical tours', 'Wine tasting', 'Boat cruises'],
-          videoPrompt: 'Beautiful Mediterranean islands with crystal blue waters, whitewashed buildings, and ancient ruins under sunny skies',
+          activities: [
+            'Beach hopping',
+            'Historical tours',
+            'Wine tasting',
+            'Boat cruises',
+          ],
+          videoPrompt:
+            'Beautiful Mediterranean islands with crystal blue waters, whitewashed buildings, and ancient ruins under sunny skies',
         },
         {
           title: 'Alpine Adventure',
-          description: 'Experience the majesty of the Swiss Alps and surrounding mountains',
+          description:
+            'Experience the majesty of the Swiss Alps and surrounding mountains',
           destinations: ['Zurich', 'Interlaken', 'Zermatt', 'Geneva'],
           duration: '8 days',
-          activities: ['Hiking', 'Cable car rides', 'Lake cruises', 'Cheese tasting'],
-          videoPrompt: 'Majestic snow-capped mountains, pristine alpine lakes, charming mountain villages, and breathtaking valley views',
+          activities: [
+            'Hiking',
+            'Cable car rides',
+            'Lake cruises',
+            'Cheese tasting',
+          ],
+          videoPrompt:
+            'Majestic snow-capped mountains, pristine alpine lakes, charming mountain villages, and breathtaking valley views',
         },
         {
           title: 'Asian Discovery',
-          description: 'Immerse yourself in the vibrant cultures and landscapes of Southeast Asia',
+          description:
+            'Immerse yourself in the vibrant cultures and landscapes of Southeast Asia',
           destinations: ['Bangkok', 'Hanoi', 'Siem Reap', 'Singapore'],
           duration: '12 days',
-          activities: ['Temple visits', 'Street food tours', 'Jungle trekking', 'Island hopping'],
-          videoPrompt: 'Vibrant Asian cities with ornate temples, bustling markets, lush jungles, and peaceful beaches',
+          activities: [
+            'Temple visits',
+            'Street food tours',
+            'Jungle trekking',
+            'Island hopping',
+          ],
+          videoPrompt:
+            'Vibrant Asian cities with ornate temples, bustling markets, lush jungles, and peaceful beaches',
         },
         {
           title: 'Northern Lights Quest',
           description: 'Chase the Aurora Borealis through Scandinavia',
           destinations: ['Oslo', 'Tromsø', 'Reykjavik', 'Stockholm'],
           duration: '9 days',
-          activities: ['Northern lights viewing', 'Dog sledding', 'Ice cave exploration', 'Hot springs'],
-          videoPrompt: 'Magical northern lights dancing across starry winter skies, snow-covered landscapes, and cozy Nordic cabins',
+          activities: [
+            'Northern lights viewing',
+            'Dog sledding',
+            'Ice cave exploration',
+            'Hot springs',
+          ],
+          videoPrompt:
+            'Magical northern lights dancing across starry winter skies, snow-covered landscapes, and cozy Nordic cabins',
         },
         {
           title: 'Safari Adventure',
           description: 'Witness the incredible wildlife of East Africa',
           destinations: ['Nairobi', 'Serengeti', 'Maasai Mara', 'Amboseli'],
           duration: '7 days',
-          activities: ['Game drives', 'Hot air balloon safaris', 'Cultural visits', 'Photography'],
-          videoPrompt: 'Vast savannas teeming with wildlife, majestic elephants, lions, and giraffes under the African sun',
+          activities: [
+            'Game drives',
+            'Hot air balloon safaris',
+            'Cultural visits',
+            'Photography',
+          ],
+          videoPrompt:
+            'Vast savannas teeming with wildlife, majestic elephants, lions, and giraffes under the African sun',
         },
       ];
 
@@ -255,9 +296,12 @@ export class VideoGenerationService {
       const predictionId = this.generatePredictionId();
 
       // Use provided images or generate from prompt
-      const imageUrls = request.images && request.images.length > 0
-        ? request.images
-        : this.generateImagesFromPrompt(request.prompt || 'travel destination');
+      const imageUrls =
+        request.images && request.images.length > 0
+          ? request.images
+          : this.generateImagesFromPrompt(
+              request.prompt || 'travel destination',
+            );
 
       const videoGeneration = new this.videoGenerationModel({
         userId,
@@ -272,7 +316,11 @@ export class VideoGenerationService {
       await videoGeneration.save();
 
       // Start async video generation
-      this.processVideoGeneration(predictionId, imageUrls, request.musicTrackId);
+      this.processVideoGeneration(
+        predictionId,
+        imageUrls,
+        request.musicTrackId,
+      );
 
       return {
         success: true,
@@ -281,7 +329,9 @@ export class VideoGenerationService {
           status: 'pending',
           originalPrompt: request.prompt || '',
           enhancedPrompt: this.enhancePrompt(request.prompt || ''),
-          musicTrack: request.musicTrackId ? await this.getMusicTrackById(request.musicTrackId) : null,
+          musicTrack: request.musicTrackId
+            ? await this.getMusicTrackById(request.musicTrackId)
+            : null,
           estimatedTime: '3-5 minutes',
         },
       };
@@ -297,9 +347,13 @@ export class VideoGenerationService {
   /**
    * Check status of video generation
    */
-  async checkAiVideoStatus(predictionId: string): Promise<AiVideoCheckStatusResponse> {
+  async checkAiVideoStatus(
+    predictionId: string,
+  ): Promise<AiVideoCheckStatusResponse> {
     try {
-      const videoGeneration = await this.videoGenerationModel.findOne({ predictionId });
+      const videoGeneration = await this.videoGenerationModel.findOne({
+        predictionId,
+      });
 
       if (!videoGeneration) {
         return {
@@ -364,7 +418,7 @@ export class VideoGenerationService {
 
       return {
         success: true,
-        tracks: tracks.map(track => ({
+        tracks: tracks.map((track) => ({
           id: (track._id as any).toString(),
           name: track.name,
           genre: track.genre,
@@ -390,7 +444,7 @@ export class VideoGenerationService {
 
       return {
         success: true,
-        plans: plans.map(plan => ({
+        plans: plans.map((plan) => ({
           id: (plan._id as any).toString(),
           title: plan.title,
           description: plan.description,
@@ -459,7 +513,8 @@ export class VideoGenerationService {
       'with professional cinematography',
     ];
 
-    const randomEnhancement = enhancements[Math.floor(Math.random() * enhancements.length)];
+    const randomEnhancement =
+      enhancements[Math.floor(Math.random() * enhancements.length)];
     return `${prompt}, ${randomEnhancement}`;
   }
 
@@ -491,13 +546,13 @@ export class VideoGenerationService {
   private async processVideoGeneration(
     predictionId: string,
     imageUrls: string[],
-    musicTrackId?: string
+    musicTrackId?: string,
   ) {
     try {
       // Update to processing
       await this.videoGenerationModel.findOneAndUpdate(
         { predictionId },
-        { status: 'processing', progress: 10 }
+        { status: 'processing', progress: 10 },
       );
 
       // Get music track URL if provided
@@ -512,15 +567,16 @@ export class VideoGenerationService {
       // Update progress
       await this.videoGenerationModel.findOneAndUpdate(
         { predictionId },
-        { progress: 30 }
+        { progress: 30 },
       );
 
       // Generate video using composition service
-      const videoUrl = await this.videoCompositionService.generateVideoFromImages(
-        predictionId,
-        imageUrls,
-        musicUrl
-      );
+      const videoUrl =
+        await this.videoCompositionService.generateVideoFromImages(
+          predictionId,
+          imageUrls,
+          musicUrl,
+        );
 
       // Update progress to completed
       await this.videoGenerationModel.findOneAndUpdate(
@@ -530,10 +586,12 @@ export class VideoGenerationService {
           progress: 100,
           videoUrl,
           completedAt: new Date(),
-        }
+        },
       );
 
-      this.logger.log(`Video generation completed for prediction: ${predictionId}`);
+      this.logger.log(
+        `Video generation completed for prediction: ${predictionId}`,
+      );
     } catch (error) {
       this.logger.error('Error in video generation:', error);
       await this.videoGenerationModel.findOneAndUpdate(
@@ -542,7 +600,7 @@ export class VideoGenerationService {
           status: 'failed',
           error: error.message || 'Video generation failed',
           completedAt: new Date(),
-        }
+        },
       );
     }
   }
@@ -565,7 +623,7 @@ export class VideoGenerationService {
       '1441974231533-cb5fe1af6227?w=800&h=600&fit=crop&q=80', // Beach sunset
       '1469474968028-56623f02e42e?w=800&h=600&fit=crop&q=80', // Forest path
       '1502920917128-1aa500764cbd?w=800&h=600&fit=crop&q=80', // Ancient ruins
-      '1447757039982-b5a14badbf7?w=800&h=600&fit=crop&q=80',  // Hot air balloon
+      '1447757039982-b5a14badbf7?w=800&h=600&fit=crop&q=80', // Hot air balloon
     ];
 
     // Return 3-5 images based on keywords
@@ -582,15 +640,43 @@ export class VideoGenerationService {
    */
   private extractKeywords(prompt: string): string[] {
     const travelKeywords = [
-      'beach', 'mountain', 'city', 'forest', 'desert', 'ocean', 'lake', 'river',
-      'sunset', 'sunrise', 'night', 'snow', 'tropical', 'adventure', 'explore',
-      'travel', 'vacation', 'holiday', 'destination', 'landscape', 'nature',
-      'urban', 'village', 'island', 'canyon', 'waterfall', 'garden', 'park'
+      'beach',
+      'mountain',
+      'city',
+      'forest',
+      'desert',
+      'ocean',
+      'lake',
+      'river',
+      'sunset',
+      'sunrise',
+      'night',
+      'snow',
+      'tropical',
+      'adventure',
+      'explore',
+      'travel',
+      'vacation',
+      'holiday',
+      'destination',
+      'landscape',
+      'nature',
+      'urban',
+      'village',
+      'island',
+      'canyon',
+      'waterfall',
+      'garden',
+      'park',
     ];
 
     const words = prompt.toLowerCase().split(/\s+/);
-    return words.filter(word => travelKeywords.some(keyword =>
-      word.includes(keyword) || keyword.includes(word)
-    )).slice(0, 5); // Max 5 keywords
+    return words
+      .filter((word) =>
+        travelKeywords.some(
+          (keyword) => word.includes(keyword) || keyword.includes(word),
+        ),
+      )
+      .slice(0, 5); // Max 5 keywords
   }
 }

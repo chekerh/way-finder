@@ -174,7 +174,7 @@ export class SocialController {
     );
 
     const data = result.data.map((trip) => {
-      const tripObj = (trip as any).toObject ? (trip as any).toObject() : trip;
+      const tripObj = trip.toObject ? trip.toObject() : trip;
       return tripObj;
     });
 

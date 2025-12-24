@@ -42,7 +42,8 @@ export class VideoGeneration {
   completedAt?: Date;
 }
 
-export const VideoGenerationSchema = SchemaFactory.createForClass(VideoGeneration);
+export const VideoGenerationSchema =
+  SchemaFactory.createForClass(VideoGeneration);
 
 // Add indexes
 VideoGenerationSchema.index({ userId: 1, createdAt: -1 });

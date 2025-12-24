@@ -129,14 +129,14 @@ async function bootstrap() {
   SwaggerModule.setup('api-docs', app, document);
 
   const port = Number(process.env.PORT) || 3000;
-  
+
   // Start server and wait for it to be ready
   await app.listen(port, '0.0.0.0');
   logger.log(`🚀 Application is running on: http://localhost:${port}/api`);
   logger.log(`📚 Swagger docs available at: http://localhost:${port}/api-docs`);
   logger.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.log(`💾 MongoDB: Connected with connection pooling enabled`);
-  
+
   // Ensure server is fully ready before marking as started
   // This helps with Render cold starts by pre-initializing critical paths
   try {
@@ -154,31 +154,40 @@ async function bootstrap() {
     try {
       // Small delay to ensure server is fully ready
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      
+
       // Call warmup endpoint via HTTP to ensure full request pipeline is warmed
       const http = await import('http');
       const warmupUrl = `http://localhost:${port}/api/warmup`;
-      
+
       logger.log('🔥 Pre-warming critical services...');
-      
-      http.get(warmupUrl, (res) => {
-        let data = '';
-        res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => {
-          try {
-            const result = JSON.parse(data);
-            logger.log(`✅ Services pre-warmed: ${JSON.stringify(result.services)}`);
-          } catch (e) {
-            // Ignore parse errors
-          }
+
+      http
+        .get(warmupUrl, (res) => {
+          let data = '';
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+          res.on('end', () => {
+            try {
+              const result = JSON.parse(data);
+              logger.log(
+                `✅ Services pre-warmed: ${JSON.stringify(result.services)}`,
+              );
+            } catch (e) {
+              // Ignore parse errors
+            }
+          });
+        })
+        .on('error', (err) => {
+          // Ignore warm-up errors, server is still running
+          logger.warn('⚠️ Warm-up failed (non-critical):', err.message);
         });
-      }).on('error', (err) => {
-        // Ignore warm-up errors, server is still running
-        logger.warn('⚠️ Warm-up failed (non-critical):', err.message);
-      });
     } catch (error) {
       // Ignore warm-up errors, server is still running
-      logger.warn('⚠️ Could not pre-warm services (non-critical):', error.message);
+      logger.warn(
+        '⚠️ Could not pre-warm services (non-critical):',
+        error.message,
+      );
     }
   });
 }

@@ -8,4 +8,3 @@ import { UpsellsService } from './upsells.service';
   exports: [UpsellsService],
 })
 export class UpsellsModule {}
-

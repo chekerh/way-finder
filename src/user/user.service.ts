@@ -24,13 +24,17 @@ export class UserService {
     // The schema now uses default: undefined instead of default: null, but we still
     // want to ensure it's completely omitted if not provided
     const userData: any = { ...createUserDto };
-    
+
     // Explicitly remove google_id if it's undefined, null, or empty string
     // This ensures the field is truly omitted from the document
-    if (!userData.google_id || userData.google_id === null || userData.google_id === '') {
+    if (
+      !userData.google_id ||
+      userData.google_id === null ||
+      userData.google_id === ''
+    ) {
       delete userData.google_id;
     }
-    
+
     // Create the document - with default: undefined in schema, Mongoose won't set it to null
     const created = new this.userModel(userData);
     return await created.save();

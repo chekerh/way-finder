@@ -1,5 +1,9 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { AmadeusService, AmadeusRateLimitError, AmadeusServerError } from './amadeus.service';
+import {
+  AmadeusService,
+  AmadeusRateLimitError,
+  AmadeusServerError,
+} from './amadeus.service';
 import { ActivitiesService } from './activities.service';
 import type { ActivityFeedResponse } from './activities.service';
 import { FlightSearchDto, RecommendedQueryDto } from './dto/flight-search.dto';
@@ -44,7 +48,9 @@ export class CatalogService {
       }
     }
 
-    this.logger.debug(`Deduplicated ${flights.length} flights to ${uniqueFlights.length} unique offers`);
+    this.logger.debug(
+      `Deduplicated ${flights.length} flights to ${uniqueFlights.length} unique offers`,
+    );
     return uniqueFlights;
   }
 
@@ -154,7 +160,9 @@ export class CatalogService {
           try {
             await this.cacheService.set(cacheKey, fallbackResult, 3600); // 1 hour (increased from 10 minutes)
           } catch (cacheError) {
-            this.logger.warn(`Failed to cache rate-limited fallback result: ${cacheError}`);
+            this.logger.warn(
+              `Failed to cache rate-limited fallback result: ${cacheError}`,
+            );
           }
           return fallbackResult;
         } else if (error instanceof AmadeusServerError) {
@@ -167,7 +175,9 @@ export class CatalogService {
           try {
             await this.cacheService.set(cacheKey, fallbackResult, 1800); // 30 minutes (increased from 5)
           } catch (cacheError) {
-            this.logger.warn(`Failed to cache server error fallback result: ${cacheError}`);
+            this.logger.warn(
+              `Failed to cache server error fallback result: ${cacheError}`,
+            );
           }
           return fallbackResult;
         } else {
@@ -190,8 +200,21 @@ export class CatalogService {
     // Prioritize European destinations first as they're more likely to have flights from Tunisia
     // Include diverse destinations but be more conservative with API calls
     const defaultDestinations = [
-      'CDG', 'ORY', 'FCO', 'BCN', 'MAD', 'LHR', 'AMS', 'ATH', // Europe (high priority)
-      'IST', 'DXB', 'JFK', 'NRT', 'BKK', 'SIN', 'ICN',        // Other regions (lower priority)
+      'CDG',
+      'ORY',
+      'FCO',
+      'BCN',
+      'MAD',
+      'LHR',
+      'AMS',
+      'ATH', // Europe (high priority)
+      'IST',
+      'DXB',
+      'JFK',
+      'NRT',
+      'BKK',
+      'SIN',
+      'ICN', // Other regions (lower priority)
     ];
     const popularDestinations =
       preferences.destination_preferences?.length > 0
@@ -227,7 +250,9 @@ export class CatalogService {
 
     let hadSuccessfulExternalCall = false;
 
-    this.logger.debug(`Searching ${numDestinations} destinations for ${maxPerDestination} flights each (total requested: ${totalRequested})`);
+    this.logger.debug(
+      `Searching ${numDestinations} destinations for ${maxPerDestination} flights each (total requested: ${totalRequested})`,
+    );
 
     const searchPromises = popularDestinations
       .slice(0, numDestinations)
@@ -273,13 +298,19 @@ export class CatalogService {
         } catch (error) {
           if (error instanceof AmadeusRateLimitError) {
             this.registerAmadeusRateLimit();
-            this.logger.warn(`Rate limit hit for destination ${dest} (attempt ${index + 1}/${numDestinations})`);
+            this.logger.warn(
+              `Rate limit hit for destination ${dest} (attempt ${index + 1}/${numDestinations})`,
+            );
           } else if (error instanceof AmadeusServerError) {
             this.registerAmadeusFailure();
-            this.logger.warn(`Server error for destination ${dest} (attempt ${index + 1}/${numDestinations})`);
+            this.logger.warn(
+              `Server error for destination ${dest} (attempt ${index + 1}/${numDestinations})`,
+            );
           } else {
             this.registerAmadeusFailure();
-            this.logger.warn(`Unknown error for destination ${dest} (attempt ${index + 1}/${numDestinations}): ${error.message}`);
+            this.logger.warn(
+              `Unknown error for destination ${dest} (attempt ${index + 1}/${numDestinations}): ${error.message}`,
+            );
           }
           return [];
         }
@@ -313,12 +344,17 @@ export class CatalogService {
 
     // Deduplicate flights before returning
     const deduplicatedFlights = this.deduplicateFlights(allFlights);
-    const result = { data: deduplicatedFlights.slice(0, totalRequested), meta: {} };
+    const result = {
+      data: deduplicatedFlights.slice(0, totalRequested),
+      meta: {},
+    };
 
     // Cache the deduplicated result for much longer time (2 hours)
     try {
       await this.cacheService.set(cacheKey, result, 7200);
-      this.logger.debug(`Cached recommended flights: ${cacheKey} (${result.data.length} unique offers)`);
+      this.logger.debug(
+        `Cached recommended flights: ${cacheKey} (${result.data.length} unique offers)`,
+      );
     } catch (error) {
       // Cache failures shouldn't break the response
       this.logger.warn(`Failed to cache recommended flights: ${error}`);
@@ -416,26 +452,34 @@ export class CatalogService {
 
     // Use fallback if in cooldown period
     if (Date.now() < this.amadeusCooldownUntil) {
-      this.logger.debug(`Using fallback: in cooldown until ${new Date(this.amadeusCooldownUntil).toISOString()}`);
+      this.logger.debug(
+        `Using fallback: in cooldown until ${new Date(this.amadeusCooldownUntil).toISOString()}`,
+      );
       return true;
     }
 
     // Use fallback if we have ANY consecutive failures (more aggressive)
     if (this.consecutiveFailures >= 1) {
-      this.logger.warn(`Using fallback due to ${this.consecutiveFailures} consecutive Amadeus failures`);
+      this.logger.warn(
+        `Using fallback due to ${this.consecutiveFailures} consecutive Amadeus failures`,
+      );
       return true;
     }
 
     // If last failure was recent (within 30 minutes), be more conservative
     const timeSinceLastFailure = Date.now() - this.lastFailureTime;
     if (timeSinceLastFailure < 30 * 60 * 1000 && this.consecutiveFailures > 0) {
-      this.logger.debug('Recent Amadeus failure detected, using fallback to be safe');
+      this.logger.debug(
+        'Recent Amadeus failure detected, using fallback to be safe',
+      );
       return true;
     }
 
     // Use fallback if circuit breaker is in half-open state (testing recovery)
     if (circuitStatus.state === 'HALF_OPEN') {
-      this.logger.debug('Using fallback: Circuit breaker in HALF_OPEN state (testing recovery)');
+      this.logger.debug(
+        'Using fallback: Circuit breaker in HALF_OPEN state (testing recovery)',
+      );
       return true;
     }
 
@@ -450,11 +494,13 @@ export class CatalogService {
     const baseCooldown = 5 * 60 * 1000; // 5 minutes (increased from 2)
     const exponentialCooldown = Math.min(
       baseCooldown * Math.pow(2, Math.min(this.consecutiveFailures - 1, 4)), // Cap at 2^4 = 16x
-      60 * 60 * 1000 // Max 60 minutes (increased from 30)
+      60 * 60 * 1000, // Max 60 minutes (increased from 30)
     );
 
     this.amadeusCooldownUntil = Date.now() + exponentialCooldown;
-    this.logger.warn(`Amadeus failure #${this.consecutiveFailures}, cooldown: ${Math.round(exponentialCooldown / 1000 / 60)} minutes`);
+    this.logger.warn(
+      `Amadeus failure #${this.consecutiveFailures}, cooldown: ${Math.round(exponentialCooldown / 1000 / 60)} minutes`,
+    );
   }
 
   private registerAmadeusRateLimit() {
@@ -465,11 +511,13 @@ export class CatalogService {
     const baseCooldown = 15 * 60 * 1000; // 15 minutes (increased from 10)
     const exponentialCooldown = Math.min(
       baseCooldown * Math.pow(1.5, Math.min(this.consecutiveFailures - 1, 4)), // Slightly more aggressive
-      120 * 60 * 1000 // Max 120 minutes (2 hours, increased from 60)
+      120 * 60 * 1000, // Max 120 minutes (2 hours, increased from 60)
     );
 
     this.amadeusCooldownUntil = Date.now() + exponentialCooldown;
-    this.logger.warn(`Amadeus rate limit #${this.consecutiveFailures}, cooldown: ${Math.round(exponentialCooldown / 1000 / 60)} minutes`);
+    this.logger.warn(
+      `Amadeus rate limit #${this.consecutiveFailures}, cooldown: ${Math.round(exponentialCooldown / 1000 / 60)} minutes`,
+    );
   }
 
   private registerAmadeusSuccess() {
@@ -479,8 +527,11 @@ export class CatalogService {
 
     // If it was a long time since last failure, we can be more aggressive
     const timeSinceLastFailure = Date.now() - this.lastFailureTime;
-    if (timeSinceLastFailure > 60 * 60 * 1000) { // 1 hour
-      this.logger.debug('Long time since last Amadeus failure, system appears stable');
+    if (timeSinceLastFailure > 60 * 60 * 1000) {
+      // 1 hour
+      this.logger.debug(
+        'Long time since last Amadeus failure, system appears stable',
+      );
     }
   }
 
@@ -509,7 +560,17 @@ export class CatalogService {
   private getContinentForDestination(code: string): string {
     const upperCode = code.toUpperCase();
     // Europe destinations
-    const europeCodes = ['CDG', 'ORY', 'FCO', 'BCN', 'MAD', 'LHR', 'AMS', 'ATH', 'IST'];
+    const europeCodes = [
+      'CDG',
+      'ORY',
+      'FCO',
+      'BCN',
+      'MAD',
+      'LHR',
+      'AMS',
+      'ATH',
+      'IST',
+    ];
     // Asia destinations
     const asiaCodes = ['DXB', 'NRT', 'BKK', 'SIN', 'ICN'];
     // Americas destinations
@@ -582,7 +643,9 @@ export class CatalogService {
       if (!seenDestinations.has(flight.destinationCode)) {
         diverseFlights.push(flight);
         seenDestinations.add(flight.destinationCode);
-        const continent = this.getContinentForDestination(flight.destinationCode);
+        const continent = this.getContinentForDestination(
+          flight.destinationCode,
+        );
         if (continent !== 'unknown') {
           seenContinents.add(continent);
         }
@@ -647,7 +710,7 @@ export class CatalogService {
   }) {
     // Generate a cache key
     const cacheKey = `hotels_${params.cityCode}_${params.checkInDate}_${params.checkOutDate}_${params.tripType}_${params.limit}`;
-    
+
     // Try cache first
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
@@ -688,7 +751,8 @@ export class CatalogService {
         cityCode: cityCode,
         rating: 4.5,
         type: tripType === 'business' ? 'business' : 'hotel',
-        pricePerNight: tripType === 'backpacking' ? 45 : tripType === 'business' ? 150 : 120,
+        pricePerNight:
+          tripType === 'backpacking' ? 45 : tripType === 'business' ? 150 : 120,
         currency: 'EUR',
         amenities: ['wifi', 'pool', 'restaurant', 'parking'],
         address: {
@@ -702,7 +766,10 @@ export class CatalogService {
         },
         description: 'A comfortable hotel in the heart of the city',
         media: [
-          { uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800', category: 'exterior' },
+          {
+            uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+            category: 'exterior',
+          },
         ],
         googleRating: 4.5,
         googleReviewCount: 1250,
@@ -728,7 +795,10 @@ export class CatalogService {
         },
         description: 'Charming boutique hotel with modern amenities',
         media: [
-          { uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800', category: 'exterior' },
+          {
+            uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+            category: 'exterior',
+          },
         ],
         googleRating: 4.2,
         googleReviewCount: 890,
@@ -754,7 +824,10 @@ export class CatalogService {
         },
         description: 'Affordable accommodation for budget travelers',
         media: [
-          { uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800', category: 'exterior' },
+          {
+            uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+            category: 'exterior',
+          },
         ],
         googleRating: 3.8,
         googleReviewCount: 450,
@@ -764,11 +837,17 @@ export class CatalogService {
     // Filter by trip type if specified
     let filtered = baseHotels;
     if (tripType === 'backpacking') {
-      filtered = baseHotels.filter((h) => h.type === 'hostel' || h.pricePerNight < 60);
+      filtered = baseHotels.filter(
+        (h) => h.type === 'hostel' || h.pricePerNight < 60,
+      );
     } else if (tripType === 'business') {
-      filtered = baseHotels.filter((h) => h.type === 'business' || h.amenities.includes('wifi'));
+      filtered = baseHotels.filter(
+        (h) => h.type === 'business' || h.amenities.includes('wifi'),
+      );
     } else if (tripType === 'honeymoon') {
-      filtered = baseHotels.filter((h) => h.type === 'boutique' || h.rating >= 4.0);
+      filtered = baseHotels.filter(
+        (h) => h.type === 'boutique' || h.rating >= 4.0,
+      );
     }
 
     // Repeat hotels to reach limit

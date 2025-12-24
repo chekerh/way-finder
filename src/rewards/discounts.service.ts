@@ -343,4 +343,3 @@ export class DiscountsService {
     return eligibleDiscounts.length > 0 ? eligibleDiscounts[0] : null;
   }
 }
-

@@ -43,4 +43,3 @@ export class Commission {
 }
 
 export const CommissionSchema = SchemaFactory.createForClass(Commission);
-

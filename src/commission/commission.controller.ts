@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Put, Param, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Body,
+  UseGuards,
+} from '@nestjs/common';
 import { CommissionService } from './commission.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GetUser } from '../auth/get-user.decorator';
@@ -35,4 +43,3 @@ export class CommissionController {
     return this.commissionService.updateCommissionStatus(id, status);
   }
 }
-

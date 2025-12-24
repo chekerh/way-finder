@@ -20,7 +20,9 @@ import {
 @Controller('ai-video')
 @UseGuards(JwtAuthGuard)
 export class VideoGenerationController {
-  constructor(private readonly videoGenerationService: VideoGenerationService) {}
+  constructor(
+    private readonly videoGenerationService: VideoGenerationService,
+  ) {}
 
   @Get('status')
   async getAiVideoStatus() {
@@ -29,7 +31,8 @@ export class VideoGenerationController {
 
   @Get('suggestions')
   async getAiVideoSuggestions() {
-    const suggestions = await this.videoGenerationService.getAiVideoSuggestions();
+    const suggestions =
+      await this.videoGenerationService.getAiVideoSuggestions();
     return { suggestions };
   }
 
@@ -68,7 +71,10 @@ export class VideoGenerationController {
     @Request() req: any,
   ) {
     const userId = req.user.sub;
-    return this.videoGenerationService.generateAiTravelVideoWithMedia(userId, request);
+    return this.videoGenerationService.generateAiTravelVideoWithMedia(
+      userId,
+      request,
+    );
   }
 
   @Post('upload-image')

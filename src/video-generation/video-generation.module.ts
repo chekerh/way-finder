@@ -3,7 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { VideoGenerationController } from './video-generation.controller';
 import { VideoGenerationService } from './video-generation.service';
 import { VideoCompositionService } from './video-composition.service';
-import { VideoGeneration, VideoGenerationSchema } from './schemas/video-generation.schema';
+import {
+  VideoGeneration,
+  VideoGenerationSchema,
+} from './schemas/video-generation.schema';
 import { MusicTrack, MusicTrackSchema } from './schemas/music-track.schema';
 import { TravelPlan, TravelPlanSchema } from './schemas/travel-plan.schema';
 

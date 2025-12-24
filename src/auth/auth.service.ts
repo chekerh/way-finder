@@ -77,7 +77,7 @@ export class AuthService {
       );
       throw new ConflictException('Username already exists');
     }
-    
+
     // Check if email already exists
     const existingEmail = await this.userService.findByEmail(email);
     if (existingEmail) {
@@ -88,7 +88,7 @@ export class AuthService {
       );
       throw new ConflictException('Email already exists');
     }
-    
+
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
 
@@ -99,12 +99,12 @@ export class AuthService {
       this.emailService.generateVerificationToken();
 
     try {
-    const user = await this.userService.create({
-      username,
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      password: hash,
+      const user = await this.userService.create({
+        username,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        password: hash,
         email_verified: false, // Email not verified yet
         email_verification_token: emailVerificationToken,
       });
@@ -124,8 +124,8 @@ export class AuthService {
         );
       }
 
-    const userObj = (user as any).toObject ? (user as any).toObject() : user;
-    const { password: _password, ...result } = userObj;
+      const userObj = (user as any).toObject ? (user as any).toObject() : user;
+      const { password: _password, ...result } = userObj;
       return {
         message:
           'User registered successfully. Please check your email to verify your account.',
@@ -761,7 +761,7 @@ export class AuthService {
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
     const { password: _password, ...userData } = userObj;
 
-    return { 
+    return {
       access_token: token,
       user: userData,
       onboarding_completed: user.onboarding_completed || false,
@@ -1039,7 +1039,7 @@ export class AuthService {
         "Ce nom d'utilisateur est déjà utilisé. Veuillez en choisir un autre.",
       );
     }
-    
+
     // Additional safety check: try to find user by email one more time
     // This handles edge cases where the user might exist but wasn't found in the first check
     const finalEmailCheck = await this.userService.findByEmail(email);
@@ -1106,7 +1106,9 @@ export class AuthService {
         this.logger.warn(
           `MongoDB duplicate key error for email: ${email}, username: ${username}`,
         );
-        this.logger.debug(`Error keyPattern: ${JSON.stringify(error.keyPattern)}`);
+        this.logger.debug(
+          `Error keyPattern: ${JSON.stringify(error.keyPattern)}`,
+        );
         this.logger.debug(`Error message: ${error.message}`);
 
         let duplicateField: string | null = null;
@@ -1119,7 +1121,10 @@ export class AuthService {
             const fieldName = keys[0];
             if (fieldName === 'email' || fieldName.includes('email')) {
               duplicateField = 'email';
-            } else if (fieldName === 'username' || fieldName.includes('username')) {
+            } else if (
+              fieldName === 'username' ||
+              fieldName.includes('username')
+            ) {
               duplicateField = 'username';
             }
           }
@@ -1144,7 +1149,7 @@ export class AuthService {
           this.logger.debug(
             `Duplicate field not determined from error, checking database...`,
           );
-          
+
           // Check if the error is about google_id (sparse index issue with null values)
           if (error.keyPattern && error.keyPattern.google_id) {
             this.logger.warn(
@@ -1157,7 +1162,8 @@ export class AuthService {
               duplicateField = 'email';
             } else {
               // google_id index issue - try to find user by email or username
-              const checkUsername = await this.userService.findByUsername(username);
+              const checkUsername =
+                await this.userService.findByUsername(username);
               if (checkUsername) {
                 duplicateField = 'username';
               } else {
@@ -1180,8 +1186,9 @@ export class AuthService {
           } else {
             // Not a google_id error, check email and username normally
             const checkEmail = await this.userService.findByEmail(email);
-            const checkUsername = await this.userService.findByUsername(username);
-            
+            const checkUsername =
+              await this.userService.findByUsername(username);
+
             if (checkEmail) {
               this.logger.debug(`Found existing user by email: ${email}`);
               duplicateField = 'email';
@@ -1223,7 +1230,7 @@ export class AuthService {
                 `Sparse index issue detected: google_id duplicate key but user not found by email. This may require database index fix.`,
               );
               throw new ConflictException(
-                'Une erreur technique s\'est produite lors de la création du compte. Veuillez réessayer dans quelques instants ou contactez le support si le problème persiste.',
+                "Une erreur technique s'est produite lors de la création du compte. Veuillez réessayer dans quelques instants ou contactez le support si le problème persiste.",
               );
             }
             throw new ConflictException(
@@ -1231,7 +1238,7 @@ export class AuthService {
             );
           }
         }
-        
+
         if (duplicateField === 'username') {
           throw new ConflictException(
             "Ce nom d'utilisateur est déjà utilisé. Veuillez en choisir un autre.",

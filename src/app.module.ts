@@ -48,12 +48,12 @@ const mongoUri = (() => {
     }
     return 'mongodb://localhost:27017/wayfindr';
   }
-  
+
   // Remove deprecated options from connection string
   // bufferMaxEntries is deprecated and not supported in newer MongoDB drivers
   uri = uri.replace(/[?&]bufferMaxEntries=[^&]*/gi, '');
   uri = uri.replace(/[?&]buffermaxentries=[^&]*/gi, '');
-  
+
   return uri;
 })();
 

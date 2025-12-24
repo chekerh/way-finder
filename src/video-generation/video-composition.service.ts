@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { VideoGeneration, VideoGenerationDocument } from './schemas/video-generation.schema';
+import {
+  VideoGeneration,
+  VideoGenerationDocument,
+} from './schemas/video-generation.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
@@ -44,7 +47,10 @@ export class VideoCompositionService {
 
       this.logger.log(`FFmpeg path set to: ${ffmpegPath}`);
     } catch (error) {
-      this.logger.warn('Could not set FFmpeg path, using system default:', error);
+      this.logger.warn(
+        'Could not set FFmpeg path, using system default:',
+        error,
+      );
     }
   }
 
@@ -71,17 +77,26 @@ export class VideoCompositionService {
     transitionDuration: number = 1.0, // seconds for crossfade transitions
   ): Promise<string> {
     try {
-      this.logger.log(`Creating video for prediction ${predictionId} with ${imageUrls.length} images`);
+      this.logger.log(
+        `Creating video for prediction ${predictionId} with ${imageUrls.length} images`,
+      );
 
       // Check if FFmpeg dependencies are available
       if (!ffmpeg || !sharp || !axios) {
-        this.logger.warn('FFmpeg dependencies not available, using mock implementation');
+        this.logger.warn(
+          'FFmpeg dependencies not available, using mock implementation',
+        );
         return this.createMockVideo(predictionId, imageUrls, musicTrackUrl);
       }
 
       // Full FFmpeg implementation
-      return this.createVideoWithFFmpeg(predictionId, imageUrls, musicTrackUrl, durationPerImage, transitionDuration);
-
+      return this.createVideoWithFFmpeg(
+        predictionId,
+        imageUrls,
+        musicTrackUrl,
+        durationPerImage,
+        transitionDuration,
+      );
     } catch (error) {
       this.logger.error('Error creating video from images:', error);
       // Fallback to mock video
@@ -107,7 +122,10 @@ export class VideoCompositionService {
       await fs.mkdir(tempDir, { recursive: true });
 
       // Step 1: Download and process images
-      const processedImages = await this.downloadAndProcessImages(imageUrls, tempDir);
+      const processedImages = await this.downloadAndProcessImages(
+        imageUrls,
+        tempDir,
+      );
 
       if (processedImages.length === 0) {
         throw new Error('No images could be processed');
@@ -118,13 +136,17 @@ export class VideoCompositionService {
         processedImages,
         tempDir,
         durationPerImage,
-        transitionDuration
+        transitionDuration,
       );
 
       // Step 3: Add background music if provided
       let finalVideoPath = videoPath;
       if (musicTrackUrl) {
-        finalVideoPath = await this.addBackgroundMusicToVideo(videoPath, musicTrackUrl, outputPath);
+        finalVideoPath = await this.addBackgroundMusicToVideo(
+          videoPath,
+          musicTrackUrl,
+          outputPath,
+        );
       } else {
         // No music, just move to final location
         await fs.rename(videoPath, outputPath);
@@ -137,7 +159,6 @@ export class VideoCompositionService {
       await this.cleanupTempFiles(tempDir);
 
       return finalVideoPath;
-
     } catch (error) {
       this.logger.error('Error in FFmpeg video creation:', error);
       // Cleanup on error
@@ -154,10 +175,12 @@ export class VideoCompositionService {
     imageUrls: string[],
     musicTrackUrl?: string,
   ): Promise<string> {
-    this.logger.log(`Creating mock video for ${predictionId} with ${imageUrls.length} images`);
+    this.logger.log(
+      `Creating mock video for ${predictionId} with ${imageUrls.length} images`,
+    );
 
     // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Return a sample video URL for testing
     // In production, this would be replaced with actual video generation
@@ -170,9 +193,14 @@ export class VideoCompositionService {
   /**
    * Download and process images to consistent format for video
    */
-  private async downloadAndProcessImages(imageUrls: string[], outputDir: string): Promise<string[]> {
+  private async downloadAndProcessImages(
+    imageUrls: string[],
+    outputDir: string,
+  ): Promise<string[]> {
     if (!sharp || !axios) {
-      this.logger.warn('Image processing dependencies not available, using mock processing');
+      this.logger.warn(
+        'Image processing dependencies not available, using mock processing',
+      );
       return this.mockImageProcessing(imageUrls, outputDir);
     }
 
@@ -181,17 +209,22 @@ export class VideoCompositionService {
     for (let i = 0; i < imageUrls.length; i++) {
       try {
         const imageUrl = imageUrls[i];
-        const outputPath = path.join(outputDir, `processed_${i.toString().padStart(3, '0')}.jpg`);
+        const outputPath = path.join(
+          outputDir,
+          `processed_${i.toString().padStart(3, '0')}.jpg`,
+        );
 
-        this.logger.log(`Processing image ${i + 1}/${imageUrls.length}: ${imageUrl}`);
+        this.logger.log(
+          `Processing image ${i + 1}/${imageUrls.length}: ${imageUrl}`,
+        );
 
         // Download image
         const response = await axios.get(imageUrl, {
           responseType: 'arraybuffer',
           timeout: 30000, // 30 second timeout
           headers: {
-            'User-Agent': 'WayFinder-Video-Generator/1.0'
-          }
+            'User-Agent': 'WayFinder-Video-Generator/1.0',
+          },
         });
 
         // Process image with Sharp (resize, optimize for video)
@@ -199,22 +232,23 @@ export class VideoCompositionService {
           .resize(1920, 1080, {
             fit: 'cover',
             position: 'center',
-            withoutEnlargement: false
+            withoutEnlargement: false,
           })
           .jpeg({
             quality: 85,
-            progressive: true
+            progressive: true,
           })
           .toFile(outputPath);
 
         processedImages.push(outputPath);
         this.logger.log(`Successfully processed image ${i + 1}`);
-
       } catch (error) {
         this.logger.warn(`Failed to process image ${i}: ${error.message}`);
         // Create a fallback image
         await this.createFallbackImage(outputDir, i);
-        processedImages.push(path.join(outputDir, `fallback_${i.toString().padStart(3, '0')}.jpg`));
+        processedImages.push(
+          path.join(outputDir, `fallback_${i.toString().padStart(3, '0')}.jpg`),
+        );
       }
     }
 
@@ -224,13 +258,18 @@ export class VideoCompositionService {
   /**
    * Mock image processing when dependencies aren't available
    */
-  private async mockImageProcessing(imageUrls: string[], outputDir: string): Promise<string[]> {
+  private async mockImageProcessing(
+    imageUrls: string[],
+    outputDir: string,
+  ): Promise<string[]> {
     const processedImages: string[] = [];
 
     for (let i = 0; i < imageUrls.length; i++) {
       // Create a simple placeholder image
       await this.createFallbackImage(outputDir, i);
-      processedImages.push(path.join(outputDir, `fallback_${i.toString().padStart(3, '0')}.jpg`));
+      processedImages.push(
+        path.join(outputDir, `fallback_${i.toString().padStart(3, '0')}.jpg`),
+      );
       this.logger.log(`Mock processed image ${i + 1}/${imageUrls.length}`);
     }
 
@@ -240,8 +279,14 @@ export class VideoCompositionService {
   /**
    * Create fallback image when download fails
    */
-  private async createFallbackImage(outputDir: string, index: number): Promise<void> {
-    const outputPath = path.join(outputDir, `fallback_${index.toString().padStart(3, '0')}.jpg`);
+  private async createFallbackImage(
+    outputDir: string,
+    index: number,
+  ): Promise<void> {
+    const outputPath = path.join(
+      outputDir,
+      `fallback_${index.toString().padStart(3, '0')}.jpg`,
+    );
 
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57'];
     const color = colors[index % colors.length];
@@ -260,7 +305,6 @@ export class VideoCompositionService {
 
     await sharp(Buffer.from(svg)).jpeg().toFile(outputPath);
   }
-
 
   /**
    * Create video with smooth crossfade transitions between images
@@ -285,11 +329,16 @@ export class VideoCompositionService {
           .inputOptions(['-loop 1', '-t', durationPerImage.toString()])
           .videoCodec('libx264')
           .outputOptions([
-            '-pix_fmt', 'yuv420p',
-            '-r', '30',
-            '-preset', 'medium',
-            '-crf', '23',
-            '-movflags', '+faststart', // Optimize for web playback
+            '-pix_fmt',
+            'yuv420p',
+            '-r',
+            '30',
+            '-preset',
+            'medium',
+            '-crf',
+            '23',
+            '-movflags',
+            '+faststart', // Optimize for web playback
           ])
           .output(outputPath)
           .on('end', () => resolve(outputPath))
@@ -300,28 +349,39 @@ export class VideoCompositionService {
         const ffmpegCommand = ffmpeg();
 
         // Add all images as inputs
-        imagePaths.forEach(imagePath => {
+        imagePaths.forEach((imagePath) => {
           ffmpegCommand.input(imagePath);
         });
 
         // Calculate total duration and transition points
         const totalImages = imagePaths.length;
-        const imageDuration = durationPerImage - (transitionDuration / 2); // Account for transition overlap
-        const transitionStart = imageDuration - (transitionDuration / 2);
+        const imageDuration = durationPerImage - transitionDuration / 2; // Account for transition overlap
+        const transitionStart = imageDuration - transitionDuration / 2;
 
         // Build complex filter for crossfade transitions
-        const filterComplex = this.buildCrossfadeFilter(totalImages, imageDuration, transitionDuration);
+        const filterComplex = this.buildCrossfadeFilter(
+          totalImages,
+          imageDuration,
+          transitionDuration,
+        );
 
         ffmpegCommand
           .complexFilter(filterComplex)
           .outputOptions([
-            '-map', '[outv]', // Map the filtered video output
-            '-pix_fmt', 'yuv420p',
-            '-r', '30',
-            '-preset', 'medium',
-            '-crf', '23',
-            '-movflags', '+faststart',
-            '-t', ((totalImages * imageDuration) + (transitionDuration / 2)).toString(), // Total duration
+            '-map',
+            '[outv]', // Map the filtered video output
+            '-pix_fmt',
+            'yuv420p',
+            '-r',
+            '30',
+            '-preset',
+            'medium',
+            '-crf',
+            '23',
+            '-movflags',
+            '+faststart',
+            '-t',
+            (totalImages * imageDuration + transitionDuration / 2).toString(), // Total duration
           ])
           .output(outputPath)
           .on('end', () => {
@@ -340,7 +400,11 @@ export class VideoCompositionService {
   /**
    * Build FFmpeg complex filter for crossfade transitions
    */
-  private buildCrossfadeFilter(totalImages: number, imageDuration: number, transitionDuration: number): string {
+  private buildCrossfadeFilter(
+    totalImages: number,
+    imageDuration: number,
+    transitionDuration: number,
+  ): string {
     const filters: string[] = [];
 
     // Create individual video streams with durations
@@ -348,13 +412,17 @@ export class VideoCompositionService {
       const startTime = i * imageDuration;
       const endTime = (i + 1) * imageDuration;
 
-      filters.push(`[${i}:v]trim=${startTime}:${endTime},setpts=PTS-STARTPTS[v${i}]`);
+      filters.push(
+        `[${i}:v]trim=${startTime}:${endTime},setpts=PTS-STARTPTS[v${i}]`,
+      );
     }
 
     // Add crossfade transitions between consecutive images
     for (let i = 0; i < totalImages - 1; i++) {
       const offset = i * imageDuration;
-      filters.push(`[v${i}][v${i + 1}]xfade=transition=fade:duration=${transitionDuration}:offset=${offset + imageDuration - transitionDuration}[v${i}x]`);
+      filters.push(
+        `[v${i}][v${i + 1}]xfade=transition=fade:duration=${transitionDuration}:offset=${offset + imageDuration - transitionDuration}[v${i}x]`,
+      );
     }
 
     // Concatenate all the transition segments
@@ -375,10 +443,12 @@ export class VideoCompositionService {
   private async addBackgroundMusicToVideo(
     videoPath: string,
     musicUrl: string,
-    outputPath: string
+    outputPath: string,
   ): Promise<string> {
     if (!ffmpeg || !axios) {
-      this.logger.warn('FFmpeg or axios not available, returning video without music');
+      this.logger.warn(
+        'FFmpeg or axios not available, returning video without music',
+      );
       return videoPath;
     }
 
@@ -391,7 +461,10 @@ export class VideoCompositionService {
           timeout: 60000, // 60 second timeout for music
         });
 
-        const musicPath = path.join(path.dirname(videoPath), 'background_music.mp3');
+        const musicPath = path.join(
+          path.dirname(videoPath),
+          'background_music.mp3',
+        );
         await fs.writeFile(musicPath, Buffer.from(musicResponse.data));
 
         // Get video duration to loop music if needed
@@ -408,12 +481,17 @@ export class VideoCompositionService {
             'afade=t=out:st=' + (videoDuration - 3) + ':d=3', // Fade out last 3 seconds
           ])
           .outputOptions([
-            '-c:v', 'copy', // Copy video stream (no re-encoding)
-            '-c:a', 'aac',
+            '-c:v',
+            'copy', // Copy video stream (no re-encoding)
+            '-c:a',
+            'aac',
             '-shortest', // End when shortest stream ends
-            '-map', '0:v:0', // Video from first input
-            '-map', '1:a:0', // Audio from second input
-            '-movflags', '+faststart',
+            '-map',
+            '0:v:0', // Video from first input
+            '-map',
+            '1:a:0', // Audio from second input
+            '-movflags',
+            '+faststart',
           ])
           .output(outputPath)
           .on('end', () => {
@@ -426,7 +504,6 @@ export class VideoCompositionService {
             resolve(videoPath);
           })
           .run();
-
       } catch (error) {
         this.logger.error('Failed to download/process music:', error);
         // Return video without music
@@ -474,10 +551,17 @@ export class VideoCompositionService {
     images: string[],
     musicTrackUrl?: string,
   ): Promise<string> {
-    const videoUrl = await this.createVideoFromImages(predictionId, images, musicTrackUrl);
+    const videoUrl = await this.createVideoFromImages(
+      predictionId,
+      images,
+      musicTrackUrl,
+    );
 
     // Convert to web-accessible URL
-    const relativePath = path.relative(path.join(process.cwd(), 'uploads'), videoUrl);
+    const relativePath = path.relative(
+      path.join(process.cwd(), 'uploads'),
+      videoUrl,
+    );
     return `/uploads/${relativePath.replace(/\\/g, '/')}`;
   }
 }
