@@ -187,6 +187,25 @@ export class UserService {
   }
 
   /**
+   * Update user's password
+   * @param userId - User ID
+   * @param hashedPassword - New hashed password
+   * @returns Updated user document
+   * @throws NotFoundException if user not found
+   */
+  async updatePassword(userId: string, hashedPassword: string): Promise<User> {
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $set: { password: hashedPassword } },
+        { new: true, runValidators: true },
+      )
+      .exec();
+    if (!updated) throw new NotFoundException('User not found');
+    return updated;
+  }
+
+  /**
    * Update day streak when user logs in or performs an activity
    * Returns the updated streak count
    */
