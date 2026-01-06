@@ -123,3 +123,25 @@ PRE_PUSH_CHECKLIST.md
 *_REPORT.md
 *_STATUS.md
 *_UPDATE.md
+
+# Additional generated files
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
