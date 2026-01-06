@@ -72,7 +72,7 @@ export class AuthService {
     }
 
     // Check if username already exists
-    const existing: UserDocument | null = await this.userService.findByUsername(username);
+    const existing: UserDocument | null = await this.userService.findByUsername(username) as UserDocument | null;
     if (existing) {
       const userId = existing._id?.toString() || existing.username || 'unknown';
       this.logger.warn(
@@ -82,7 +82,7 @@ export class AuthService {
     }
 
     // Check if email already exists
-    const existingEmail: UserDocument | null = await this.userService.findByEmail(email);
+    const existingEmail: UserDocument | null = await this.userService.findByEmail(email) as UserDocument | null;
     if (existingEmail) {
       const userId = existingEmail._id?.toString() || existingEmail.username || 'unknown';
       this.logger.warn(
@@ -109,7 +109,7 @@ export class AuthService {
         password: hash,
         email_verified: false, // Email not verified yet
         email_verification_token: emailVerificationToken,
-      });
+      }) as UserDocument;
 
       // Send verification email
       try {
