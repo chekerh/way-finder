@@ -549,7 +549,23 @@ export class CatalogService {
   ): string {
     const paramsHash = JSON.stringify(params).replace(/\s+/g, '').slice(0, 100); // Limit hash length
     const userPart = userId ? `:${userId}` : '';
-    return `catalog:${type}${userPart}:${paramsHash}`;
+    // Include current year in cache key to automatically invalidate old cache at year change
+    const currentYear = new Date().getFullYear();
+    return `catalog:${type}${userPart}:${currentYear}:${paramsHash}`;
+  }
+
+  /**
+   * Clear cache for recommended flights
+   * Useful when updating date formats or fallback data
+   */
+  async clearRecommendedFlightsCache(): Promise<void> {
+    try {
+      // Clear all cache keys matching the pattern for recommended flights
+      await this.cacheService.deleteByPattern('catalog:recommended:*');
+      this.logger.log('Cleared recommended flights cache');
+    } catch (error) {
+      this.logger.warn(`Failed to clear recommended flights cache: ${error}`);
+    }
   }
 
   /**
