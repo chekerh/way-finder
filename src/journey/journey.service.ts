@@ -879,6 +879,13 @@ export class JourneyService {
       journey_id: this.toObjectId(journeyId, 'journey id') as any,
     };
 
+    // Get public base URL for converting relative URLs to absolute URLs
+    const publicBaseUrl = (
+      process.env.PUBLIC_BASE_URL ||
+      process.env.BASE_URL ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
+
     const [data, total] = await Promise.all([
       this.journeyCommentModel
         .find(query)
@@ -900,6 +907,28 @@ export class JourneyService {
         typeof populatedUserId === 'object' &&
         populatedUserId._id;
 
+      // Get profile image URL and convert to absolute URL if needed
+      let profileImageUrl: string | null = null;
+      if (isPopulatedUser) {
+        const rawProfileUrl =
+          populatedUserId.profile_image_url ||
+          populatedUserId.profileImageUrl ||
+          null;
+
+        if (rawProfileUrl && rawProfileUrl.trim() !== '' && rawProfileUrl !== 'null') {
+          // If URL is already absolute (starts with http), use it as is
+          if (rawProfileUrl.startsWith('http://') || rawProfileUrl.startsWith('https://')) {
+            profileImageUrl = rawProfileUrl;
+          } else {
+            // Convert relative URL to absolute URL
+            const cleanUrl = rawProfileUrl.startsWith('/')
+              ? rawProfileUrl
+              : `/${rawProfileUrl}`;
+            profileImageUrl = `${publicBaseUrl}${cleanUrl}`;
+          }
+        }
+      }
+
       return {
         ...commentObj,
         user_id: isPopulatedUser
@@ -913,10 +942,7 @@ export class JourneyService {
                 populatedUserId.firstName || populatedUserId.first_name || '',
               lastName:
                 populatedUserId.lastName || populatedUserId.last_name || '',
-              profileImageUrl:
-                populatedUserId.profile_image_url ||
-                populatedUserId.profileImageUrl ||
-                '',
+              profileImageUrl: profileImageUrl,
             }
           : null,
         journey_id: commentObj.journey_id?.toString() || commentObj.journey_id,
