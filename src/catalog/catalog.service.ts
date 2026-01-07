@@ -103,11 +103,17 @@ export class CatalogService {
 
     // If a specific destination is requested, use it
     if (overrides.destinationLocationCode) {
+      const departureDate = overrides.departureDate ?? this.generateDateString(14);
+      const returnDate = overrides.returnDate ?? this.generateDateString(21);
+      this.logger.debug(
+        `Searching flights with dates: departure=${departureDate}, return=${returnDate}`,
+      );
+      
       const search: FlightSearchDto = {
         originLocationCode: origin,
         destinationLocationCode: overrides.destinationLocationCode,
-        departureDate: overrides.departureDate ?? this.generateDateString(14),
-        returnDate: overrides.returnDate ?? this.generateDateString(21),
+        departureDate,
+        returnDate,
         travelClass:
           overrides.travelClass ?? this.mapTravelClass(preferences.travel_type),
         adults: overrides.adults ?? 1,
@@ -421,7 +427,15 @@ export class CatalogService {
 
   private generateDateString(offsetDays: number): string {
     const date = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
-    return date.toISOString().split('T')[0];
+    const dateString = date.toISOString().split('T')[0];
+    // Log to ensure we're using current year (for debugging)
+    const currentYear = new Date().getFullYear();
+    if (!dateString.startsWith(currentYear.toString())) {
+      this.logger.warn(
+        `Generated date ${dateString} does not match current year ${currentYear}`,
+      );
+    }
+    return dateString;
   }
 
   private mapTravelClass(travelType?: string) {
@@ -549,7 +563,23 @@ export class CatalogService {
   ): string {
     const paramsHash = JSON.stringify(params).replace(/\s+/g, '').slice(0, 100); // Limit hash length
     const userPart = userId ? `:${userId}` : '';
-    return `catalog:${type}${userPart}:${paramsHash}`;
+    // Include current year in cache key to automatically invalidate old cache at year change
+    const currentYear = new Date().getFullYear();
+    return `catalog:${type}${userPart}:${currentYear}:${paramsHash}`;
+  }
+
+  /**
+   * Clear cache for recommended flights
+   * Useful when updating date formats or fallback data
+   */
+  async clearRecommendedFlightsCache(): Promise<void> {
+    try {
+      // Clear all cache keys matching the pattern for recommended flights
+      await this.cacheService.deleteByPattern('catalog:recommended:*');
+      this.logger.log('Cleared recommended flights cache');
+    } catch (error) {
+      this.logger.warn(`Failed to clear recommended flights cache: ${error}`);
+    }
   }
 
   /**

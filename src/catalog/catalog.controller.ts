@@ -231,7 +231,8 @@ export class CatalogController {
   @Get('admin/clear-cache')
   async clearFlightCache() {
     this.amadeusService.clearFlightCache();
-    return { message: 'Flight cache cleared successfully' };
+    await this.catalogService.clearRecommendedFlightsCache();
+    return { message: 'Flight cache cleared successfully (Amadeus + Redis)' };
   }
 
   /**

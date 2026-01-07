@@ -53,8 +53,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-CDG-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-05T08:30:00' },
-              arrival: { iataCode: 'CDG', at: '2025-12-05T11:00:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-05T08:30:00' },
+              arrival: { iataCode: 'CDG', at: '2026-12-05T11:00:00' },
               carrierCode: 'TU',
               number: '750',
               aircraft: { code: '32A' },
@@ -67,8 +67,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-CDG-001-2',
-              departure: { iataCode: 'CDG', at: '2025-12-12T15:30:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-12T18:05:00' },
+              departure: { iataCode: 'CDG', at: '2026-12-12T15:30:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-12T18:05:00' },
               carrierCode: 'TU',
               number: '751',
               aircraft: { code: '32A' },
@@ -93,8 +93,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-FCO-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-06T10:15:00' },
-              arrival: { iataCode: 'FCO', at: '2025-12-06T11:40:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-06T10:15:00' },
+              arrival: { iataCode: 'FCO', at: '2026-12-06T11:40:00' },
               carrierCode: 'AZ',
               number: '865',
               aircraft: { code: '32N' },
@@ -107,8 +107,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-FCO-001-2',
-              departure: { iataCode: 'FCO', at: '2025-12-13T17:10:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-13T18:40:00' },
+              departure: { iataCode: 'FCO', at: '2026-12-13T17:10:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-13T18:40:00' },
               carrierCode: 'AZ',
               number: '866',
               aircraft: { code: '32N' },
@@ -133,8 +133,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-DXB-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-08T21:00:00' },
-              arrival: { iataCode: 'DXB', at: '2025-12-09T04:10:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-08T21:00:00' },
+              arrival: { iataCode: 'DXB', at: '2026-12-09T04:10:00' },
               carrierCode: 'EK',
               number: '748',
               aircraft: { code: '77W' },
@@ -147,8 +147,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-DXB-001-2',
-              departure: { iataCode: 'DXB', at: '2025-12-16T02:45:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-16T08:00:00' },
+              departure: { iataCode: 'DXB', at: '2026-12-16T02:45:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-16T08:00:00' },
               carrierCode: 'EK',
               number: '749',
               aircraft: { code: '77W' },
@@ -173,8 +173,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-JFK-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-10T07:20:00' },
-              arrival: { iataCode: 'JFK', at: '2025-12-10T13:00:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-10T07:20:00' },
+              arrival: { iataCode: 'JFK', at: '2026-12-10T13:00:00' },
               carrierCode: 'DL',
               number: '113',
               aircraft: { code: '330' },
@@ -187,8 +187,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-JFK-001-2',
-              departure: { iataCode: 'JFK', at: '2025-12-18T22:30:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-19T11:15:00' },
+              departure: { iataCode: 'JFK', at: '2026-12-18T22:30:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-19T11:15:00' },
               carrierCode: 'DL',
               number: '114',
               aircraft: { code: '330' },
@@ -213,8 +213,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-BCN-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-07T06:40:00' },
-              arrival: { iataCode: 'BCN', at: '2025-12-07T08:30:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-07T06:40:00' },
+              arrival: { iataCode: 'BCN', at: '2026-12-07T08:30:00' },
               carrierCode: 'VY',
               number: '8871',
               aircraft: { code: '320' },
@@ -227,8 +227,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-BCN-001-2',
-              departure: { iataCode: 'BCN', at: '2025-12-14T19:25:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-14T21:20:00' },
+              departure: { iataCode: 'BCN', at: '2026-12-14T19:25:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-14T21:20:00' },
               carrierCode: 'VY',
               number: '8872',
               aircraft: { code: '320' },
@@ -253,8 +253,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-LHR-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-09T09:00:00' },
-              arrival: { iataCode: 'LHR', at: '2025-12-09T12:15:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-09T09:00:00' },
+              arrival: { iataCode: 'LHR', at: '2026-12-09T12:15:00' },
               carrierCode: 'BA',
               number: '202',
               aircraft: { code: '320' },
@@ -267,8 +267,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-LHR-001-2',
-              departure: { iataCode: 'LHR', at: '2025-12-16T14:30:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-16T17:50:00' },
+              departure: { iataCode: 'LHR', at: '2026-12-16T14:30:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-16T17:50:00' },
               carrierCode: 'BA',
               number: '203',
               aircraft: { code: '320' },
@@ -293,8 +293,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-MAD-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-11T11:20:00' },
-              arrival: { iataCode: 'MAD', at: '2025-12-11T13:30:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-11T11:20:00' },
+              arrival: { iataCode: 'MAD', at: '2026-12-11T13:30:00' },
               carrierCode: 'IB',
               number: '3456',
               aircraft: { code: '320' },
@@ -307,8 +307,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-MAD-001-2',
-              departure: { iataCode: 'MAD', at: '2025-12-18T16:45:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-18T18:00:00' },
+              departure: { iataCode: 'MAD', at: '2026-12-18T16:45:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-18T18:00:00' },
               carrierCode: 'IB',
               number: '3457',
               aircraft: { code: '320' },
@@ -333,8 +333,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-NRT-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-12T10:00:00' },
-              arrival: { iataCode: 'NRT', at: '2025-12-13T02:30:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-12T10:00:00' },
+              arrival: { iataCode: 'NRT', at: '2026-12-13T02:30:00' },
               carrierCode: 'JL',
               number: '601',
               aircraft: { code: '787' },
@@ -347,8 +347,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-NRT-001-2',
-              departure: { iataCode: 'NRT', at: '2025-12-20T11:00:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-21T01:45:00' },
+              departure: { iataCode: 'NRT', at: '2026-12-20T11:00:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-21T01:45:00' },
               carrierCode: 'JL',
               number: '602',
               aircraft: { code: '787' },
@@ -373,8 +373,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-BKK-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-13T08:30:00' },
-              arrival: { iataCode: 'BKK', at: '2025-12-13T19:50:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-13T08:30:00' },
+              arrival: { iataCode: 'BKK', at: '2026-12-13T19:50:00' },
               carrierCode: 'TG',
               number: '945',
               aircraft: { code: '777' },
@@ -387,8 +387,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-BKK-001-2',
-              departure: { iataCode: 'BKK', at: '2025-12-21T14:20:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-22T01:50:00' },
+              departure: { iataCode: 'BKK', at: '2026-12-21T14:20:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-22T01:50:00' },
               carrierCode: 'TG',
               number: '946',
               aircraft: { code: '777' },
@@ -413,8 +413,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-SIN-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-14T09:15:00' },
-              arrival: { iataCode: 'SIN', at: '2025-12-14T21:30:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-14T09:15:00' },
+              arrival: { iataCode: 'SIN', at: '2026-12-14T21:30:00' },
               carrierCode: 'SQ',
               number: '351',
               aircraft: { code: '350' },
@@ -427,8 +427,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-SIN-001-2',
-              departure: { iataCode: 'SIN', at: '2025-12-22T23:45:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-23T12:10:00' },
+              departure: { iataCode: 'SIN', at: '2026-12-22T23:45:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-23T12:10:00' },
               carrierCode: 'SQ',
               number: '352',
               aircraft: { code: '350' },
@@ -453,8 +453,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-ICN-001-1',
-              departure: { iataCode: 'TUN', at: '2025-12-15T07:45:00' },
-              arrival: { iataCode: 'ICN', at: '2025-12-15T21:25:00' },
+              departure: { iataCode: 'TUN', at: '2026-12-15T07:45:00' },
+              arrival: { iataCode: 'ICN', at: '2026-12-15T21:25:00' },
               carrierCode: 'KE',
               number: '654',
               aircraft: { code: '777' },
@@ -467,8 +467,8 @@ export const FALLBACK_FLIGHT_OFFERS: FallbackFlightOffer[] = [
           segments: [
             {
               id: 'WF-ICN-001-2',
-              departure: { iataCode: 'ICN', at: '2025-12-23T10:30:00' },
-              arrival: { iataCode: 'TUN', at: '2025-12-24T00:20:00' },
+              departure: { iataCode: 'ICN', at: '2026-12-23T10:30:00' },
+              arrival: { iataCode: 'TUN', at: '2026-12-24T00:20:00' },
               carrierCode: 'KE',
               number: '655',
               aircraft: { code: '777' },
@@ -494,8 +494,8 @@ export const FALLBACK_EXPLORE_OFFERS = [
     countryTo: { code: 'FR', name: 'France' },
     price: 189,
     currency: 'EUR',
-    localDeparture: '2025-12-05T08:30:00',
-    localArrival: '2025-12-05T11:00:00',
+    localDeparture: '2026-12-05T08:30:00',
+    localArrival: '2026-12-05T11:00:00',
     airlines: ['TU'],
   },
   {
@@ -508,8 +508,8 @@ export const FALLBACK_EXPLORE_OFFERS = [
     countryTo: { code: 'IT', name: 'Italy' },
     price: 205,
     currency: 'EUR',
-    localDeparture: '2025-12-06T10:15:00',
-    localArrival: '2025-12-06T11:40:00',
+    localDeparture: '2026-12-06T10:15:00',
+    localArrival: '2026-12-06T11:40:00',
     airlines: ['AZ'],
   },
   {
@@ -522,8 +522,8 @@ export const FALLBACK_EXPLORE_OFFERS = [
     countryTo: { code: 'AE', name: 'United Arab Emirates' },
     price: 420,
     currency: 'EUR',
-    localDeparture: '2025-12-08T21:00:00',
-    localArrival: '2025-12-09T04:10:00',
+    localDeparture: '2026-12-08T21:00:00',
+    localArrival: '2026-12-09T04:10:00',
     airlines: ['EK'],
   },
   {
@@ -536,8 +536,8 @@ export const FALLBACK_EXPLORE_OFFERS = [
     countryTo: { code: 'US', name: 'United States' },
     price: 690,
     currency: 'EUR',
-    localDeparture: '2025-12-10T07:20:00',
-    localArrival: '2025-12-10T13:00:00',
+    localDeparture: '2026-12-10T07:20:00',
+    localArrival: '2026-12-10T13:00:00',
     airlines: ['DL'],
   },
   {
@@ -550,8 +550,8 @@ export const FALLBACK_EXPLORE_OFFERS = [
     countryTo: { code: 'ES', name: 'Spain' },
     price: 170,
     currency: 'EUR',
-    localDeparture: '2025-12-07T06:40:00',
-    localArrival: '2025-12-07T08:30:00',
+    localDeparture: '2026-12-07T06:40:00',
+    localArrival: '2026-12-07T08:30:00',
     airlines: ['VY'],
   },
   {
@@ -564,8 +564,8 @@ export const FALLBACK_EXPLORE_OFFERS = [
     countryTo: { code: 'TR', name: 'Turkey' },
     price: 230,
     currency: 'EUR',
-    localDeparture: '2025-12-09T13:45:00',
-    localArrival: '2025-12-09T17:15:00',
+    localDeparture: '2026-12-09T13:45:00',
+    localArrival: '2026-12-09T17:15:00',
     airlines: ['TK'],
   },
 ];
