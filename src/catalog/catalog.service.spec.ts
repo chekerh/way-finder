@@ -16,7 +16,7 @@ describe('CatalogService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    jest.useFakeTimers().setSystemTime(new Date('2025-01-01T00:00:00Z'));
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:00:00Z'));
     (amadeus.isConfigured as jest.Mock).mockReturnValue(true);
     catalogService = new CatalogService(amadeus, activities, userService);
   });
@@ -52,8 +52,8 @@ describe('CatalogService', () => {
         max: 3,
         maxPrice: 800,
         adults: 2,
-        departureDate: '2025-01-15',
-        returnDate: '2025-01-22',
+        departureDate: '2026-01-15',
+        returnDate: '2026-01-22',
       }),
     );
   });
