@@ -34,10 +34,7 @@ export class DiscountsController {
     @Request() req,
     @Query('type') type?: DiscountType,
   ): Promise<AvailableDiscountsResponse> {
-    return this.discountsService.getAvailableDiscounts(
-      req.user.sub,
-      type,
-    );
+    return this.discountsService.getAvailableDiscounts(req.user.sub, type);
   }
 
   /**
@@ -71,4 +68,3 @@ export class DiscountsController {
     };
   }
 }
-

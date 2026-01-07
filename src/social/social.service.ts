@@ -354,14 +354,18 @@ export class SocialService {
       'http://localhost:3000'
     ).replace(/\/$/, '');
 
-    this.logger.log(`[getUserSharedTripsPaginated] Fetching trips for user: ${userId}, page: ${page}, limit: ${limit}`);
+    this.logger.log(
+      `[getUserSharedTripsPaginated] Fetching trips for user: ${userId}, page: ${page}, limit: ${limit}`,
+    );
 
     // Convert userId to ObjectId for queries
     let userIdObjectId: any;
     try {
       userIdObjectId = new this.sharedTripModel.db.base.Types.ObjectId(userId);
     } catch (error) {
-      this.logger.error(`[getUserSharedTripsPaginated] Invalid userId format: ${userId}`);
+      this.logger.error(
+        `[getUserSharedTripsPaginated] Invalid userId format: ${userId}`,
+      );
       return { data: [], total: 0 };
     }
 
@@ -376,10 +380,16 @@ export class SocialService {
       this.sharedTripModel.countDocuments(sharedTripsQuery).exec(),
     ]);
 
-    this.logger.log(`[getUserSharedTripsPaginated] Found ${sharedTrips.length} SharedTrips (total: ${sharedTripsTotal})`);
+    this.logger.log(
+      `[getUserSharedTripsPaginated] Found ${sharedTrips.length} SharedTrips (total: ${sharedTripsTotal})`,
+    );
 
     // Get Journeys (these are also shared trips)
-    const journeysQuery = { user_id: userIdObjectId, is_visible: true, is_public: true };
+    const journeysQuery = {
+      user_id: userIdObjectId,
+      is_visible: true,
+      is_public: true,
+    };
     const [journeys, journeysTotal] = await Promise.all([
       this.journeyModel
         .find(journeysQuery)
@@ -389,7 +399,9 @@ export class SocialService {
       this.journeyModel.countDocuments(journeysQuery).exec(),
     ]);
 
-    this.logger.log(`[getUserSharedTripsPaginated] Found ${journeys.length} Journeys (total: ${journeysTotal})`);
+    this.logger.log(
+      `[getUserSharedTripsPaginated] Found ${journeys.length} Journeys (total: ${journeysTotal})`,
+    );
 
     // Format shared trips with full image URLs
     const formattedSharedTrips = sharedTrips.map((trip: any) => {
@@ -477,7 +489,9 @@ export class SocialService {
     const total = sharedTripsTotal + journeysTotal;
     const paginatedData = allTrips.slice(skip, skip + limit);
 
-    this.logger.log(`[getUserSharedTripsPaginated] Returning ${paginatedData.length} trips (total: ${total}, skip: ${skip}, limit: ${limit})`);
+    this.logger.log(
+      `[getUserSharedTripsPaginated] Returning ${paginatedData.length} trips (total: ${total}, skip: ${skip}, limit: ${limit})`,
+    );
 
     return { data: paginatedData, total };
   }
@@ -606,7 +620,9 @@ export class SocialService {
       .sort({ createdAt: -1 })
       .exec();
 
-    this.logger.debug(`Found ${sharedTripsRaw.length} shared trips for user ${userId} (query: { userId: ${userIdObjectId}, isVisible: true })`);
+    this.logger.debug(
+      `Found ${sharedTripsRaw.length} shared trips for user ${userId} (query: { userId: ${userIdObjectId}, isVisible: true })`,
+    );
 
     // Format shared trips with full image URLs
     const sharedTrips = sharedTripsRaw.map((trip: any) => {
@@ -629,7 +645,9 @@ export class SocialService {
       .sort({ createdAt: -1 })
       .exec();
 
-    this.logger.debug(`Found ${journeys.length} journeys for user ${userId} (query: { user_id: ${userIdObjectId}, is_visible: true })`);
+    this.logger.debug(
+      `Found ${journeys.length} journeys for user ${userId} (query: { user_id: ${userIdObjectId}, is_visible: true })`,
+    );
 
     // Convert journeys to shared trip format for processing
     const journeyAsTrips = journeys.map((journey: any) => {
@@ -699,18 +717,24 @@ export class SocialService {
     this.logger.log(
       `[MapMemories] Total trips found: ${trips.length} (${sharedTrips.length} shared trips + ${journeyAsTrips.length} journeys)`,
     );
-    
+
     if (trips.length === 0) {
-      this.logger.warn(`[MapMemories] No trips found for user ${userId}. Checking database...`);
-      
+      this.logger.warn(
+        `[MapMemories] No trips found for user ${userId}. Checking database...`,
+      );
+
       // Debug: Check if there are any trips at all for this user (without filters)
-      const allSharedTrips = await this.sharedTripModel.find({ userId: userIdObjectId }).exec();
-      const allJourneys = await this.journeyModel.find({ user_id: userIdObjectId }).exec();
-      
+      const allSharedTrips = await this.sharedTripModel
+        .find({ userId: userIdObjectId })
+        .exec();
+      const allJourneys = await this.journeyModel
+        .find({ user_id: userIdObjectId })
+        .exec();
+
       this.logger.warn(
         `[MapMemories] Debug - Total shared trips (no filters): ${allSharedTrips.length}, Total journeys (no filters): ${allJourneys.length}`,
       );
-      
+
       if (allSharedTrips.length > 0) {
         this.logger.warn(
           `[MapMemories] Debug - Shared trips details: ${JSON.stringify(
@@ -723,7 +747,7 @@ export class SocialService {
           )}`,
         );
       }
-      
+
       if (allJourneys.length > 0) {
         this.logger.warn(
           `[MapMemories] Debug - Journeys details: ${JSON.stringify(
@@ -736,7 +760,7 @@ export class SocialService {
           )}`,
         );
       }
-      
+
       return {
         countries: [],
         memories: [],
@@ -909,13 +933,13 @@ export class SocialService {
     // Helper function to convert destination code (e.g., "WF-BCN-001") to country
     const convertDestinationCodeToCountry = (code: string): string | null => {
       if (!code || !code.startsWith('WF-')) return null;
-      
+
       // Extract airport code from format "WF-XXX-001"
       const parts = code.split('-');
       if (parts.length < 2) return null;
-      
+
       const airportCode = parts[1].toUpperCase();
-      
+
       // Mapping airport codes to countries (matching iOS DestinationHelper)
       const airportToCountry: Record<string, string> = {
         // Spain
@@ -963,26 +987,28 @@ export class SocialService {
         SYD: 'Australia', // Sydney
         MEL: 'Australia', // Melbourne
       };
-      
+
       const country = airportToCountry[airportCode];
       if (country) {
-        this.logger.debug(`Converted destination code "${code}" (airport: ${airportCode}) to country: ${country}`);
+        this.logger.debug(
+          `Converted destination code "${code}" (airport: ${airportCode}) to country: ${country}`,
+        );
         return country;
       }
-      
+
       return null;
     };
 
     // Helper function to extract country from text
     const extractCountryFromText = (text: string): string | null => {
       if (!text) return null;
-      
+
       // First, check if it's a destination code (e.g., "WF-BCN-001")
       const countryFromCode = convertDestinationCodeToCountry(text);
       if (countryFromCode) {
         return countryFromCode;
       }
-      
+
       // Normalize text: remove extra spaces, convert to lowercase, trim
       const normalizedText = text
         .toLowerCase()
@@ -990,7 +1016,9 @@ export class SocialService {
         .replace(/\s+/g, ' ')
         .replace(/[^\w\s,]/g, ''); // Remove special characters except commas
 
-      this.logger.debug(`Extracting country from text: "${text}" (normalized: "${normalizedText}")`);
+      this.logger.debug(
+        `Extracting country from text: "${text}" (normalized: "${normalizedText}")`,
+      );
 
       // First, try to find city and map to country (more specific, check this first)
       // Sort by length (longest first) to match "paris, france" before just "paris"
@@ -1000,7 +1028,9 @@ export class SocialService {
       for (const [city, country] of sortedCities) {
         // Check if the normalized text contains the city (as whole word or part)
         if (normalizedText.includes(city)) {
-          this.logger.debug(`City "${city}" found in text "${text}" -> ${country}`);
+          this.logger.debug(
+            `City "${city}" found in text "${text}" -> ${country}`,
+          );
           return country;
         }
       }
@@ -1020,7 +1050,7 @@ export class SocialService {
 
       // Try to extract country from common patterns like "City, Country" or "City Country"
       // Extract the part after comma or the last word
-      const parts = normalizedText.split(',').map(p => p.trim());
+      const parts = normalizedText.split(',').map((p) => p.trim());
       if (parts.length > 1) {
         // If there's a comma, check the part after comma as country
         const possibleCountry = parts[parts.length - 1];
@@ -1028,28 +1058,41 @@ export class SocialService {
         for (const [countryName, _] of Object.entries(countryCoordinates)) {
           const lowerCountryName = countryName.toLowerCase();
           if (possibleCountry === lowerCountryName) {
-            this.logger.debug(`Country "${countryName}" extracted from pattern (exact match) in text "${text}"`);
+            this.logger.debug(
+              `Country "${countryName}" extracted from pattern (exact match) in text "${text}"`,
+            );
             return countryName;
           }
         }
         // Then try contains match
         for (const [countryName, _] of Object.entries(countryCoordinates)) {
           const lowerCountryName = countryName.toLowerCase();
-          if (possibleCountry.includes(lowerCountryName) || lowerCountryName.includes(possibleCountry)) {
-            this.logger.debug(`Country "${countryName}" extracted from pattern (contains match) in text "${text}"`);
+          if (
+            possibleCountry.includes(lowerCountryName) ||
+            lowerCountryName.includes(possibleCountry)
+          ) {
+            this.logger.debug(
+              `Country "${countryName}" extracted from pattern (contains match) in text "${text}"`,
+            );
             return countryName;
           }
         }
       }
-      
+
       // Also try to find country in the last word if no comma found
       const words = normalizedText.split(/\s+/);
       if (words.length > 1) {
         const lastWord = words[words.length - 1];
         for (const [countryName, _] of Object.entries(countryCoordinates)) {
           const lowerCountryName = countryName.toLowerCase();
-          if (lastWord === lowerCountryName || lowerCountryName.includes(lastWord) || lastWord.includes(lowerCountryName)) {
-            this.logger.debug(`Country "${countryName}" extracted from last word "${lastWord}" in text "${text}"`);
+          if (
+            lastWord === lowerCountryName ||
+            lowerCountryName.includes(lastWord) ||
+            lastWord.includes(lowerCountryName)
+          ) {
+            this.logger.debug(
+              `Country "${countryName}" extracted from last word "${lastWord}" in text "${text}"`,
+            );
             return countryName;
           }
         }
@@ -1063,7 +1106,9 @@ export class SocialService {
     trips.forEach((trip: any) => {
       const tripObj = trip.toObject ? trip.toObject() : trip;
 
-      this.logger.log(`[MapMemories] Processing trip ${tripObj._id}: title="${tripObj.title}", destination="${tripObj.destination}", metadata=${JSON.stringify(tripObj.metadata)}`);
+      this.logger.log(
+        `[MapMemories] Processing trip ${tripObj._id}: title="${tripObj.title}", destination="${tripObj.destination}", metadata=${JSON.stringify(tripObj.metadata)}`,
+      );
 
       // Processing trip for country extraction
 
@@ -1083,18 +1128,25 @@ export class SocialService {
         country = extractCountryFromText(tripObj.destination);
         source = 'destination';
         if (country) {
-          this.logger.debug(`Country extracted from destination "${tripObj.destination}": ${country}`);
+          this.logger.debug(
+            `Country extracted from destination "${tripObj.destination}": ${country}`,
+          );
         } else {
           // If extraction failed, try to extract country name directly from "City, Country" format
-          const destinationParts = tripObj.destination.split(',').map(p => p.trim());
+          const destinationParts = tripObj.destination
+            .split(',')
+            .map((p) => p.trim());
           if (destinationParts.length > 1) {
-            const possibleCountry = destinationParts[destinationParts.length - 1];
+            const possibleCountry =
+              destinationParts[destinationParts.length - 1];
             // Check if the country name exists in our mapping
             for (const [countryName, _] of Object.entries(countryCoordinates)) {
               if (countryName.toLowerCase() === possibleCountry.toLowerCase()) {
                 country = countryName;
                 source = 'destination (direct country match)';
-                this.logger.debug(`Country "${country}" found directly in destination "${tripObj.destination}"`);
+                this.logger.debug(
+                  `Country "${country}" found directly in destination "${tripObj.destination}"`,
+                );
                 break;
               }
             }
@@ -1106,7 +1158,9 @@ export class SocialService {
         country = extractCountryFromText(tripObj.metadata.destination);
         source = 'metadata.destination';
         if (country) {
-          this.logger.debug(`Country extracted from metadata.destination: ${country}`);
+          this.logger.debug(
+            `Country extracted from metadata.destination: ${country}`,
+          );
         }
       }
       // 4. Check title
@@ -1142,22 +1196,26 @@ export class SocialService {
         // Log for debugging with all available information
         this.logger.warn(
           `[MapMemories] No country found for trip ${tripObj._id}. ` +
-          `Title: "${tripObj.title}", ` +
-          `Destination: "${tripObj.destination}", ` +
-          `Metadata: ${JSON.stringify(tripObj.metadata)}, ` +
-          `Description: "${tripObj.description}", ` +
-          `Tags: ${JSON.stringify(tripObj.tags)}`
+            `Title: "${tripObj.title}", ` +
+            `Destination: "${tripObj.destination}", ` +
+            `Metadata: ${JSON.stringify(tripObj.metadata)}, ` +
+            `Description: "${tripObj.description}", ` +
+            `Tags: ${JSON.stringify(tripObj.tags)}`,
         );
         return;
       }
 
       // Country successfully detected
-      this.logger.log(`[MapMemories] Country "${country}" found for trip ${tripObj._id} from source: ${source}`);
+      this.logger.log(
+        `[MapMemories] Country "${country}" found for trip ${tripObj._id} from source: ${source}`,
+      );
 
       // Get coordinates for country
       const coords = countryCoordinates[country];
       if (!coords) {
-        this.logger.warn(`Country "${country}" found but no coordinates available in mapping for trip ${tripObj._id}`);
+        this.logger.warn(
+          `Country "${country}" found but no coordinates available in mapping for trip ${tripObj._id}`,
+        );
         return; // Skip if country not in our mapping
       }
 
@@ -1170,13 +1228,17 @@ export class SocialService {
           trips: [],
           count: 0,
         });
-        this.logger.debug(`Created new country entry for ${country} at (${coords.lat}, ${coords.lng})`);
+        this.logger.debug(
+          `Created new country entry for ${country} at (${coords.lat}, ${coords.lng})`,
+        );
       }
 
       const countryData = countryMap.get(country)!;
       countryData.trips.push(tripObj);
       countryData.count = countryData.trips.length;
-      this.logger.debug(`Added trip ${tripObj._id} to country ${country}. Total trips for this country: ${countryData.count}`);
+      this.logger.debug(
+        `Added trip ${tripObj._id} to country ${country}. Total trips for this country: ${countryData.count}`,
+      );
     });
 
     // Convert map to array (for backward compatibility - grouped by country)
@@ -1186,10 +1248,10 @@ export class SocialService {
     const individualMemories = trips
       .map((trip: any) => {
         const tripObj = trip.toObject ? trip.toObject() : trip;
-        
+
         // Extract country from trip
         let country: string | null = null;
-        
+
         // 1. Check metadata.country
         if (tripObj.metadata?.country) {
           country = tripObj.metadata.country;
@@ -1206,17 +1268,17 @@ export class SocialService {
         else if (tripObj.title) {
           country = extractCountryFromText(tripObj.title);
         }
-        
+
         if (!country) {
           return null;
         }
-        
+
         // Get coordinates for country
         const coords = countryCoordinates[country];
         if (!coords) {
           return null;
         }
-        
+
         // Return memory with trip data embedded
         return {
           _id: tripObj._id || tripObj.id,

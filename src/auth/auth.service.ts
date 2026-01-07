@@ -3,14 +3,15 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  UnauthorizedException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
+import { UserDocument } from '../user/user.schema';
 import {
   RegisterDto,
   LoginDto,
@@ -20,6 +21,8 @@ import {
   VerifyOTPDto,
   RegisterWithOTPDto,
   SendOTPForRegistrationDto,
+  RequestPasswordResetDto,
+  ResetPasswordDto,
 } from './auth.dto';
 import { GoogleAuthService } from './google-auth.service';
 import { EmailService } from './email.service';
@@ -69,26 +72,25 @@ export class AuthService {
     }
 
     // Check if username already exists
-    const existing = await this.userService.findByUsername(username);
+    const existing: UserDocument | null = await this.userService.findByUsername(username) as UserDocument | null;
     if (existing) {
-      const userId = (existing as any)._id || (existing as any).id || 'unknown';
+      const userId = existing._id?.toString() || existing.username || 'unknown';
       this.logger.warn(
         `Username conflict: ${username} already exists (user ID: ${userId})`,
       );
       throw new ConflictException('Username already exists');
     }
-    
+
     // Check if email already exists
-    const existingEmail = await this.userService.findByEmail(email);
+    const existingEmail: UserDocument | null = await this.userService.findByEmail(email) as UserDocument | null;
     if (existingEmail) {
-      const userId =
-        (existingEmail as any)._id || (existingEmail as any).id || 'unknown';
+      const userId = existingEmail._id?.toString() || existingEmail.username || 'unknown';
       this.logger.warn(
         `Email conflict: ${email} already exists (user ID: ${userId})`,
       );
       throw new ConflictException('Email already exists');
     }
-    
+
     const rawPassword = dto.password.trim();
     if (!rawPassword) throw new BadRequestException('Password is required');
 
@@ -99,15 +101,15 @@ export class AuthService {
       this.emailService.generateVerificationToken();
 
     try {
-    const user = await this.userService.create({
-      username,
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      password: hash,
+      const user: UserDocument = await this.userService.create({
+        username,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        password: hash,
         email_verified: false, // Email not verified yet
         email_verification_token: emailVerificationToken,
-      });
+      }) as UserDocument;
 
       // Send verification email
       try {
@@ -116,35 +118,36 @@ export class AuthService {
           emailVerificationToken,
           firstName,
         );
-      } catch (error) {
+      } catch (error: unknown) {
         // Log error but don't fail registration if email fails
-        this.logger.error(
-          'Failed to send verification email',
-          error.stack || error,
-        );
+        const errorMessage =
+          error instanceof Error ? error.stack || error.message : String(error);
+        this.logger.error('Failed to send verification email', errorMessage);
       }
 
-    const userObj = (user as any).toObject ? (user as any).toObject() : user;
-    const { password: _password, ...result } = userObj;
+      // Safely extract user data without password
+      const userObj = typeof user.toObject === 'function' ? user.toObject() : user;
+      const { password: _, ...result } = userObj;
       return {
         message:
           'User registered successfully. Please check your email to verify your account.',
         user: result,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle MongoDB duplicate key errors
-      if (error.code === 11000) {
+      const mongoError = error as { code?: number; keyPattern?: Record<string, number>; message?: string };
+      if (mongoError?.code === 11000) {
         // MongoDB duplicate key error
         let duplicateField: string | null = null;
 
         // Try to get the field from keyPattern
-        if (error.keyPattern) {
-          duplicateField = Object.keys(error.keyPattern)[0];
+        if (mongoError.keyPattern) {
+          duplicateField = Object.keys(mongoError.keyPattern)[0];
         }
 
         // If not found, try to extract from error message
-        if (!duplicateField && error.message) {
-          const message = error.message.toLowerCase();
+        if (!duplicateField && mongoError.message) {
+          const message = mongoError.message.toLowerCase();
           if (message.includes('email') || message.includes('email_1')) {
             duplicateField = 'email';
           } else if (
@@ -761,7 +764,7 @@ export class AuthService {
     const userObj = (user as any).toObject ? (user as any).toObject() : user;
     const { password: _password, ...userData } = userObj;
 
-    return { 
+    return {
       access_token: token,
       user: userData,
       onboarding_completed: user.onboarding_completed || false,
@@ -888,6 +891,209 @@ export class AuthService {
     return {
       message: 'Code de vérification envoyé avec succès',
       email: email,
+    };
+  }
+
+  /**
+   * Request a password reset by sending an OTP to the user's email.
+   * Validates user existence, generates OTP, and sends verification email.
+   *
+   * @param dto - Password reset request containing email address
+   * @returns Success message and email confirmation
+   * @throws NotFoundException if user doesn't exist with the provided email
+   * @throws BadRequestException if cooldown period hasn't elapsed (30 seconds) or email service fails
+   *
+   * Note: OTP code is 4 digits and expires after 5 minutes
+   * Note: 30-second cooldown between OTP requests
+   * Note: Existing OTPs for the email are invalidated when new one is sent
+   */
+  async requestPasswordReset(dto: RequestPasswordResetDto) {
+    const email = dto.email.trim().toLowerCase();
+
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      this.logger.warn(`Request Password Reset: User not found for email: ${email}`);
+      throw new NotFoundException(
+        "Aucun compte trouvé avec cet email. Veuillez vérifier l'email fourni.",
+      );
+    }
+
+    this.logger.debug(
+      `Request Password Reset: User found for email: ${email}, user ID: ${(user as any)._id}`,
+    );
+
+    // Check cooldown period (30 seconds) - reusing OTP cooldown logic
+    const recentOTP = await this.otpModel
+      .findOne({
+        email,
+        last_sent_at: { $gte: new Date(Date.now() - 30 * 1000) }, // Within last 30 seconds
+      })
+      .sort({ last_sent_at: -1 })
+      .exec();
+
+    if (recentOTP) {
+      const secondsRemaining = Math.ceil(
+        (30 * 1000 - (Date.now() - recentOTP.last_sent_at.getTime())) / 1000,
+      );
+      throw new BadRequestException(
+        `Veuillez attendre ${secondsRemaining} seconde(s) avant de renvoyer le code.`,
+      );
+    }
+
+    const otpCode = this.emailService.generateOTPCode();
+    const normalizedCode = otpCode
+      .replace(/\D/g, '')
+      .padStart(4, '0')
+      .slice(0, 4);
+
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+    const now = new Date();
+
+    await this.otpModel
+      .updateMany({ email, used: false }, { $set: { used: true } })
+      .exec();
+
+    const otp = new this.otpModel({
+      email,
+      code: normalizedCode,
+      expires_at: expiresAt,
+      used: false,
+      last_sent_at: now,
+    });
+    await otp.save();
+
+    try {
+      this.logger.debug(
+        `Request Password Reset: Attempting to send OTP email to ${email}`,
+      );
+      await this.emailService.sendOTPEmail(
+        email,
+        normalizedCode,
+        user.first_name,
+      );
+      this.logger.log(`Request Password Reset: OTP email sent to ${email}`);
+    } catch (error: any) {
+      this.logger.error(
+        `Request Password Reset: Failed to send email to ${email}: ${error.message || error}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Impossible d'envoyer l'email. Erreur: ${error.message || 'Service email non configuré'}. Veuillez vérifier la configuration email sur Render ou réessayer plus tard.`,
+      );
+    }
+
+    return {
+      message: 'Code de réinitialisation de mot de passe envoyé avec succès',
+      email: email,
+    };
+  }
+
+  /**
+   * Reset user password after OTP verification.
+   * Verifies OTP code and updates the user's password.
+   *
+   * @param dto - Password reset data containing email, OTP code, and new password
+   * @returns Success message
+   * @throws BadRequestException if code format is invalid, new password is too short, or no OTP was sent
+   * @throws UnauthorizedException if code is invalid, expired, or already used
+   * @throws NotFoundException if user doesn't exist after OTP verification
+   */
+  async resetPassword(dto: ResetPasswordDto) {
+    const email = dto.email.trim().toLowerCase();
+    const code = dto.code
+      .trim()
+      .replace(/\D/g, '')
+      .padStart(4, '0')
+      .slice(0, 4);
+    const newPassword = dto.new_password;
+
+    this.logger.debug(`Reset Password: Verifying OTP for ${email}`);
+
+    if (code.length !== 4 || !/^\d{4}$/.test(code)) {
+      throw new BadRequestException('Le code doit être composé de 4 chiffres');
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      throw new BadRequestException(
+        'Le nouveau mot de passe doit contenir au moins 6 caractères.',
+      );
+    }
+
+    const anyOTP = await this.otpModel
+      .findOne({ email })
+      .sort({ last_sent_at: -1 })
+      .exec();
+    if (!anyOTP) {
+      this.logger.warn(`Reset Password: No OTP found for email: ${email}`);
+      throw new BadRequestException(
+        "Aucun code n'a été envoyé. Veuillez d'abord demander un code de réinitialisation.",
+      );
+    }
+
+    const otp = await this.otpModel
+      .findOne({
+        email,
+        code: code,
+        used: false,
+        expires_at: { $gt: new Date() },
+      })
+      .exec();
+
+    if (!otp) {
+      this.logger.warn(`Reset Password: No valid OTP found for ${email}`);
+
+      const usedOtp = await this.otpModel
+        .findOne({ email, code: code, used: true })
+        .exec();
+      if (usedOtp) {
+        this.logger.warn(`Reset Password: OTP found but already used for ${email}`);
+        throw new UnauthorizedException(
+          'Ce code a déjà été utilisé. Veuillez demander un nouveau code.',
+        );
+      }
+
+      const expiredOtp = await this.otpModel
+        .findOne({
+          email,
+          code: code,
+          expires_at: { $lte: new Date() },
+        })
+        .exec();
+      if (expiredOtp) {
+        this.logger.warn(`Reset Password: OTP found but expired for ${email}`);
+        throw new UnauthorizedException(
+          'Le code a expiré. Veuillez demander un nouveau code.',
+        );
+      }
+
+      throw new UnauthorizedException(
+        'Code invalide. Veuillez vérifier le code et réessayer.',
+      );
+    }
+
+    this.logger.debug(`Reset Password: Valid OTP found for ${email}`);
+
+    await this.otpModel.findByIdAndUpdate(otp._id, { used: true }).exec();
+
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      this.logger.error(
+        `Reset Password: User not found for email: ${email} after OTP verification`,
+      );
+      throw new NotFoundException(
+        "Utilisateur introuvable. Veuillez réessayer.",
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.userService.updatePassword(
+      (user as any)._id.toString(),
+      hashedPassword,
+    );
+
+    return {
+      message: 'Mot de passe réinitialisé avec succès.',
     };
   }
 
@@ -1039,7 +1245,7 @@ export class AuthService {
         "Ce nom d'utilisateur est déjà utilisé. Veuillez en choisir un autre.",
       );
     }
-    
+
     // Additional safety check: try to find user by email one more time
     // This handles edge cases where the user might exist but wasn't found in the first check
     const finalEmailCheck = await this.userService.findByEmail(email);
@@ -1106,7 +1312,9 @@ export class AuthService {
         this.logger.warn(
           `MongoDB duplicate key error for email: ${email}, username: ${username}`,
         );
-        this.logger.debug(`Error keyPattern: ${JSON.stringify(error.keyPattern)}`);
+        this.logger.debug(
+          `Error keyPattern: ${JSON.stringify(error.keyPattern)}`,
+        );
         this.logger.debug(`Error message: ${error.message}`);
 
         let duplicateField: string | null = null;
@@ -1119,7 +1327,10 @@ export class AuthService {
             const fieldName = keys[0];
             if (fieldName === 'email' || fieldName.includes('email')) {
               duplicateField = 'email';
-            } else if (fieldName === 'username' || fieldName.includes('username')) {
+            } else if (
+              fieldName === 'username' ||
+              fieldName.includes('username')
+            ) {
               duplicateField = 'username';
             }
           }
@@ -1144,7 +1355,7 @@ export class AuthService {
           this.logger.debug(
             `Duplicate field not determined from error, checking database...`,
           );
-          
+
           // Check if the error is about google_id (sparse index issue with null values)
           if (error.keyPattern && error.keyPattern.google_id) {
             this.logger.warn(
@@ -1157,7 +1368,8 @@ export class AuthService {
               duplicateField = 'email';
             } else {
               // google_id index issue - try to find user by email or username
-              const checkUsername = await this.userService.findByUsername(username);
+              const checkUsername =
+                await this.userService.findByUsername(username);
               if (checkUsername) {
                 duplicateField = 'username';
               } else {
@@ -1180,8 +1392,9 @@ export class AuthService {
           } else {
             // Not a google_id error, check email and username normally
             const checkEmail = await this.userService.findByEmail(email);
-            const checkUsername = await this.userService.findByUsername(username);
-            
+            const checkUsername =
+              await this.userService.findByUsername(username);
+
             if (checkEmail) {
               this.logger.debug(`Found existing user by email: ${email}`);
               duplicateField = 'email';
@@ -1223,7 +1436,7 @@ export class AuthService {
                 `Sparse index issue detected: google_id duplicate key but user not found by email. This may require database index fix.`,
               );
               throw new ConflictException(
-                'Une erreur technique s\'est produite lors de la création du compte. Veuillez réessayer dans quelques instants ou contactez le support si le problème persiste.',
+                "Une erreur technique s'est produite lors de la création du compte. Veuillez réessayer dans quelques instants ou contactez le support si le problème persiste.",
               );
             }
             throw new ConflictException(
@@ -1231,7 +1444,7 @@ export class AuthService {
             );
           }
         }
-        
+
         if (duplicateField === 'username') {
           throw new ConflictException(
             "Ce nom d'utilisateur est déjà utilisé. Veuillez en choisir un autre.",
@@ -1240,7 +1453,7 @@ export class AuthService {
 
         // Final fallback (should rarely reach here)
         throw new ConflictException(
-          'Un utilisateur avec ces informations existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.',
+          "Un utilisateur avec ces informations existe déjà. Veuillez vous connecter avec votre mot de passe ou utilisez la connexion par code OTP.",
         );
       }
       throw error;

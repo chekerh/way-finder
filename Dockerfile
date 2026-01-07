@@ -33,12 +33,11 @@ RUN apk add --no-cache \
     fribidi-dev \
     libimagequant-dev \
     libxcb-dev \
-    libpng-dev; \
-    python3 -m pip install --upgrade --no-cache-dir pip setuptools wheel || true
+    libpng-dev
 
 # Copy package files first (for better caching)
 COPY package*.json ./
-RUN npm ci --silent --legacy-peer-deps
+RUN npm install --silent --legacy-peer-deps --no-fund --no-audit
 
 # Copy all application files (including Python scripts)
 COPY . .
@@ -47,10 +46,10 @@ COPY . .
 # NOTE: Build will continue even if Python deps fail - errors will be caught at runtime
 RUN set +e || true; \
     echo "=== Installing Python dependencies ==="; \
-    python3 -c "from PIL import Image" 2>/dev/null && echo "✓ Pillow OK" || (echo "Installing Pillow..." && python3 -m pip install --no-cache-dir Pillow>=10.0.0 2>&1 | tail -3 || echo "Pillow install failed"); \
-    python3 -m pip install --no-cache-dir numpy>=1.24.0 2>&1 | tail -2 || echo "numpy install failed"; \
-    python3 -m pip install --no-cache-dir requests>=2.31.0 2>&1 | tail -2 || echo "requests install failed"; \
-    python3 -m pip install --no-cache-dir moviepy>=1.0.3 2>&1 | tail -3 || echo "moviepy install failed"; \
+    python3 -c "from PIL import Image" 2>/dev/null && echo "✓ Pillow OK" || (echo "Installing Pillow..." && python3 -m pip install --break-system-packages --no-cache-dir Pillow>=10.0.0 2>&1 | tail -3 || echo "Pillow install failed"); \
+    python3 -m pip install --break-system-packages --no-cache-dir numpy>=1.24.0 2>&1 | tail -2 || echo "numpy install failed"; \
+    python3 -m pip install --break-system-packages --no-cache-dir requests>=2.31.0 2>&1 | tail -2 || echo "requests install failed"; \
+    python3 -m pip install --break-system-packages --no-cache-dir moviepy>=1.0.3 2>&1 | tail -3 || echo "moviepy install failed"; \
     echo "Python deps installation step completed"; \
     exit 0
 

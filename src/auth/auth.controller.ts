@@ -1,4 +1,10 @@
-import { Body, Controller, Post, Get, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Get,
+  Query,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
@@ -10,6 +16,8 @@ import {
   VerifyOTPDto,
   RegisterWithOTPDto,
   SendOTPForRegistrationDto,
+  RequestPasswordResetDto,
+  ResetPasswordDto,
 } from './auth.dto';
 
 /**
@@ -93,5 +101,25 @@ export class AuthController {
   @Post('register-with-otp')
   registerWithOTP(@Body() dto: RegisterWithOTPDto) {
     return this.authService.registerWithOTP(dto);
+  }
+
+  /**
+   * Request password reset OTP
+   * Rate limited: 3 requests per minute to prevent abuse
+   */
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('request-password-reset')
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  /**
+   * Reset password with OTP
+   * Rate limited: 3 requests per minute to prevent abuse
+   */
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 }

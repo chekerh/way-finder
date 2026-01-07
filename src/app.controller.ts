@@ -78,7 +78,7 @@ export class AppController {
         health.services.database.latency = latency;
         health.services.database.status = 'connected';
         health.services.database.ready = true;
-        
+
         // Mark as ready if database is connected and responsive
         // Don't require < 100ms latency as Render can have variable network conditions
         health.ready = true;
@@ -186,7 +186,7 @@ export class AppController {
       } else {
         results.jwt = { status: 'not_configured' };
       }
-    } catch (error) {
+    } catch {
       results.jwt = { status: 'error' };
     }
 

@@ -97,4 +97,3 @@ export class AvailableDiscountsResponse {
   user_points: number;
   eligible_discounts: DiscountDto[];
 }
-

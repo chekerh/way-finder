@@ -1,0 +1,11 @@
+[**WayFinder Backend API Documentation v0.0.1**](../../README.md)
+
+***
+
+[WayFinder Backend API Documentation](../../README.md) / chat/chat.controller
+
+# chat/chat.controller
+
+## Classes
+
+- [ChatController](classes/ChatController.md)

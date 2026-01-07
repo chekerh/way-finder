@@ -12,6 +12,7 @@ import { BookingModule } from './booking/booking.module';
 import { PaymentModule } from './payment/payment.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { VideoGenerationModule } from './video-generation/video-generation.module';
 import { RealTimeGateway } from './real-time/real-time.gateway';
 import { CatalogModule } from './catalog/catalog.module';
 import { DiscussionModule } from './discussion/discussion.module';
@@ -27,7 +28,6 @@ import { JourneyModule } from './journey/journey.module';
 import { VideoProcessingModule } from './video-processing/video-processing.module';
 import { DestinationVideoModule } from './video-generation/destination-video.module';
 import { ChatModule } from './chat/chat.module';
-import { RewardsModule } from './rewards/rewards.module';
 import { OutfitWeatherModule } from './outfit-weather/outfit-weather.module';
 import { CacheModule } from './common/cache/cache.module';
 import { CommissionModule } from './commission/commission.module';
@@ -47,12 +47,12 @@ const mongoUri = (() => {
     }
     return 'mongodb://localhost:27017/wayfindr';
   }
-  
+
   // Remove deprecated options from connection string
   // bufferMaxEntries is deprecated and not supported in newer MongoDB drivers
   uri = uri.replace(/[?&]bufferMaxEntries=[^&]*/gi, '');
   uri = uri.replace(/[?&]buffermaxentries=[^&]*/gi, '');
-  
+
   return uri;
 })();
 
@@ -161,10 +161,12 @@ const createRedisOptions = (): RedisOptions => {
           : tlsOptions),
         ...sharedOptions,
       } as RedisOptions;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const logger = new Logger('AppModule');
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.warn(
-        `Invalid Redis URL provided (${urlFromEnv}): ${error.message}. Falling back to host/port configuration.`,
+        `Invalid Redis URL provided (${urlFromEnv}): ${errorMessage}. Falling back to host/port configuration.`,
       );
     }
   }
@@ -231,6 +233,7 @@ const createRedisOptions = (): RedisOptions => {
     OutfitWeatherModule,
     CommissionModule,
     UpsellsModule,
+    VideoGenerationModule,
   ],
   controllers: [AppController],
   providers: [

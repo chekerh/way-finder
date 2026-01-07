@@ -49,7 +49,7 @@ export interface TravelPlanSuggestion {
 /**
  * AI Travel Video Service
  * Generates travel-themed videos from text prompts using AI models
- * 
+ *
  * Uses Replicate API with specialized travel video generation models
  * Enhances user prompts with travel-specific context for better results
  */
@@ -97,20 +97,57 @@ export class AiTravelVideoService {
 
   // Travel destination keywords for context detection
   private readonly travelKeywords = [
-    'beach', 'mountain', 'city', 'sunset', 'sunrise', 'ocean', 'forest',
-    'desert', 'island', 'temple', 'castle', 'village', 'countryside',
-    'lake', 'river', 'waterfall', 'canyon', 'safari', 'cruise',
-    'paris', 'tokyo', 'rome', 'dubai', 'bali', 'new york', 'london',
-    'maldives', 'santorini', 'venice', 'barcelona', 'amsterdam',
-    'hiking', 'camping', 'adventure', 'explore', 'journey', 'trip',
-    'vacation', 'holiday', 'travel', 'destination', 'wanderlust',
+    'beach',
+    'mountain',
+    'city',
+    'sunset',
+    'sunrise',
+    'ocean',
+    'forest',
+    'desert',
+    'island',
+    'temple',
+    'castle',
+    'village',
+    'countryside',
+    'lake',
+    'river',
+    'waterfall',
+    'canyon',
+    'safari',
+    'cruise',
+    'paris',
+    'tokyo',
+    'rome',
+    'dubai',
+    'bali',
+    'new york',
+    'london',
+    'maldives',
+    'santorini',
+    'venice',
+    'barcelona',
+    'amsterdam',
+    'hiking',
+    'camping',
+    'adventure',
+    'explore',
+    'journey',
+    'trip',
+    'vacation',
+    'holiday',
+    'travel',
+    'destination',
+    'wanderlust',
   ];
 
   constructor(private readonly httpService: HttpService) {
     this.replicateApiToken = process.env.REPLICATE_API_TOKEN;
 
     if (this.replicateApiToken) {
-      this.logger.log('✅ Replicate API configured for AI travel video generation');
+      this.logger.log(
+        '✅ Replicate API configured for AI travel video generation',
+      );
     } else {
       this.logger.warn(
         '⚠️ REPLICATE_API_TOKEN not set. AI travel video generation will not work.',
@@ -500,11 +537,18 @@ export class AiTravelVideoService {
       {
         id: 'romantic-paris',
         title: 'Romantic Week in Paris',
-        description: 'Experience the city of love with wine, art, and breathtaking views',
+        description:
+          'Experience the city of love with wine, art, and breathtaking views',
         destinations: ['Paris', 'Versailles', 'Giverny'],
         duration: '7 days',
-        activities: ['Eiffel Tower sunset', 'Louvre Museum', 'Seine River cruise', 'Montmartre walk'],
-        videoPrompt: 'Romantic couple walking through Paris streets at sunset, Eiffel Tower glowing, Seine River cruise under lights, French cafes and wine',
+        activities: [
+          'Eiffel Tower sunset',
+          'Louvre Museum',
+          'Seine River cruise',
+          'Montmartre walk',
+        ],
+        videoPrompt:
+          'Romantic couple walking through Paris streets at sunset, Eiffel Tower glowing, Seine River cruise under lights, French cafes and wine',
       },
       {
         id: 'adventure-bali',
@@ -512,8 +556,15 @@ export class AiTravelVideoService {
         description: 'Temples, rice terraces, and tropical beaches await',
         destinations: ['Ubud', 'Seminyak', 'Uluwatu', 'Nusa Penida'],
         duration: '10 days',
-        activities: ['Temple hopping', 'Rice terrace trekking', 'Surfing', 'Snorkeling', 'Spa day'],
-        videoPrompt: 'Drone over Bali rice terraces at sunrise, ancient temples with incense, crystal blue waters of Nusa Penida, tropical jungle waterfalls',
+        activities: [
+          'Temple hopping',
+          'Rice terrace trekking',
+          'Surfing',
+          'Snorkeling',
+          'Spa day',
+        ],
+        videoPrompt:
+          'Drone over Bali rice terraces at sunrise, ancient temples with incense, crystal blue waters of Nusa Penida, tropical jungle waterfalls',
       },
       {
         id: 'safari-africa',
@@ -521,8 +572,14 @@ export class AiTravelVideoService {
         description: 'Witness the Big Five in their natural habitat',
         destinations: ['Serengeti', 'Ngorongoro', 'Masai Mara'],
         duration: '12 days',
-        activities: ['Game drives', 'Hot air balloon', 'Masai village visit', 'Sunset sundowners'],
-        videoPrompt: 'African safari lions at golden hour, elephants crossing savanna, hot air balloon over Serengeti, spectacular African sunset',
+        activities: [
+          'Game drives',
+          'Hot air balloon',
+          'Masai village visit',
+          'Sunset sundowners',
+        ],
+        videoPrompt:
+          'African safari lions at golden hour, elephants crossing savanna, hot air balloon over Serengeti, spectacular African sunset',
       },
       {
         id: 'japan-culture',
@@ -530,17 +587,34 @@ export class AiTravelVideoService {
         description: 'Ancient traditions meet modern marvels',
         destinations: ['Tokyo', 'Kyoto', 'Osaka', 'Hakone'],
         duration: '14 days',
-        activities: ['Temple visits', 'Tea ceremony', 'Cherry blossom viewing', 'Mount Fuji'],
-        videoPrompt: 'Cherry blossoms falling in Japanese garden, ancient Kyoto temples, Mount Fuji at sunrise, Tokyo neon lights at night',
+        activities: [
+          'Temple visits',
+          'Tea ceremony',
+          'Cherry blossom viewing',
+          'Mount Fuji',
+        ],
+        videoPrompt:
+          'Cherry blossoms falling in Japanese garden, ancient Kyoto temples, Mount Fuji at sunrise, Tokyo neon lights at night',
       },
       {
         id: 'iceland-nature',
         title: 'Iceland Nature Wonders',
         description: 'Fire and ice landscapes like nowhere else',
-        destinations: ['Reykjavik', 'Golden Circle', 'South Coast', 'Snæfellsnes'],
+        destinations: [
+          'Reykjavik',
+          'Golden Circle',
+          'South Coast',
+          'Snæfellsnes',
+        ],
         duration: '8 days',
-        activities: ['Northern lights', 'Glacier hiking', 'Hot springs', 'Whale watching'],
-        videoPrompt: 'Northern lights dancing over Iceland glacier, dramatic waterfall with rainbow, geothermal hot springs steam, black sand beaches',
+        activities: [
+          'Northern lights',
+          'Glacier hiking',
+          'Hot springs',
+          'Whale watching',
+        ],
+        videoPrompt:
+          'Northern lights dancing over Iceland glacier, dramatic waterfall with rainbow, geothermal hot springs steam, black sand beaches',
       },
       {
         id: 'maldives-relaxation',
@@ -548,8 +622,14 @@ export class AiTravelVideoService {
         description: 'Crystal clear waters and overwater bungalows',
         destinations: ['Malé', 'Private Island Resort'],
         duration: '7 days',
-        activities: ['Snorkeling', 'Spa treatments', 'Sunset dolphin cruise', 'Underwater dining'],
-        videoPrompt: 'Crystal clear turquoise Maldives water, overwater bungalow at sunset, tropical fish swimming, romantic beach dinner under stars',
+        activities: [
+          'Snorkeling',
+          'Spa treatments',
+          'Sunset dolphin cruise',
+          'Underwater dining',
+        ],
+        videoPrompt:
+          'Crystal clear turquoise Maldives water, overwater bungalow at sunset, tropical fish swimming, romantic beach dinner under stars',
       },
     ];
 
@@ -557,16 +637,24 @@ export class AiTravelVideoService {
     if (preferences?.tripType) {
       const tripType = preferences.tripType.toLowerCase();
       if (tripType === 'romantic') {
-        return plans.filter(p => p.id.includes('romantic') || p.id.includes('maldives'));
+        return plans.filter(
+          (p) => p.id.includes('romantic') || p.id.includes('maldives'),
+        );
       }
       if (tripType === 'adventure') {
-        return plans.filter(p => p.id.includes('adventure') || p.id.includes('iceland'));
+        return plans.filter(
+          (p) => p.id.includes('adventure') || p.id.includes('iceland'),
+        );
       }
       if (tripType === 'cultural') {
-        return plans.filter(p => p.id.includes('culture') || p.id.includes('paris'));
+        return plans.filter(
+          (p) => p.id.includes('culture') || p.id.includes('paris'),
+        );
       }
       if (tripType === 'relaxation') {
-        return plans.filter(p => p.id.includes('maldives') || p.id.includes('bali'));
+        return plans.filter(
+          (p) => p.id.includes('maldives') || p.id.includes('bali'),
+        );
       }
     }
 
@@ -643,7 +731,8 @@ export class AiTravelVideoService {
           this.httpService.post(
             `${this.replicateApiUrl}/predictions`,
             {
-              version: 'dc6b8e5e60a8738aa0dd71e62b80b1aba1c72ab6a9d4e595e73d05ef7b0e01f3', // img2vid-xt
+              version:
+                'dc6b8e5e60a8738aa0dd71e62b80b1aba1c72ab6a9d4e595e73d05ef7b0e01f3', // img2vid-xt
               input: {
                 image: images[0],
                 motion_bucket_id: 127,
@@ -692,4 +781,3 @@ export class AiTravelVideoService {
     };
   }
 }
-

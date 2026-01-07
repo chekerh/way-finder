@@ -6,11 +6,12 @@ import { CommissionSchema } from './commission.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: 'Commission', schema: CommissionSchema }]),
+    MongooseModule.forFeature([
+      { name: 'Commission', schema: CommissionSchema },
+    ]),
   ],
   providers: [CommissionService],
   controllers: [CommissionController],
   exports: [CommissionService],
 })
 export class CommissionModule {}
-

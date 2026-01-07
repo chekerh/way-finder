@@ -1,0 +1,11 @@
+[**WayFinder Backend API Documentation v0.0.1**](../../README.md)
+
+***
+
+[WayFinder Backend API Documentation](../../README.md) / recommendations/recommendations.service
+
+# recommendations/recommendations.service
+
+## Classes
+
+- [RecommendationsService](classes/RecommendationsService.md)

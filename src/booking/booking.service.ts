@@ -188,19 +188,19 @@ export class BookingService {
 
     const confirmation_number = `CONF-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
     const total_price = dto.total_price ?? 0;
-    
+
     // Calculate commission breakdown
     let flightCommission = 0;
     let accommodationCommission = 0;
     let upsellCommission = 0;
-    
+
     // Calculate flight commission (assume base price is flight price)
     const flightCalculation = this.commissionService.calculateCommission(
       total_price * 0.7, // Estimate 70% is flight, adjust based on your pricing
       'flight',
     );
     flightCommission = flightCalculation.commissionAmount;
-    
+
     // Calculate accommodation commission if present
     if (dto.accommodation) {
       const accCalculation = this.commissionService.calculateCommission(
@@ -209,7 +209,7 @@ export class BookingService {
       );
       accommodationCommission = accCalculation.commissionAmount;
     }
-    
+
     // Calculate upsell commissions
     if (dto.upsells && dto.upsells.length > 0) {
       upsellCommission = dto.upsells.reduce(
@@ -217,9 +217,10 @@ export class BookingService {
         0,
       );
     }
-    
-    const totalCommission = flightCommission + accommodationCommission + upsellCommission;
-    
+
+    const totalCommission =
+      flightCommission + accommodationCommission + upsellCommission;
+
     const booking = new this.bookingModel({
       user_id: this.toObjectId(userId, 'user id'),
       offer_id: dto.offer_id,
@@ -239,7 +240,7 @@ export class BookingService {
       },
     });
     const savedBooking = await booking.save();
-    
+
     // Create commission records
     try {
       const commissionItems: Array<{
@@ -250,7 +251,7 @@ export class BookingService {
         currency: string;
         category?: string;
       }> = [];
-      
+
       // Flight commission
       commissionItems.push({
         type: 'flight' as const,
@@ -259,7 +260,7 @@ export class BookingService {
         basePrice: total_price * 0.7,
         currency: 'EUR',
       });
-      
+
       // Accommodation commission
       if (dto.accommodation) {
         commissionItems.push({
@@ -270,7 +271,7 @@ export class BookingService {
           currency: dto.accommodation.currency,
         });
       }
-      
+
       // Upsell commissions
       if (dto.upsells && dto.upsells.length > 0) {
         dto.upsells.forEach((upsell) => {
@@ -284,15 +285,17 @@ export class BookingService {
           });
         });
       }
-      
+
       await this.commissionService.createCommissions(
         savedBooking._id.toString(),
         userId,
         commissionItems,
       );
-      
+
       // Confirm commissions
-      await this.commissionService.confirmCommissions(savedBooking._id.toString());
+      await this.commissionService.confirmCommissions(
+        savedBooking._id.toString(),
+      );
     } catch (error) {
       this.logger.warn(`Failed to create commissions: ${error.message}`);
       // Don't fail booking if commission creation fails
@@ -633,9 +636,7 @@ export class BookingService {
 
     // Check if booking is cancelled
     if (booking.status !== BookingStatus.CANCELLED) {
-      throw new BadRequestException(
-        'Only cancelled bookings can be rebooked',
-      );
+      throw new BadRequestException('Only cancelled bookings can be rebooked');
     }
 
     const destinationName =

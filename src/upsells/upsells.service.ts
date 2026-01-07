@@ -35,19 +35,28 @@ export class UpsellsService {
         category: 'travel_insurance',
         commissionRate: 18.0,
         recommended: true,
-        features: ['Annulation', 'Bagages', 'Assistance médicale', 'Rapatriement'],
+        features: [
+          'Annulation',
+          'Bagages',
+          'Assistance médicale',
+          'Rapatriement',
+        ],
       },
       {
         id: 'airport_transfer_1',
         name: 'Transfert Aéroport',
         description:
-          'Transfert privé aller-retour entre l\'aéroport et votre hôtel',
+          "Transfert privé aller-retour entre l'aéroport et votre hôtel",
         price: 45.0,
         currency: 'EUR',
         category: 'airport_transfer',
         commissionRate: 12.0,
         recommended: false,
-        features: ['Aller-retour', 'Conducteur professionnel', 'Suivi en temps réel'],
+        features: [
+          'Aller-retour',
+          'Conducteur professionnel',
+          'Suivi en temps réel',
+        ],
       },
       {
         id: 'car_rental_1',
@@ -69,7 +78,12 @@ export class UpsellsService {
         category: 'lounge_access',
         commissionRate: 25.0,
         recommended: true,
-        features: ['Repas inclus', 'Boissons illimitées', 'WiFi gratuit', 'Confort'],
+        features: [
+          'Repas inclus',
+          'Boissons illimitées',
+          'WiFi gratuit',
+          'Confort',
+        ],
       },
       {
         id: 'wifi_data_1',
@@ -80,20 +94,25 @@ export class UpsellsService {
         category: 'wifi_data',
         commissionRate: 35.0,
         recommended: true,
-        features: ['10GB de données', '50+ pays', 'Vitesse 4G/5G', 'Valable 30 jours'],
+        features: [
+          '10GB de données',
+          '50+ pays',
+          'Vitesse 4G/5G',
+          'Valable 30 jours',
+        ],
       },
       {
         id: 'seat_selection_1',
         name: 'Sélection de Siège',
-        description: 'Choisissez votre siège à l\'avance (fenêtre, couloir, ou siège premium)',
+        description:
+          "Choisissez votre siège à l'avance (fenêtre, couloir, ou siège premium)",
         price: 15.0,
         currency: 'EUR',
         category: 'seat_selection',
         commissionRate: 8.0,
         recommended: false,
-        features: ['Choix du siège', 'Réservation à l\'avance', 'Plus d\'espace'],
+        features: ['Choix du siège', "Réservation à l'avance", "Plus d'espace"],
       },
     ];
   }
 }
-

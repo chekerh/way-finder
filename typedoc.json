@@ -1,0 +1,79 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/main.ts",
+    "src/app.module.ts",
+    "src/**/*.controller.ts",
+    "src/**/*.service.ts",
+    "src/**/*.module.ts",
+    "src/**/*.dto.ts",
+    "src/**/*.interface.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs",
+  "name": "WayFinder Backend API Documentation",
+  "includeVersion": true,
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/test/**",
+    "**/*.entity.ts"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "excludeInternal": false,
+  "hideGenerator": true,
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Controllers",
+    "Services",
+    "Modules",
+    "DTOs",
+    "Interfaces"
+  ],
+  "defaultCategory": "Other",
+  "readme": "none",
+  "plugin": ["typedoc-plugin-markdown"],
+  "theme": "markdown",
+  "sort": ["source-order", "visibility"],
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "validation": {
+    "notExported": false,
+    "invalidLink": false,
+    "notDocumented": false
+  },
+  "blockTags": [
+    "@query",
+    "@body",
+    "@param",
+    "@returns",
+    "@throws",
+    "@example",
+    "@minimum",
+    "@maximum",
+    "@default",
+    "@deprecated",
+    "@since",
+    "@see",
+    "@link"
+  ],
+  "inlineTags": [
+    "@link",
+    "@linkplain"
+  ],
+  "modifierTags": [
+    "@public",
+    "@private",
+    "@protected",
+    "@readonly",
+    "@package"
+  ],
+  "skipErrorChecking": true,
+  "treatWarningsAsErrors": false
+}

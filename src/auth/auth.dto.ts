@@ -85,3 +85,24 @@ export class SendOTPForRegistrationDto {
   @IsNotEmpty()
   email: string;
 }
+
+export class RequestPasswordResetDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  code: string; // OTP code for password reset
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  new_password: string;
+}

@@ -126,7 +126,11 @@ export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.pre('save', function (next) {
   // If google_id is null, undefined, or empty string, set it to undefined
   // This ensures the field is truly omitted from the document, not stored as null
-  if (this.google_id === null || this.google_id === undefined || this.google_id === '') {
+  if (
+    this.google_id === null ||
+    this.google_id === undefined ||
+    this.google_id === ''
+  ) {
     this.google_id = undefined;
   }
   next();

@@ -169,4 +169,3 @@ export class CommissionService {
     return this.commissionModel.find(query).exec();
   }
 }
-

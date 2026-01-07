@@ -140,7 +140,7 @@ export class CatalogController {
     @Query('currency') currency?: string,
   ) {
     const ids = hotelIds?.split(',').map((id) => id.trim()) || [];
-    
+
     return this.hotelsService.getHotelOffers(
       ids,
       checkInDate || this.getDefaultCheckInDate(),
@@ -158,15 +158,18 @@ export class CatalogController {
   @Get('hotels/:hotelId')
   async getHotelById(@Param('hotelId') hotelId: string) {
     const hotel = await this.hotelsService.getHotelById(hotelId);
-    
+
     if (!hotel) {
       return { error: 'Hotel not found', hotelId };
     }
 
     // Enrich with images from free APIs
     const cityCode = hotel.cityCode || 'PAR';
-    const enrichedHotel = await this.hotelsService.enrichWithImages(hotel, cityCode);
-    
+    const enrichedHotel = await this.hotelsService.enrichWithImages(
+      hotel,
+      cityCode,
+    );
+
     // Get reviews (placeholder for future integration)
     const reviews: any[] = [];
 
@@ -244,7 +247,7 @@ export class CatalogController {
       health,
       circuitStatus,
       cacheStats,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
