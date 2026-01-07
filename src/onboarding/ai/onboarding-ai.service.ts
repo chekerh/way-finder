@@ -109,6 +109,8 @@ SMART BUDGET INFERENCE - DO NOT ASK ABOUT BUDGET DIRECTLY:
 GUIDELINES FOR MAXIMUM VALUE:
 - Each question should reveal MULTIPLE insights about the user
 - Use multiple_choice when possible to gather more data per question (preferred for activities, interests, destinations)
+- CRITICAL: Always provide AT LEAST 4-8 options for multiple_choice questions and 4-6 options for single_choice questions
+- NEVER generate a question with only 1 option - always provide multiple choices
 - Make questions comprehensive but not overwhelming (4-8 options for multiple_choice, 4-6 for single_choice)
 - Ask questions that help predict: destinations they'll love, activities they'll enjoy, when they'll travel, who they travel with
 - Build on previous answers to create a cohesive profile
@@ -133,10 +135,17 @@ Return a JSON object with this structure:
   "id": "unique_question_id",
   "type": "single_choice" | "multiple_choice" | "text",
   "text": "Your strategic question here",
-  "options": [{"value": "option1", "label": "Display Label 1"}, ...],
+  "options": [{"value": "option1", "label": "Display Label 1"}, {"value": "option2", "label": "Display Label 2"}, ...],
   "required": true,
   "min_selections": 1 (if multiple_choice),
-  "max_selections": 5 (if multiple_choice - allow more selections to gather more data)
+  "max_selections": 8 (if multiple_choice - allow more selections to gather more data)
+}
+
+CRITICAL REQUIREMENTS:
+- For single_choice: Provide AT LEAST 4-6 options
+- For multiple_choice: Provide AT LEAST 6-8 options to give users comprehensive choices
+- NEVER return a question with only 1 option - this will cause the system to reject it
+- Each option must have both "value" (lowercase, underscore-separated) and "label" (user-friendly display text)
 }`;
 
     const userPrompt = `Here's what the user has told us so far (Question ${session.questions_answered.length + 1} of 5):
@@ -183,9 +192,12 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     if (
       (question.type === 'single_choice' ||
         question.type === 'multiple_choice') &&
-      (!question.options || question.options.length === 0)
+      (!question.options || question.options.length < 2)
     ) {
-      throw new Error('Choice questions must have options');
+      this.logger.warn(
+        `AI generated question with insufficient options (${question.options?.length || 0}), will use fallback`,
+      );
+      return null; // Return null to trigger fallback
     }
 
     return question;
@@ -394,16 +406,30 @@ Remember: We only have ${5 - session.questions_answered.length} questions left. 
     if (normalizedQuestion.type === 'multiple_choice') {
       const options =
         normalizedQuestion.options?.filter((opt) => !!opt?.label) ?? [];
-      normalizedQuestion.options = options.slice(0, 6);
+      // Don't limit options - show all of them to give users full choice
+      normalizedQuestion.options = options;
       if (!normalizedQuestion.min_selections) {
         normalizedQuestion.min_selections = 1;
       }
       if (!normalizedQuestion.max_selections) {
         normalizedQuestion.max_selections = Math.min(
-          5,
-          normalizedQuestion.options.length || 5,
+          8, // Allow up to 8 selections for comprehensive data gathering
+          normalizedQuestion.options.length || 8,
         );
       }
+    }
+    
+    // Validate that choice questions have at least 2 options
+    if (
+      (normalizedQuestion.type === 'single_choice' ||
+        normalizedQuestion.type === 'multiple_choice') &&
+      (!normalizedQuestion.options ||
+        normalizedQuestion.options.length < 2)
+    ) {
+      this.logger.warn(
+        `Question ${normalizedQuestion.id} has insufficient options (${normalizedQuestion.options?.length || 0}), using fallback`,
+      );
+      return null; // This will trigger fallback question generation
     }
 
     return normalizedQuestion;
