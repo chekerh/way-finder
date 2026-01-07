@@ -326,7 +326,14 @@ export class HotelsService {
       // Enrich hotels with images from free APIs (Pixabay/Unsplash)
       this.logger.debug(`Enriching ${mappedHotels.length} hotels with images`);
       mappedHotels = await Promise.all(
-        mappedHotels.map((hotel) => this.enrichWithImages(hotel, cityCode)),
+        mappedHotels.map((hotel) =>
+          this.enrichWithImages(
+            hotel,
+            cityCode,
+            params.tripType,
+            params.accommodationType,
+          ),
+        ),
       );
 
       const result: HotelSearchResponse = {
@@ -429,8 +436,14 @@ export class HotelsService {
 
   /**
    * Enrich hotel with images from free APIs (Pixabay, Unsplash)
+   * Uses trip type and accommodation type to generate appropriate image keywords
    */
-  async enrichWithImages(hotel: Hotel, cityCode: string): Promise<Hotel> {
+  async enrichWithImages(
+    hotel: Hotel,
+    cityCode: string,
+    tripType?: TripType,
+    accommodationType?: string,
+  ): Promise<Hotel> {
     // If hotel already has media, keep it
     if (hotel.media && hotel.media.length > 0) {
       return hotel;
@@ -438,7 +451,16 @@ export class HotelsService {
 
     try {
       const cityName = hotel.address?.cityName || cityCode;
-      const searchQuery = `${hotel.name} ${cityName} hotel`.trim();
+      
+      // Generate appropriate image keywords based on trip type and accommodation type
+      const imageKeywords = this.getImageKeywords(
+        tripType,
+        accommodationType,
+        cityName,
+        hotel.name,
+      );
+      
+      const searchQuery = `${hotel.name} ${cityName} ${imageKeywords}`.trim();
 
       // Try Pixabay first if API key is available
       if (this.pixabayKey) {
@@ -476,14 +498,14 @@ export class HotelsService {
 
       // Fallback to Unsplash Source API (no API key needed)
       // Use direct image URLs based on search terms
-      const imageKeywords = `${cityName} hotel luxury`.replace(/\s+/g, ',');
+      const unsplashKeywords = `${cityName} ${imageKeywords}`.replace(/\s+/g, ',');
       hotel.media = [
         {
-          uri: `https://source.unsplash.com/800x600/?${imageKeywords}`,
+          uri: `https://source.unsplash.com/800x600/?${unsplashKeywords}`,
           category: 'EXTERIOR',
         },
         {
-          uri: `https://source.unsplash.com/800x600/?hotel,room,${cityName.replace(/\s+/g, ',')}`,
+          uri: `https://source.unsplash.com/800x600/?${imageKeywords},room,${cityName.replace(/\s+/g, ',')}`,
           category: 'INTERIOR',
         },
       ];
@@ -491,18 +513,63 @@ export class HotelsService {
       return hotel;
     } catch (error) {
       this.logger.warn('Failed to enrich hotel with images', error);
-      // Return hotel with default image
+      // Return hotel with default image using appropriate keywords
       if (!hotel.media || hotel.media.length === 0) {
         const cityName = hotel.address?.cityName || 'hotel';
+        const imageKeywords = this.getImageKeywords(
+          tripType,
+          accommodationType,
+          cityName,
+          hotel.name,
+        );
+        const fallbackKeywords = `${imageKeywords},${cityName}`.replace(/\s+/g, ',');
         hotel.media = [
           {
-            uri: `https://source.unsplash.com/800x600/?hotel,${cityName.replace(/\s+/g, ',')}`,
+            uri: `https://source.unsplash.com/800x600/?${fallbackKeywords}`,
             category: 'EXTERIOR',
           },
         ];
       }
       return hotel;
     }
+  }
+
+  /**
+   * Get appropriate image keywords based on trip type and accommodation type
+   */
+  private getImageKeywords(
+    tripType?: TripType,
+    accommodationType?: string,
+    cityName?: string,
+    hotelName?: string,
+  ): string {
+    // Priority: trip type > accommodation type > default
+    if (tripType) {
+      const tripTypeKeywords: Record<TripType, string> = {
+        adventure: 'eco lodge mountain cabin hiking nature outdoor adventure accommodation',
+        business: 'business hotel conference hotel modern hotel corporate hotel',
+        honeymoon: 'romantic hotel boutique hotel luxury hotel spa resort',
+        family: 'family hotel family resort kids friendly hotel',
+        leisure: 'hotel resort vacation',
+        solo: 'hostel budget hotel backpacker accommodation',
+        wellness: 'spa resort wellness hotel yoga retreat',
+        backpacking: 'hostel backpacker accommodation budget accommodation',
+      };
+      return tripTypeKeywords[tripType] || 'hotel';
+    }
+
+    if (accommodationType) {
+      const accTypeKeywords: Record<string, string> = {
+        hotel: 'hotel',
+        airbnb: 'apartment airbnb',
+        hostel: 'hostel backpacker',
+        resort: 'resort luxury',
+        apartment: 'apartment',
+      };
+      return accTypeKeywords[accommodationType.toLowerCase()] || 'hotel';
+    }
+
+    return 'hotel';
   }
 
   /**
@@ -638,52 +705,166 @@ export class HotelsService {
 
   /**
    * Filter hotels by trip type
-   * Made less strict to avoid filtering out all hotels
+   * Filters accommodations to show appropriate types for each trip type
    */
   private filterByTripType(hotels: Hotel[], tripType: TripType): Hotel[] {
     const filters: Record<TripType, (h: Hotel) => boolean> = {
       business: (h) => {
-        // Less strict: rating >= 3 OR has business amenities OR has wifi
+        const hotelName = (h.name || '').toLowerCase();
+        const hotelDesc = (h.description || '').toLowerCase();
+        const hotelType = ((h as any).type || '').toUpperCase();
+        const amenities = (h.amenities || []).map((a: string) => a.toUpperCase());
+        
+        // Business hotels: business center, meeting rooms, conference facilities
         return (
-          (h.rating || 0) >= 3 ||
-          h.amenities?.some((a) =>
-            ['BUSINESS_CENTER', 'WIFI', 'MEETING_ROOMS'].includes(a),
+          hotelName.includes('business') ||
+          hotelName.includes('conference') ||
+          hotelName.includes('executive') ||
+          hotelName.includes('corporate') ||
+          hotelDesc.includes('business') ||
+          hotelDesc.includes('conference') ||
+          amenities.some((a: string) =>
+            ['BUSINESS_CENTER', 'MEETING_ROOMS', 'CONFERENCE', 'WIFI'].includes(a),
           ) ||
-          h.amenities?.some((a) => a.includes('WIFI')) ||
-          !h.rating
-        ); // Include hotels without rating
+          amenities.some((a: string) => a.includes('BUSINESS')) ||
+          amenities.some((a: string) => a.includes('MEETING')) ||
+          (h.rating || 0) >= 3.5 // Higher-rated hotels more likely to have business facilities
+        );
       },
       honeymoon: (h) => {
-        // Less strict: rating >= 3 OR has romantic amenities OR no rating
+        const hotelName = (h.name || '').toLowerCase();
+        const hotelDesc = (h.description || '').toLowerCase();
+        const hotelType = ((h as any).type || '').toUpperCase();
+        const amenities = (h.amenities || []).map((a: string) => a.toUpperCase());
+        
+        // Romantic/boutique hotels: spa, pool, luxury, boutique
         return (
-          (h.rating || 0) >= 3 ||
-          h.amenities?.some((a) => ['SPA', 'POOL', 'RESTAURANT'].includes(a)) ||
-          !h.rating
+          hotelName.includes('boutique') ||
+          hotelName.includes('romantic') ||
+          hotelName.includes('luxury') ||
+          hotelName.includes('spa') ||
+          hotelDesc.includes('romantic') ||
+          hotelDesc.includes('boutique') ||
+          hotelDesc.includes('luxury') ||
+          hotelType === 'RESORT' ||
+          amenities.some((a: string) =>
+            ['SPA', 'POOL', 'RESTAURANT', 'ROMANTIC'].includes(a),
+          ) ||
+          (h.rating || 0) >= 4.0 // Higher-rated for romantic getaways
         );
       },
       family: (h) => {
-        // Include all hotels
+        const hotelName = (h.name || '').toLowerCase();
+        const hotelDesc = (h.description || '').toLowerCase();
+        const amenities = (h.amenities || []).map((a: string) => a.toUpperCase());
+        
+        // Family-friendly hotels: family rooms, playground, kids activities
+        return (
+          hotelName.includes('family') ||
+          hotelName.includes('kids') ||
+          hotelName.includes('children') ||
+          hotelDesc.includes('family') ||
+          hotelDesc.includes('kids') ||
+          amenities.some((a: string) =>
+            ['FAMILY_ROOMS', 'PLAYGROUND', 'KIDS_CLUB', 'POOL'].includes(a),
+          ) ||
+          amenities.some((a: string) => a.includes('FAMILY')) ||
+          amenities.some((a: string) => a.includes('KIDS')) ||
+          true // Include all hotels for family (most hotels are family-friendly)
+        );
+      },
+      adventure: (h) => {
+        const hotelName = (h.name || '').toLowerCase();
+        const hotelDesc = (h.description || '').toLowerCase();
+        const hotelType = ((h as any).type || '').toUpperCase();
+        const amenities = (h.amenities || []).map((a: string) => a.toUpperCase());
+        
+        // Adventure: eco-lodges, hostels, nature-focused, hiking-friendly
+        return (
+          hotelName.includes('eco') ||
+          hotelName.includes('lodge') ||
+          hotelName.includes('mountain') ||
+          hotelName.includes('hiking') ||
+          hotelName.includes('adventure') ||
+          hotelName.includes('outdoor') ||
+          hotelName.includes('nature') ||
+          hotelName.includes('hostel') ||
+          hotelName.includes('backpacker') ||
+          hotelDesc.includes('eco') ||
+          hotelDesc.includes('lodge') ||
+          hotelDesc.includes('mountain') ||
+          hotelDesc.includes('hiking') ||
+          hotelDesc.includes('adventure') ||
+          hotelDesc.includes('outdoor') ||
+          hotelDesc.includes('nature') ||
+          hotelType === 'HOSTEL' ||
+          amenities.some((a: string) =>
+            ['BIKE_RENTAL', 'GUIDED_TOURS', 'OUTDOOR_ACTIVITIES', 'HIKING'].includes(a),
+          ) ||
+          amenities.some((a: string) => a.includes('BIKE')) ||
+          amenities.some((a: string) => a.includes('TOUR')) ||
+          (h.rating || 0) <= 4.5 // Adventure accommodations are often more rustic
+        );
+      },
+      leisure: (h) => {
+        // Leisure: all types of accommodations
         return true;
       },
-      adventure: (h) => true, // All hotels
-      leisure: (h) => true, // All hotels
       solo: (h) => {
-        // Less strict: rating >= 2.5 or no rating
-        return (h.rating || 0) >= 2.5 || !h.rating;
-      },
-      wellness: (h) => {
-        // Less strict: has wellness amenities OR rating >= 3 OR no rating
+        const hotelName = (h.name || '').toLowerCase();
+        const hotelType = ((h as any).type || '').toUpperCase();
+        
+        // Solo: hostels, budget hotels, apartments (budget-friendly)
         return (
-          h.amenities?.some((a) =>
-            ['SPA', 'GYM', 'POOL', 'SAUNA'].includes(a),
-          ) ||
-          (h.rating || 0) >= 3 ||
+          hotelType === 'HOSTEL' ||
+          hotelType === 'APARTMENT' ||
+          hotelName.includes('hostel') ||
+          hotelName.includes('budget') ||
+          (h.rating || 0) <= 4.0 || // Budget-friendly options
           !h.rating
         );
       },
+      wellness: (h) => {
+        const hotelName = (h.name || '').toLowerCase();
+        const hotelDesc = (h.description || '').toLowerCase();
+        const amenities = (h.amenities || []).map((a: string) => a.toUpperCase());
+        
+        // Wellness: spa, gym, pool, sauna, wellness center
+        return (
+          hotelName.includes('spa') ||
+          hotelName.includes('wellness') ||
+          hotelName.includes('yoga') ||
+          hotelName.includes('meditation') ||
+          hotelDesc.includes('spa') ||
+          hotelDesc.includes('wellness') ||
+          hotelDesc.includes('yoga') ||
+          amenities.some((a: string) =>
+            ['SPA', 'GYM', 'POOL', 'SAUNA', 'WELLNESS_CENTER', 'FITNESS'].includes(a),
+          ) ||
+          amenities.some((a: string) => a.includes('SPA')) ||
+          amenities.some((a: string) => a.includes('WELLNESS')) ||
+          (h.rating || 0) >= 3.5
+        );
+      },
       backpacking: (h) => {
-        // Less strict: rating <= 4 OR no rating (more budget options)
-        return (h.rating || 0) <= 4 || !h.rating;
+        const hotelName = (h.name || '').toLowerCase();
+        const hotelType = ((h as any).type || '').toUpperCase();
+        const amenities = (h.amenities || []).map((a: string) => a.toUpperCase());
+        
+        // Backpacking: hostels, budget hotels, shared accommodations
+        return (
+          hotelType === 'HOSTEL' ||
+          hotelName.includes('hostel') ||
+          hotelName.includes('backpacker') ||
+          hotelName.includes('budget') ||
+          hotelName.includes('youth') ||
+          hotelName.includes('dormitory') ||
+          amenities.some((a: string) =>
+            ['SHARED_KITCHEN', 'DORMITORY', 'COMMON_ROOM'].includes(a),
+          ) ||
+          (h.rating || 0) <= 4.0 || // Budget options
+          !h.rating
+        );
       },
     };
 
