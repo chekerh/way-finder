@@ -103,11 +103,17 @@ export class CatalogService {
 
     // If a specific destination is requested, use it
     if (overrides.destinationLocationCode) {
+      const departureDate = overrides.departureDate ?? this.generateDateString(14);
+      const returnDate = overrides.returnDate ?? this.generateDateString(21);
+      this.logger.debug(
+        `Searching flights with dates: departure=${departureDate}, return=${returnDate}`,
+      );
+      
       const search: FlightSearchDto = {
         originLocationCode: origin,
         destinationLocationCode: overrides.destinationLocationCode,
-        departureDate: overrides.departureDate ?? this.generateDateString(14),
-        returnDate: overrides.returnDate ?? this.generateDateString(21),
+        departureDate,
+        returnDate,
         travelClass:
           overrides.travelClass ?? this.mapTravelClass(preferences.travel_type),
         adults: overrides.adults ?? 1,
@@ -421,7 +427,15 @@ export class CatalogService {
 
   private generateDateString(offsetDays: number): string {
     const date = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
-    return date.toISOString().split('T')[0];
+    const dateString = date.toISOString().split('T')[0];
+    // Log to ensure we're using current year (for debugging)
+    const currentYear = new Date().getFullYear();
+    if (!dateString.startsWith(currentYear.toString())) {
+      this.logger.warn(
+        `Generated date ${dateString} does not match current year ${currentYear}`,
+      );
+    }
+    return dateString;
   }
 
   private mapTravelClass(travelType?: string) {
